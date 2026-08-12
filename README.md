@@ -2,6 +2,10 @@
 
 **Serial Lab** is a high-performance, native macOS serial port debugging tool built specifically for developers and hardware engineers. It combines the blazing-fast execution of a **Rust** backend with the fluid, modern interface of **Vue 3 + Tauri v2**.
 
+<p align="center">
+  <img src="./ScreenShot_1.png" alt="Serial Lab Screenshot" width="800"/>
+</p>
+
 ## ✨ Features
 - **Native macOS Experience:** Beautiful dark mode interface, borderless immersive window, and tailored visual aesthetics.
 - **High-Performance Terminal:** Engineered to handle massive hardware data throughput using a memory-safe virtual scrolling engine.
