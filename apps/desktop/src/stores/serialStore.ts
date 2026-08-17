@@ -1,0 +1,290 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import {
+  listPorts,
+  openPort,
+  closePort,
+  writePort,
+  setDtr,
+  setRts,
+  stopRecording,
+} from '../api/serialApi'
+import type {
+  SerialPortDescriptor,
+  SerialOpenConfig,
+  TerminalLogLine,
+  IoChunk,
+} from '../types/serial'
+
+export const useSerialStore = defineStore('serial', () => {
+  const ports = ref<SerialPortDescriptor[]>([])
+  const loading = ref(false)
+  const errorMsg = ref('')
+
+  const selectedPort = ref('')
+  const connectedPort = ref<string | null>(null)
+  const logs = ref<TerminalLogLine[]>([])
+  const rxBytes = ref(0)
+  const txBytes = ref(0)
+
+  const dtrState = ref(false)
+  const rtsState = ref(false)
+  const isRecording = ref(false)
+
+  const config = ref<SerialOpenConfig>({
+    path: '',
+    baudRate: 115200,
+    dataBits: 'eight',
+    stopBits: 'one',
+    parity: 'none',
+    flowControl: 'none',
+  })
+
+  // Decoder & buffer
+  const decoder = new TextDecoder()
+  let lineBuffer = ''
+  const lineListeners = new Map<string, (line: string) => void>()
+
+  function registerLineListener(id: string, listener: (line: string) => void) {
+    lineListeners.set(id, listener)
+  }
+
+  function unregisterLineListener(id: string) {
+    lineListeners.delete(id)
+  }
+
+  function getTimeString(): string {
+    const d = new Date()
+    return `${d.getHours().toString().padStart(2, '0')}:${d
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d
+      .getMilliseconds()
+      .toString()
+      .padStart(3, '0')}`
+  }
+
+  function parseLogLevel(text: string): 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'RAW' {
+    if (text.includes('[ERROR]') || text.includes('DBGE') || text.includes('Error:')) {
+      return 'ERROR'
+    }
+    if (text.includes('[WARN]') || text.includes('DBGW') || text.includes('Warning')) {
+      return 'WARN'
+    }
+    if (text.includes('[INFO]') || text.includes('DBGI')) {
+      return 'INFO'
+    }
+    if (text.includes('[DEBUG]') || text.includes('DBG')) {
+      return 'DEBUG'
+    }
+    return 'RAW'
+  }
+
+  function appendLog(direction: 'rx' | 'tx', text: string) {
+    const timeStr = getTimeString()
+    const logItem: TerminalLogLine = {
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      direction,
+      text,
+      timestamp: timeStr,
+      level: parseLogLevel(text),
+    }
+
+    logs.value.push(logItem)
+    if (logs.value.length > 5000) {
+      logs.value.splice(0, logs.value.length - 5000)
+    }
+  }
+
+  async function refreshPorts() {
+    loading.value = true
+    errorMsg.value = ''
+    try {
+      ports.value = await listPorts()
+      if (ports.value.length > 0 && !selectedPort.value) {
+        selectedPort.value = ports.value[0].portName
+      } else if (ports.value.length === 0) {
+        selectedPort.value = ''
+      }
+    } catch (err: any) {
+      errorMsg.value = `扫描串口失败: ${String(err)}`
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function connect(portName?: string) {
+    const target = portName || selectedPort.value
+    if (!target) return
+
+    errorMsg.value = ''
+    loading.value = true
+    try {
+      config.value.path = target
+      await openPort(
+        {
+          path: target,
+          baudRate: config.value.baudRate,
+          dataBits: config.value.dataBits,
+          stopBits: config.value.stopBits,
+          parity: config.value.parity,
+          flowControl: config.value.flowControl,
+        },
+        (chunks: IoChunk[]) => {
+          let chunkText = ''
+          for (const chunk of chunks) {
+            rxBytes.value += chunk.payload.length
+            const text = decoder.decode(new Uint8Array(chunk.payload), { stream: true })
+            if (text) {
+              chunkText += text
+            }
+          }
+
+          if (chunkText) {
+            lineBuffer += chunkText
+            const lines = lineBuffer.split('\n')
+            if (lines.length > 1) {
+              lineBuffer = lines.pop() || ''
+              for (const line of lines) {
+                const trimmed = line.trim()
+                if (trimmed) {
+                  appendLog('rx', trimmed)
+                  // Broadcast to registered component listeners
+                  for (const listener of lineListeners.values()) {
+                    try {
+                      listener(trimmed)
+                    } catch (e) {
+                      console.error('Line listener error:', e)
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      )
+      connectedPort.value = target
+      logs.value = []
+      lineBuffer = ''
+      rxBytes.value = 0
+      txBytes.value = 0
+      appendLog('rx', `=== 已成功打开串口 ${target} (波特率: ${config.value.baudRate} 8N1) ===`)
+    } catch (err: any) {
+      errorMsg.value = `打开串口失败: ${String(err)}`
+      connectedPort.value = null
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function disconnect() {
+    if (!connectedPort.value) return
+    errorMsg.value = ''
+    try {
+      if (isRecording.value) {
+        await stopRecording(connectedPort.value)
+        isRecording.value = false
+      }
+      await closePort(connectedPort.value)
+      appendLog('rx', `=== 已关闭串口 ${connectedPort.value} ===`)
+      connectedPort.value = null
+    } catch (err: any) {
+      errorMsg.value = `关闭串口失败: ${String(err)}`
+    }
+  }
+
+  async function toggleConnection() {
+    if (connectedPort.value) {
+      await disconnect()
+    } else {
+      await connect()
+    }
+  }
+
+  async function sendRaw(
+    text: string,
+    options: { isHex?: boolean; addCR?: boolean; addLF?: boolean; exactBytes?: boolean } = {}
+  ): Promise<void> {
+    if (!connectedPort.value || !text) return
+
+    let payload: number[] = []
+    let echoText = text
+
+    if (options.isHex) {
+      const hexStr = text.replace(/\s/g, '')
+      for (let i = 0; i < hexStr.length; i += 2) {
+        payload.push(parseInt(hexStr.substring(i, i + 2), 16))
+      }
+      echoText = payload.map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join(' ')
+    } else {
+      let str = text
+      if (!options.exactBytes) {
+        if (options.addCR ?? true) str += '\r'
+        if (options.addLF ?? true) str += '\n'
+      }
+      payload = Array.from(new TextEncoder().encode(str))
+      echoText = text.replace(/\r?\n$/, '')
+    }
+
+    try {
+      await writePort(connectedPort.value, payload)
+      txBytes.value += payload.length
+      appendLog('tx', echoText)
+    } catch (err: any) {
+      errorMsg.value = `发送失败: ${String(err)}`
+      throw err
+    }
+  }
+
+  async function toggleDtr() {
+    if (!connectedPort.value) return
+    try {
+      dtrState.value = !dtrState.value
+      await setDtr(connectedPort.value, dtrState.value)
+    } catch (err: any) {
+      dtrState.value = !dtrState.value
+      errorMsg.value = `切换 DTR 失败: ${String(err)}`
+    }
+  }
+
+  async function toggleRts() {
+    if (!connectedPort.value) return
+    try {
+      rtsState.value = !rtsState.value
+      await setRts(connectedPort.value, rtsState.value)
+    } catch (err: any) {
+      rtsState.value = !rtsState.value
+      errorMsg.value = `切换 RTS 失败: ${String(err)}`
+    }
+  }
+
+  function clearLogs() {
+    logs.value = []
+  }
+
+  return {
+    ports,
+    loading,
+    errorMsg,
+    selectedPort,
+    connectedPort,
+    logs,
+    rxBytes,
+    txBytes,
+    dtrState,
+    rtsState,
+    isRecording,
+    config,
+    refreshPorts,
+    connect,
+    disconnect,
+    toggleConnection,
+    sendRaw,
+    toggleDtr,
+    toggleRts,
+    clearLogs,
+    registerLineListener,
+    unregisterLineListener,
+  }
+})

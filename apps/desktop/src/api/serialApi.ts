@@ -1,12 +1,5 @@
 import { invoke, Channel } from '@tauri-apps/api/core'
-
-export interface SerialPortDescriptor {
-  portName: string
-  productName?: string
-  manufacturer?: string
-  vid?: number
-  pid?: number
-}
+import type { SerialPortDescriptor, SerialOpenConfig, IoChunk } from '../types/serial'
 
 export async function listPorts(): Promise<SerialPortDescriptor[]> {
   try {
@@ -17,23 +10,10 @@ export async function listPorts(): Promise<SerialPortDescriptor[]> {
   }
 }
 
-export interface SerialOpenConfig {
-  path: string
-  baudRate: number
-  dataBits: string
-  stopBits: string
-  parity: string
-  flowControl: string
-}
-
-export interface IoChunk {
-  id: string
-  direction: string
-  timestampUs: number
-  payload: number[]
-}
-
-export async function openPort(config: SerialOpenConfig, onData: (chunks: IoChunk[]) => void): Promise<void> {
+export async function openPort(
+  config: SerialOpenConfig,
+  onData: (chunks: IoChunk[]) => void
+): Promise<void> {
   const channel = new Channel<IoChunk[]>()
   channel.onmessage = onData
   return await invoke('serial_open', { config, onData: channel })
@@ -56,7 +36,7 @@ export async function setRts(path: string, level: boolean): Promise<void> {
 }
 
 export async function startRecording(path: string, filePath: string): Promise<void> {
-  return await invoke('serial_start_recording', { path, file_path: filePath })
+  return await invoke('serial_start_recording', { path, filePath })
 }
 
 export async function stopRecording(path: string): Promise<void> {
