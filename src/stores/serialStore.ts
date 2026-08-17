@@ -96,6 +96,22 @@ export const useSerialStore = defineStore('serial', () => {
     }
   }
 
+  let flushTimer: number | null = null
+  function flushLineBuffer() {
+    if (lineBuffer.trim()) {
+      const trimmed = lineBuffer.trim()
+      appendLog('rx', trimmed)
+      for (const listener of lineListeners.values()) {
+        try {
+          listener(trimmed)
+        } catch (e) {
+          console.error('Line listener error:', e)
+        }
+      }
+    }
+    lineBuffer = ''
+  }
+
   async function refreshPorts() {
     loading.value = true
     errorMsg.value = ''
@@ -142,6 +158,8 @@ export const useSerialStore = defineStore('serial', () => {
 
           if (chunkText) {
             lineBuffer += chunkText
+            if (flushTimer) clearTimeout(flushTimer)
+
             const lines = lineBuffer.split('\n')
             if (lines.length > 1) {
               lineBuffer = lines.pop() || ''
@@ -158,6 +176,15 @@ export const useSerialStore = defineStore('serial', () => {
                     }
                   }
                 }
+              }
+            }
+
+            // Residual non-newline prompt handling
+            if (lineBuffer.length > 0) {
+              if (lineBuffer.length > 1024) {
+                flushLineBuffer()
+              } else {
+                flushTimer = window.setTimeout(flushLineBuffer, 80)
               }
             }
           }

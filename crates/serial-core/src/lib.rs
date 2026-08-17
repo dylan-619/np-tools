@@ -11,7 +11,11 @@ pub fn list_ports() -> Result<Vec<SerialPortDescriptor>, String> {
     for port in ports {
         #[cfg(target_os = "macos")]
         {
-            if !port.port_name.contains("/cu.") {
+            // On macOS, prefer /dev/cu.* calling unit devices to prevent DCD carrier blocking
+            if port.port_name.starts_with("/dev/tty.") && !port.port_name.contains("usb") {
+                continue;
+            }
+            if port.port_name.starts_with("/dev/tty.Bluetooth") || port.port_name.starts_with("/dev/cu.Bluetooth") {
                 continue;
             }
         }

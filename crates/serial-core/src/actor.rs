@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
-use tokio_serial::{SerialPortBuilderExt, SerialPort};
+use tokio_serial::{SerialStream, SerialPort};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use app_types::{SerialOpenConfig, IoChunk};
+use app_types::IoChunk;
 
 pub enum SerialCommand {
     Close,
@@ -13,29 +13,21 @@ pub enum SerialCommand {
 }
 
 pub struct SerialActor {
-    config: SerialOpenConfig,
+    port: SerialStream,
     receiver: mpsc::Receiver<SerialCommand>,
     on_data: mpsc::Sender<Vec<IoChunk>>,
 }
 
 impl SerialActor {
     pub fn new(
-        config: SerialOpenConfig,
+        port: SerialStream,
         receiver: mpsc::Receiver<SerialCommand>,
         on_data: mpsc::Sender<Vec<IoChunk>>,
     ) -> Self {
-        Self { config, receiver, on_data }
+        Self { port, receiver, on_data }
     }
 
     pub async fn run(mut self) {
-        let port_res = tokio_serial::new(&self.config.path, self.config.baud_rate)
-            .open_native_async();
-            
-        let mut port = match port_res {
-            Ok(p) => p,
-            Err(_) => return,
-        };
-
         let mut buf = vec![0; 4096];
         let mut batch = Vec::new();
         let mut batch_bytes = 0;
@@ -48,7 +40,7 @@ impl SerialActor {
                     match cmd {
                         Some(SerialCommand::Close) | None => break,
                         Some(SerialCommand::Write(data)) => {
-                            if port.write_all(&data).await.is_err() {
+                            if self.port.write_all(&data).await.is_err() {
                                 break;
                             }
                             if let Some(f) = &mut record_file {
@@ -56,10 +48,10 @@ impl SerialActor {
                             }
                         }
                         Some(SerialCommand::SetDtr(level)) => {
-                            let _ = port.write_data_terminal_ready(level);
+                            let _ = self.port.write_data_terminal_ready(level);
                         }
                         Some(SerialCommand::SetRts(level)) => {
-                            let _ = port.write_request_to_send(level);
+                            let _ = self.port.write_request_to_send(level);
                         }
                         Some(SerialCommand::StartRecording(path)) => {
                             if let Ok(file) = tokio::fs::OpenOptions::new().create(true).append(true).open(&path).await {
@@ -73,7 +65,7 @@ impl SerialActor {
                         }
                     }
                 }
-                res = port.read(&mut buf) => {
+                res = self.port.read(&mut buf) => {
                     match res {
                         Ok(n) if n > 0 => {
                             let data = buf[..n].to_vec();

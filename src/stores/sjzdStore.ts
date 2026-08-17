@@ -124,10 +124,31 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
 
     // Check for SLE:LIST responses
-    if (line.includes('[EEPROM]') || line.includes('[CHIP]') || line.includes('SLE_NETNAME')) {
-      const comparisons = await sjzdParseSleComparisons(line)
-      if (comparisons.length > 0) {
-        sleComparisons.value = comparisons
+    if (
+      line.includes('[EEPROM]') ||
+      line.includes('[CHIP]') ||
+      line.includes('SLE_NETNAME') ||
+      line.includes('SLE:') ||
+      line.includes('PWR:') ||
+      line.includes('APID:')
+    ) {
+      const newComparisons = await sjzdParseSleComparisons(line)
+      if (newComparisons.length > 0) {
+        if (sleComparisons.value.length === 0) {
+          sleComparisons.value = newComparisons
+        } else {
+          for (const nc of newComparisons) {
+            const existing = sleComparisons.value.find((c) => c.fieldName === nc.fieldName)
+            if (existing) {
+              if (nc.eepromVal !== '--') existing.eepromVal = nc.eepromVal
+              if (nc.chipVal !== '--') existing.chipVal = nc.chipVal
+              existing.isMatched =
+                existing.eepromVal === existing.chipVal && existing.eepromVal !== '--'
+            } else {
+              sleComparisons.value.push(nc)
+            }
+          }
+        }
       }
     }
 
