@@ -1,25 +1,38 @@
 {
-  "name": "mac-serial-lab-workspace",
+  "name": "np-tools",
   "private": true,
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm -F desktop dev",
-    "build": "pnpm -F desktop build",
-    "lint": "pnpm -F desktop lint"
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "lint": "eslint ."
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.2.5",
+    "@vueuse/core": "^14.4.0",
+    "echarts": "^5.6.0",
+    "lucide-vue-next": "^1.0.0",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@vue/test-utils": "^2.4.11",
+    "@tauri-apps/cli": "^2.2.4",
+    "@vitejs/plugin-vue": "^5.2.1",
     "eslint": "^10.8.1",
     "eslint-plugin-vue": "^10.10.0",
-    "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
+    "typescript": "~5.6.2",
     "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.10",
-    "vue-eslint-parser": "^10.4.1"
+    "vite": "^6.0.3",
+    "vue-eslint-parser": "^10.4.1",
+    "vue-tsc": "^2.1.10"
   }
 }

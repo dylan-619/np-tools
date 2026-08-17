@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Serial Lab",
-  "version": "0.1.0",
-  "identifier": "com.seriallab.app",
+  "productName": "NP-Tools",
+  "version": "2.0.0",
+  "identifier": "com.nptools.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,10 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "Serial Lab",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 800,
+        "title": "NP-Tools 硬件调试平台",
+        "width": 1100,
+        "height": 760,
+        "minWidth": 850,
         "minHeight": 600,
         "hiddenTitle": true,
         "titleBarStyle": "Overlay"
