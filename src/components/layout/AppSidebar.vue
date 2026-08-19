@@ -36,10 +36,10 @@ function navigateTo(path: string) {
 
     <!-- Navigation Scroll Area -->
     <div class="nav-scroll-area">
-      <!-- Section 1: SJZDV3 Data Terminal -->
+      <!-- Section 1: Smart Data Terminal -->
       <div class="nav-group">
         <div class="group-label">
-          <span>SJZDV3 采集终端</span>
+          <span>智能采集终端</span>
           <span class="tag-badge">主线产品</span>
         </div>
 
@@ -164,8 +164,7 @@ function navigateTo(path: string) {
 }
 
 .sidebar-header {
-  padding: 16px;
-  padding-top: 36px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border, #2a2f42);
   user-select: none;
 }

@@ -5,12 +5,11 @@ import {
   Trash2,
   Send,
   Activity,
-  Save,
+  Copy,
+  Check,
   Filter,
 } from 'lucide-vue-next'
-import { save } from '@tauri-apps/plugin-dialog'
 import { useSerialStore } from '../stores/serialStore'
-import { startRecording, stopRecording } from '../api/serialApi'
 import type { TerminalLogLine } from '../types/serial'
 
 const serial = useSerialStore()
@@ -128,32 +127,21 @@ function handleHistoryDown(e: KeyboardEvent) {
   }
 }
 
-async function toggleRecording() {
-  if (!serial.connectedPort) return
-  if (serial.isRecording) {
-    try {
-      await stopRecording(serial.connectedPort)
-      serial.isRecording = false
-    } catch (err: any) {
-      serial.errorMsg = String(err)
-    }
-  } else {
-    try {
-      const filePath = await save({
-        filters: [
-          {
-            name: 'Serial Lab Record',
-            extensions: ['slab', 'log', 'txt'],
-          },
-        ],
-      })
-      if (filePath) {
-        await startRecording(serial.connectedPort, filePath)
-        serial.isRecording = true
-      }
-    } catch (err: any) {
-      serial.errorMsg = String(err)
-    }
+const copiedSuccess = ref(false)
+
+async function copyCurrentLogs() {
+  if (filteredLogs.value.length === 0) return
+  try {
+    const textToCopy = filteredLogs.value
+      .map((l: TerminalLogLine) => `[${l.timestamp}] [${l.direction.toUpperCase()}] ${l.text}`)
+      .join('\n')
+    await navigator.clipboard.writeText(textToCopy)
+    copiedSuccess.value = true
+    setTimeout(() => {
+      copiedSuccess.value = false
+    }, 2000)
+  } catch (err: any) {
+    serial.errorMsg = `复制到剪贴板失败: ${err}`
   }
 }
 </script>
@@ -217,14 +205,15 @@ async function toggleRecording() {
 
       <div class="header-right">
         <button
-          v-if="serial.connectedPort"
           class="btn-tool"
-          :class="{ recording: serial.isRecording }"
-          :title="serial.isRecording ? '停止录制' : '录制原始数据流到磁盘'"
-          @click="toggleRecording"
+          :class="{ success: copiedSuccess }"
+          title="一键复制当前区域的所有日志内容到剪贴板"
+          :disabled="filteredLogs.length === 0"
+          @click="copyCurrentLogs"
         >
-          <Save :size="13" />
-          <span>{{ serial.isRecording ? '正在录制...' : '录制到文件' }}</span>
+          <Check v-if="copiedSuccess" :size="13" class="icon-success" />
+          <Copy v-else :size="13" />
+          <span>{{ copiedSuccess ? '已复制内容' : '复制当前内容' }}</span>
         </button>
 
         <label class="checkbox-label">
@@ -234,6 +223,7 @@ async function toggleRecording() {
 
         <button class="btn-tool" title="清空终端" @click="serial.clearLogs">
           <Trash2 :size="13" />
+          <span>清空</span>
         </button>
       </div>
     </header>
@@ -316,7 +306,7 @@ async function toggleRecording() {
       <div class="quick-presets-row">
         <span class="preset-label">快捷指令:</span>
         <button
-          v-for="cmd in ['DEVINFO', 'SLE:LIST', 'RS485DEV:LIST', 'AITEST', 'TESTSTOP', '@RST']"
+          v-for="cmd in ['DEVINFO', 'SLE:LIST', '@WLAN=0', '@WLAN=1', 'RS485DEV:LIST', 'AITEST', 'TESTSTOP', '@RST']"
           :key="cmd"
           class="cmd-pill"
           :disabled="!serial.connectedPort || loopTimer !== null"
@@ -443,7 +433,7 @@ async function toggleRecording() {
 }
 
 .btn-tool {
-  padding: 4px 8px;
+  padding: 4px 10px;
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
   color: var(--text-muted, #94a3b8);
@@ -451,17 +441,26 @@ async function toggleRecording() {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 0.75rem;
+  transition: all 0.15s ease;
 }
-.btn-tool:hover {
+.btn-tool:hover:not(:disabled) {
   background: #2e3448;
   color: #fff;
+  border-color: #3b82f6;
 }
-.btn-tool.recording {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: #ef4444;
-  color: #f87171;
+.btn-tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-tool.success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+.icon-success {
+  color: #34d399;
 }
 
 .checkbox-label {
@@ -480,6 +479,9 @@ async function toggleRecording() {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 0.82rem;
   line-height: 22px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .log-row {
@@ -487,6 +489,8 @@ async function toggleRecording() {
   gap: 8px;
   white-space: pre-wrap;
   word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .log-timestamp {

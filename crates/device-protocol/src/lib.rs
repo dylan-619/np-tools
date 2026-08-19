@@ -236,24 +236,40 @@ static RE_AI: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"AI1:\s*([0-9.]+)\s*mA,\s*AI2:\s*([0-9.]+)\s*mA").unwrap()
 });
 
+static RE_ANSI_STRIP: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\x1B\[[0-9;?]*[a-zA-Z]").unwrap()
+});
+
 static RE_DEV_SN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:SN|DeviceSN|Device\s*SN)[:=]\s*([0-9A-Za-z]+)").unwrap()
+    Regex::new(r"(?i)(?:SN|DeviceSN|Device\s*SN)[:=]\s*([0-9A-Za-z]+)").unwrap()
+});
+
+static RE_DEV_TYPE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:Type|DevType|Model)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
+});
+
+static RE_DEV_ADDR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:Addr|Address)[:=]\s*([0-9A-Za-z]+)").unwrap()
 });
 
 static RE_DEV_HW: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:HW|Hardware)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
+    Regex::new(r"(?i)(?:HW|Hardware|HwVer)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
 });
 
 static RE_DEV_FW: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:FW|Firmware|AppVersion|Version)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
+    Regex::new(r"(?i)(?:FW|Firmware|AppVersion|Version|FwVer)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
 });
 
 static RE_DEV_BOOT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:BOOT|BootCount|POC)[:=]\s*(\d+)").unwrap()
+    Regex::new(r"(?i)(?:BOOT|BootCount|PwrOnCnt|POC|PowerOnCount)[:=]\s*(\d+)").unwrap()
 });
 
 static RE_DEV_UPTIME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:UPTIME|Runtime|RTM)[:=]\s*(\d+)").unwrap()
+    Regex::new(r"(?i)(?:UPTIME|Runtime|TotRunTim|TotRunTime|RTM)[:=]\s*(\d+)").unwrap()
+});
+
+static RE_DEV_RPT_FREQ: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:RptFreq|ReportFreq|RTFRE)[:=]\s*(\d+)").unwrap()
 });
 
 pub fn parse_ai_sample(text: &str, timestamp_ms: u64) -> Option<AiSampleDto> {
@@ -270,19 +286,30 @@ pub fn parse_ai_sample(text: &str, timestamp_ms: u64) -> Option<AiSampleDto> {
 }
 
 pub fn parse_dev_info(text: &str) -> DeviceInfoResult {
-    let sn = RE_DEV_SN.captures(text).map(|c| c[1].to_string());
-    let hw = RE_DEV_HW.captures(text).map(|c| c[1].to_string());
-    let fw = RE_DEV_FW.captures(text).map(|c| c[1].to_string());
-    let boot = RE_DEV_BOOT.captures(text).and_then(|c| c[1].parse::<u64>().ok());
-    let uptime = RE_DEV_UPTIME.captures(text).and_then(|c| c[1].parse::<u64>().ok());
+    let clean = RE_ANSI_STRIP.replace_all(text, "");
+    let clean_str = clean.trim();
+
+    let sn = RE_DEV_SN.captures(clean_str).map(|c| c[1].to_string());
+    let dev_type = RE_DEV_TYPE.captures(clean_str).map(|c| c[1].to_string());
+    let dev_addr = RE_DEV_ADDR.captures(clean_str).map(|c| c[1].to_string());
+    let hw = RE_DEV_HW.captures(clean_str).map(|c| c[1].to_string()).or_else(|| {
+        dev_type.as_ref().map(|t| format!("SJZDV3-{}", t))
+    });
+    let fw = RE_DEV_FW.captures(clean_str).map(|c| c[1].to_string());
+    let boot = RE_DEV_BOOT.captures(clean_str).and_then(|c| c[1].parse::<u64>().ok());
+    let uptime = RE_DEV_UPTIME.captures(clean_str).and_then(|c| c[1].parse::<u64>().ok());
+    let report_freq = RE_DEV_RPT_FREQ.captures(clean_str).and_then(|c| c[1].parse::<u32>().ok());
 
     DeviceInfoResult {
         sn,
+        device_type: dev_type,
+        device_addr: dev_addr,
         hw_version: hw,
         fw_version: fw,
         boot_count: boot,
         uptime_sec: uptime,
-        raw_text: text.to_string(),
+        report_freq_sec: report_freq,
+        raw_text: clean_str.to_string(),
     }
 }
 
@@ -336,84 +363,115 @@ pub fn parse_modbus_points_str(text: &str) -> Vec<ModbusPointConfig> {
     result
 }
 
+static RE_NETNAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)(?:NetName|Net_Name|Name)=['"]?([^,'"\s\(\)]+)['"]?"#).unwrap()
+});
+
+static RE_DEV_ADDR_SLE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:DevAddr|DeviceAddr|Addr)=(\d+)").unwrap()
+});
+
+static RE_TX_PWR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:TxPwr|Tx_Pwr|PWR|Power)=(\d+)").unwrap()
+});
+
 pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
     let mut comparisons = Vec::new();
-    // Support parsing [EEPROM] and [CHIP] lines or key-value structures
-    let lines: Vec<&str> = text.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+    let clean = RE_ANSI_STRIP.replace_all(text, "");
+    let lines: Vec<&str> = clean.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
 
     let mut eeprom_netname = String::new();
-    let mut eeprom_apid = String::new();
+    let mut eeprom_devaddr = String::new();
     let mut eeprom_pwr = String::new();
-    let mut eeprom_maxpwr = String::new();
 
     let mut chip_netname = String::new();
-    let mut chip_apid = String::new();
+    let mut chip_devaddr = String::new();
     let mut chip_pwr = String::new();
-    let mut chip_maxpwr = String::new();
 
     for line in &lines {
-        let l = line.to_uppercase();
-        if l.contains("NETNAME") || l.contains("NAME") {
-            let val = line.split(':').nth(1).or_else(|| line.split('=').nth(1)).unwrap_or("").trim();
-            if l.contains("[CHIP]") || l.contains("CHIP") {
-                chip_netname = val.to_string();
-            } else {
-                eeprom_netname = val.to_string();
+        let is_eeprom = line.contains("[EEPROM]") || (!line.contains("[CHIP]") && (line.contains("APID") || line.contains("MaxTxPwr")));
+        let is_chip = line.contains("[CHIP]") || line.contains("Mac=");
+
+        if is_eeprom {
+            if let Some(c) = RE_NETNAME.captures(line) {
+                eeprom_netname = c[1].to_string();
             }
-        } else if l.contains("APID") || l.contains("AP_ID") {
-            let val = line.split(':').nth(1).or_else(|| line.split('=').nth(1)).unwrap_or("").trim();
-            if l.contains("[CHIP]") || l.contains("CHIP") {
-                chip_apid = val.to_string();
-            } else {
-                eeprom_apid = val.to_string();
+            if let Some(c) = RE_DEV_ADDR_SLE.captures(line) {
+                eeprom_devaddr = c[1].to_string();
             }
-        } else if l.contains("MAXPWR") || l.contains("MAX_PWR") {
-            let val = line.split(':').nth(1).or_else(|| line.split('=').nth(1)).unwrap_or("").trim();
-            if l.contains("[CHIP]") || l.contains("CHIP") {
-                chip_maxpwr = val.to_string();
-            } else {
-                eeprom_maxpwr = val.to_string();
+            if let Some(c) = RE_TX_PWR.captures(line) {
+                eeprom_pwr = c[1].to_string();
             }
-        } else if l.contains("PWR") || l.contains("POWER") {
-            let val = line.split(':').nth(1).or_else(|| line.split('=').nth(1)).unwrap_or("").trim();
-            if l.contains("[CHIP]") || l.contains("CHIP") {
-                chip_pwr = val.to_string();
-            } else {
-                eeprom_pwr = val.to_string();
+        }
+
+        if is_chip {
+            if let Some(c) = RE_NETNAME.captures(line) {
+                chip_netname = c[1].to_string();
+            }
+            if let Some(c) = RE_DEV_ADDR_SLE.captures(line) {
+                chip_devaddr = c[1].to_string();
+            }
+            if let Some(c) = RE_TX_PWR.captures(line) {
+                chip_pwr = c[1].to_string();
+            }
+        }
+
+        // Single key lines fallback
+        if !is_eeprom && !is_chip {
+            if let Some(c) = RE_NETNAME.captures(line) {
+                if eeprom_netname.is_empty() { eeprom_netname = c[1].to_string(); }
+            }
+            if let Some(c) = RE_DEV_ADDR_SLE.captures(line) {
+                if eeprom_devaddr.is_empty() { eeprom_devaddr = c[1].to_string(); }
+            }
+            if let Some(c) = RE_TX_PWR.captures(line) {
+                if eeprom_pwr.is_empty() { eeprom_pwr = c[1].to_string(); }
             }
         }
     }
 
+    // 1. 网络名称 (NetName)
     if !eeprom_netname.is_empty() || !chip_netname.is_empty() {
+        let is_matched = if !eeprom_netname.is_empty() && !chip_netname.is_empty() {
+            eeprom_netname == chip_netname
+        } else {
+            true
+        };
         comparisons.push(SleFieldComparison {
-            field_name: "网络名称 (NetName)".into(),
-            is_matched: eeprom_netname == chip_netname && !eeprom_netname.is_empty(),
+            field_name: "星闪网络名称 (NetName)".into(),
+            is_matched,
             eeprom_val: if eeprom_netname.is_empty() { "--".into() } else { eeprom_netname },
             chip_val: if chip_netname.is_empty() { "--".into() } else { chip_netname },
         });
     }
-    if !eeprom_apid.is_empty() || !chip_apid.is_empty() {
+
+    // 2. 通信地址 (DevAddr / Addr)
+    if !eeprom_devaddr.is_empty() || !chip_devaddr.is_empty() {
+        let is_matched = if !eeprom_devaddr.is_empty() && !chip_devaddr.is_empty() {
+            eeprom_devaddr == chip_devaddr
+        } else {
+            true
+        };
         comparisons.push(SleFieldComparison {
-            field_name: "AP ID".into(),
-            is_matched: eeprom_apid == chip_apid && !eeprom_apid.is_empty(),
-            eeprom_val: if eeprom_apid.is_empty() { "--".into() } else { eeprom_apid },
-            chip_val: if chip_apid.is_empty() { "--".into() } else { chip_apid },
+            field_name: "从机通信地址 (DevAddr)".into(),
+            is_matched,
+            eeprom_val: if eeprom_devaddr.is_empty() { "--".into() } else { eeprom_devaddr },
+            chip_val: if chip_devaddr.is_empty() { "--".into() } else { chip_devaddr },
         });
     }
+
+    // 3. 当前发射功率 (Tx Power / TxPwr)
     if !eeprom_pwr.is_empty() || !chip_pwr.is_empty() {
+        let is_matched = if !eeprom_pwr.is_empty() && !chip_pwr.is_empty() {
+            eeprom_pwr == chip_pwr
+        } else {
+            true
+        };
         comparisons.push(SleFieldComparison {
             field_name: "当前发射功率 (Tx Power)".into(),
-            is_matched: eeprom_pwr == chip_pwr && !eeprom_pwr.is_empty(),
-            eeprom_val: if eeprom_pwr.is_empty() { "--".into() } else { eeprom_pwr },
-            chip_val: if chip_pwr.is_empty() { "--".into() } else { chip_pwr },
-        });
-    }
-    if !eeprom_maxpwr.is_empty() || !chip_maxpwr.is_empty() {
-        comparisons.push(SleFieldComparison {
-            field_name: "最大发射功率 (Max Tx Power)".into(),
-            is_matched: eeprom_maxpwr == chip_maxpwr && !eeprom_maxpwr.is_empty(),
-            eeprom_val: if eeprom_maxpwr.is_empty() { "--".into() } else { eeprom_maxpwr },
-            chip_val: if chip_maxpwr.is_empty() { "--".into() } else { chip_maxpwr },
+            is_matched,
+            eeprom_val: if eeprom_pwr.is_empty() { "--".into() } else { format!("{} 档", eeprom_pwr) },
+            chip_val: if chip_pwr.is_empty() { "--".into() } else { format!("{} 档", chip_pwr) },
         });
     }
 

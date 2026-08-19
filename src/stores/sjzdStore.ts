@@ -20,6 +20,7 @@ import type {
   ModbusPointConfig,
   DeviceInfoResult,
   SleFieldComparison,
+  SleCurrentStatus,
   AiSampleDto,
 } from '../types/sjzd'
 
@@ -29,6 +30,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
   // State
   const deviceInfo = ref<DeviceInfoResult | null>(null)
   const sleComparisons = ref<SleFieldComparison[]>([])
+  const sleCurrentStatus = ref<SleCurrentStatus>({})
   const sleForm = ref({
     netName: 'star_RS01',
     apId: 1,
@@ -109,15 +111,37 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
 
     // Check for DEVINFO responses
-    if (line.includes('SN:') || line.includes('DEVINFO') || line.includes('HW:')) {
+    if (
+      line.includes('SN:') ||
+      line.includes('DEVINFO') ||
+      line.includes('DevInfo') ||
+      line.includes('HW:') ||
+      line.includes('PwrOnCnt') ||
+      line.includes('TotRunTim') ||
+      line.includes('RptFreq')
+    ) {
       const parsed = await sjzdParseDevInfo(line)
-      if (parsed.sn || parsed.hwVersion || parsed.fwVersion) {
+      if (
+        parsed.sn ||
+        parsed.hwVersion ||
+        parsed.fwVersion ||
+        parsed.deviceType ||
+        parsed.deviceAddr ||
+        parsed.bootCount !== undefined ||
+        parsed.uptimeSec !== undefined
+      ) {
         deviceInfo.value = {
           sn: parsed.sn || deviceInfo.value?.sn,
-          hwVersion: parsed.hwVersion || deviceInfo.value?.hwVersion,
+          deviceType: parsed.deviceType || deviceInfo.value?.deviceType,
+          deviceAddr: parsed.deviceAddr || deviceInfo.value?.deviceAddr,
+          hwVersion:
+            parsed.hwVersion ||
+            deviceInfo.value?.hwVersion ||
+            (parsed.deviceType ? `SJZDV3-${parsed.deviceType}` : undefined),
           fwVersion: parsed.fwVersion || deviceInfo.value?.fwVersion,
           bootCount: parsed.bootCount ?? deviceInfo.value?.bootCount,
           uptimeSec: parsed.uptimeSec ?? deviceInfo.value?.uptimeSec,
+          reportFreqSec: parsed.reportFreqSec ?? deviceInfo.value?.reportFreqSec,
           rawText: line,
         }
       }
@@ -130,8 +154,62 @@ export const useSjzdStore = defineStore('sjzd', () => {
       line.includes('SLE_NETNAME') ||
       line.includes('SLE:') ||
       line.includes('PWR:') ||
-      line.includes('APID:')
+      line.includes('APID:') ||
+      line.includes('Configuration Comparison')
     ) {
+      // 1. Direct Regex extraction for sleCurrentStatus & sleForm
+      const netNameMatch = line.match(/(?:NetName|Net_Name|Name)=['"]?([^,'"\s\(\)]+)['"]?/i)
+      if (netNameMatch) {
+        sleForm.value.netName = netNameMatch[1]
+        sleCurrentStatus.value.netName = netNameMatch[1]
+      }
+
+      const apIdMatch = line.match(/(?:APID|AP_ID)=(\d+)/i)
+      if (apIdMatch) {
+        const ap = parseInt(apIdMatch[1], 10)
+        if (!isNaN(ap)) {
+          sleForm.value.apId = ap
+          sleCurrentStatus.value.apId = ap
+        }
+      }
+
+      const addrMatch = line.match(/(?:DevAddr|DeviceAddr|Addr)=(\d+)/i)
+      if (addrMatch) {
+        sleCurrentStatus.value.devAddr = addrMatch[1]
+      }
+
+      const txPwrMatch = line.match(/(?:TxPwr|Tx_Pwr|PWR|Power)=(\d+)/i)
+      if (txPwrMatch) {
+        const pwr = parseInt(txPwrMatch[1], 10)
+        if (!isNaN(pwr) && pwr >= 1 && pwr <= 8) {
+          sleForm.value.txPower = pwr
+          sleCurrentStatus.value.txPower = pwr
+        }
+      }
+
+      const maxPwrMatch = line.match(/(?:MaxTxPwr|Max_Tx_Pwr|MaxPwr|MAX_PWR)=(\d+)/i)
+      if (maxPwrMatch) {
+        const mp = parseInt(maxPwrMatch[1], 10)
+        if (!isNaN(mp) && mp >= 1 && mp <= 8) {
+          sleForm.value.maxTxPower = mp
+          sleCurrentStatus.value.maxTxPower = mp
+        }
+      }
+
+      const macMatch = line.match(/(?:Mac|MAC)=([0-9A-Fa-f:]{17}|[0-9A-Fa-f-]{17})/i)
+      if (macMatch) {
+        sleCurrentStatus.value.mac = macMatch[1]
+      }
+
+      const bridgeMatch = line.match(/(?:Bridge|Wlan|WlanBridge)=(\d+)/i)
+      if (bridgeMatch) {
+        wlanBridgeEnabled.value = bridgeMatch[1] === '1'
+        sleCurrentStatus.value.bridge = parseInt(bridgeMatch[1], 10)
+      }
+
+      sleCurrentStatus.value.lastSyncTime = new Date().toLocaleTimeString()
+
+      // 2. Parse dual-read comparison rows (NetName, DevAddr, Tx Power)
       const newComparisons = await sjzdParseSleComparisons(line)
       if (newComparisons.length > 0) {
         if (sleComparisons.value.length === 0) {
@@ -142,8 +220,11 @@ export const useSjzdStore = defineStore('sjzd', () => {
             if (existing) {
               if (nc.eepromVal !== '--') existing.eepromVal = nc.eepromVal
               if (nc.chipVal !== '--') existing.chipVal = nc.chipVal
+              // Match only if both values are present and identical, or still waiting for one side
               existing.isMatched =
-                existing.eepromVal === existing.chipVal && existing.eepromVal !== '--'
+                existing.eepromVal === '--' ||
+                existing.chipVal === '--' ||
+                existing.eepromVal === existing.chipVal
             } else {
               sleComparisons.value.push(nc)
             }
@@ -491,6 +572,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
   return {
     deviceInfo,
     sleComparisons,
+    sleCurrentStatus,
     sleForm,
     wlanBridgeEnabled,
     modbusPoints,

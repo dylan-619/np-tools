@@ -77,10 +77,13 @@ pub struct SleFieldComparison {
 #[serde(rename_all = "camelCase")]
 pub struct DeviceInfoResult {
     pub sn: Option<String>,
+    pub device_type: Option<String>,
+    pub device_addr: Option<String>,
     pub hw_version: Option<String>,
     pub fw_version: Option<String>,
     pub boot_count: Option<u64>,
     pub uptime_sec: Option<u64>,
+    pub report_freq_sec: Option<u32>,
     pub raw_text: String,
 }
 

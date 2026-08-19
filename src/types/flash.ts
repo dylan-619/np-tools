@@ -17,3 +17,10 @@ export interface FlashProgressEvent {
   message: string
   isTerminal: boolean
 }
+
+export interface FlashLogEntry {
+  id: number
+  time: string
+  text: string
+  type: 'info' | 'success' | 'warn' | 'error' | 'header' | 'cmd'
+}

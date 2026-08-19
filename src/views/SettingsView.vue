@@ -4,21 +4,47 @@ import { Settings, Save, CheckCircle2, Cpu, Info, FolderOpen } from 'lucide-vue-
 import { open } from '@tauri-apps/plugin-dialog'
 import { useFlashStore } from '../stores/flashStore'
 import { useSerialStore } from '../stores/serialStore'
+import CustomSelect from '../components/common/CustomSelect.vue'
 
 const flash = useFlashStore()
 const serial = useSerialStore()
 
 const savedSuccess = ref(false)
 
+const baudRateOptions = [
+  { label: '9600', value: 9600 },
+  { label: '19200', value: 19200 },
+  { label: '38400', value: 38400 },
+  { label: '57600', value: 57600 },
+  { label: '115200 (推荐默认)', value: 115200 },
+  { label: '230400', value: 230400 },
+  { label: '921600', value: 921600 },
+]
+
+const dataBitOptions = [
+  { label: '8 数据位 (标准)', value: 'eight' },
+  { label: '7 数据位', value: 'seven' },
+]
+
+const parityOptions = [
+  { label: '无校验 (None)', value: 'none' },
+  { label: '奇校验 (Odd)', value: 'odd' },
+  { label: '偶校验 (Even)', value: 'even' },
+]
+
 async function chooseCliPath() {
-  const selected = await open({
-    multiple: false,
-    directory: false,
-    title: '选择 STM32_Programmer_CLI 可执行程序',
-  })
-  if (selected && typeof selected === 'string') {
-    flash.customCliPath = selected
-    await flash.probeTool(selected)
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      title: '选择 STM32_Programmer_CLI 可执行程序',
+    })
+    if (selected && typeof selected === 'string') {
+      flash.customCliPath = selected
+      await flash.probeTool(selected)
+    }
+  } catch (err) {
+    console.error('打开 CLI 路径选择对话框失败:', err)
   }
 }
 
@@ -49,37 +75,40 @@ function saveSettings() {
       </div>
     </header>
 
-    <div v-if="savedSuccess" class="success-bar">
-      <CheckCircle2 :size="16" />
-      <span>设置已成功保存！</span>
-    </div>
+    <!-- Save Success Hint -->
+    <transition name="fade">
+      <div v-if="savedSuccess" class="alert-banner success">
+        <CheckCircle2 :size="16" />
+        <span>设置已保存至本地配置。</span>
+      </div>
+    </transition>
 
-    <!-- Section 1: Flash Toolchain Path -->
+    <!-- Section 1: STM32 Programmer Toolchain -->
     <div class="section-card">
       <div class="card-header">
         <div class="header-left">
           <Cpu :size="16" class="icon-blue" />
-          <h3>STM32CubeProgrammer 烧录工具链路径</h3>
+          <h3>STM32CubeProgrammer CLI 工具链路径</h3>
         </div>
       </div>
 
       <div class="card-body">
         <div class="form-group">
-          <label>STM32_Programmer_CLI 绝对路径 (留空则使用系统默认自动探测路径)</label>
+          <label>CLI 绝对执行路径 (STM32_Programmer_CLI)</label>
           <div class="input-with-button">
             <input
               v-model="flash.customCliPath"
               type="text"
-              placeholder="例如: /Applications/STMicroelectronics/STM32Cube/STM32CubeProgrammer/.../STM32_Programmer_CLI"
               class="form-input mono-text"
+              placeholder="例如: /Applications/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI"
             />
             <button class="btn btn-secondary" @click="chooseCliPath">
               <FolderOpen :size="14" />
-              <span>浏览选择</span>
+              <span>选择路径</span>
             </button>
           </div>
           <span class="field-hint">
-            当前探测到的有效路径: <code>{{ flash.toolInfo.cliPath || '未检测到' }}</code>
+            如不填写则自动探测系统 <code>PATH</code> 及 ST 默认安装路径。
           </span>
         </div>
       </div>
@@ -90,39 +119,34 @@ function saveSettings() {
       <div class="card-header">
         <div class="header-left">
           <Settings :size="16" class="icon-blue" />
-          <h3>默认串口连接参数 (SJZDV3 标准: 115200 8N1)</h3>
+          <h3>默认串口连接参数 (标准: 115200 8N1)</h3>
         </div>
       </div>
 
       <div class="card-body form-grid-3">
         <div class="form-group">
           <label>默认波特率</label>
-          <select v-model="serial.config.baudRate" class="form-select">
-            <option :value="9600">9600</option>
-            <option :value="19200">19200</option>
-            <option :value="38400">38400</option>
-            <option :value="57600">57600</option>
-            <option :value="115200">115200 (推荐默认)</option>
-            <option :value="230400">230400</option>
-            <option :value="921600">921600</option>
-          </select>
+          <CustomSelect
+            v-model="serial.config.baudRate"
+            :options="baudRateOptions"
+            mono
+          />
         </div>
 
         <div class="form-group">
           <label>默认数据位</label>
-          <select v-model="serial.config.dataBits" class="form-select">
-            <option value="eight">8 数据位 (标准)</option>
-            <option value="seven">7 数据位</option>
-          </select>
+          <CustomSelect
+            v-model="serial.config.dataBits"
+            :options="dataBitOptions"
+          />
         </div>
 
         <div class="form-group">
           <label>默认校验位</label>
-          <select v-model="serial.config.parity" class="form-select">
-            <option value="none">无校验 (None)</option>
-            <option value="odd">奇校验 (Odd)</option>
-            <option value="even">偶校验 (Even)</option>
-          </select>
+          <CustomSelect
+            v-model="serial.config.parity"
+            :options="parityOptions"
+          />
         </div>
       </div>
     </div>
@@ -156,11 +180,13 @@ function saveSettings() {
 
 <style scoped>
 .view-container {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1000px;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-header {
@@ -168,6 +194,7 @@ function saveSettings() {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .title-col h2 {

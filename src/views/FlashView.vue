@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import {
   Flame,
   RefreshCw,
@@ -14,6 +14,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { useFlashStore } from '../stores/flashStore'
 import { useSerialStore } from '../stores/serialStore'
 import { useSjzdStore } from '../stores/sjzdStore'
+import CustomSelect from '../components/common/CustomSelect.vue'
 
 const flash = useFlashStore()
 const serial = useSerialStore()
@@ -21,25 +22,60 @@ const sjzd = useSjzdStore()
 
 const autoBurnSnAfterFlash = ref(false)
 const productionSn = ref('430125010001')
+const logTerminalRef = ref<HTMLElement | null>(null)
+
+const probeOptions = computed(() => {
+  return flash.toolInfo.probes.map((p) => ({
+    label: p.description,
+    value: p.serialNumber,
+  }))
+})
+
+function scrollToBottom() {
+  if (logTerminalRef.value) {
+    logTerminalRef.value.scrollTop = logTerminalRef.value.scrollHeight
+  }
+}
+
+watch(
+  () => flash.flashLogs.length,
+  () => {
+    nextTick(scrollToBottom)
+  }
+)
 
 async function chooseHexFile() {
-  const selected = await open({
-    multiple: false,
-    filters: [
-      {
-        name: 'STM32 Firmware',
-        extensions: ['hex', 'bin', 'elf'],
-      },
-    ],
-  })
-  if (selected && typeof selected === 'string') {
-    flash.selectedHexPath = selected
-    localStorage.setItem('np_tools_last_hex', selected)
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      title: '选择待烧录的固件文件 (.hex / .bin / .elf)',
+      filters: [
+        {
+          name: 'STM32 固件 (*.hex, *.bin, *.elf)',
+          extensions: ['hex', 'bin', 'elf', 'HEX', 'BIN', 'ELF'],
+        },
+        {
+          name: '所有文件 (*.*)',
+          extensions: ['*'],
+        },
+      ],
+    })
+    if (selected && typeof selected === 'string') {
+      flash.selectedHexPath = selected
+      localStorage.setItem('np_tools_last_hex', selected)
+    }
+  } catch (err) {
+    console.error('打开文件选择对话框失败:', err)
   }
 }
 
 async function handleStartFlash() {
-  await flash.startFlashing()
+  try {
+    await flash.startFlashing()
+  } finally {
+    flash.isFlashing = false
+  }
 
   // Optional Production Pipeline: Flash -> Serial Connect -> Write SN
   if (
@@ -48,15 +84,15 @@ async function handleStartFlash() {
     serial.selectedPort &&
     productionSn.value.length === 12
   ) {
-    flash.flashLogs.push(`[产线流水线] 正在尝试通过串口 ${serial.selectedPort} 自动写入 SN...`)
+    flash.addLog(`[产线流水线] 正在尝试通过串口 ${serial.selectedPort} 自动写入 SN...`, 'cmd')
     try {
       if (!serial.connectedPort) {
         await serial.connect(serial.selectedPort)
       }
       await sjzd.burnSn(productionSn.value)
-      flash.flashLogs.push(`[产线流水线] SN [${productionSn.value}] 自动烧录成功！`)
+      flash.addLog(`[产线流水线] SN [${productionSn.value}] 自动烧录成功！`, 'success')
     } catch (e: any) {
-      flash.flashLogs.push(`[产线流水线] 自动写入 SN 失败: ${e}`)
+      flash.addLog(`[产线流水线] 自动写入 SN 失败: ${e}`, 'error')
     }
   }
 }
@@ -161,22 +197,13 @@ onMounted(() => {
         <!-- Probe Selector -->
         <div class="form-group">
           <label>ST-Link 调试器探针</label>
-          <select
+          <CustomSelect
             v-model="flash.selectedProbeSn"
-            class="form-select"
+            :options="probeOptions"
+            :placeholder="flash.toolInfo.probes.length === 0 ? '未检测到 ST-Link 探针 (使用默认首个设备)' : '选择 ST-Link 探针'"
             :disabled="flash.isFlashing || flash.toolInfo.probes.length === 0"
-          >
-            <option v-if="flash.toolInfo.probes.length === 0" value="">
-              未检测到 ST-Link 探针 (使用默认首个设备)
-            </option>
-            <option
-              v-for="probe in flash.toolInfo.probes"
-              :key="probe.serialNumber"
-              :value="probe.serialNumber"
-            >
-              {{ probe.description }}
-            </option>
-          </select>
+            mono
+          />
         </div>
 
         <!-- Connection Parameters Display -->
@@ -221,11 +248,12 @@ onMounted(() => {
         <button
           v-if="!flash.isFlashing"
           class="btn btn-flash-start"
-          :disabled="!flash.toolInfo.isAvailable || !flash.selectedHexPath || flash.isFlashing"
+          :disabled="!flash.toolInfo.isAvailable || !flash.selectedHexPath"
           @click="handleStartFlash"
         >
           <Flame :size="16" />
-          <span>开始 SWD 硬件烧录 (Erase + Write + Verify)</span>
+          <span v-if="flash.progress.state === 'success'">重新开始 SWD 硬件烧录 (Erase + Write + Verify)</span>
+          <span v-else>开始 SWD 硬件烧录 (Erase + Write + Verify)</span>
         </button>
 
         <button
@@ -272,6 +300,9 @@ onMounted(() => {
         <div class="header-left">
           <Terminal :size="15" />
           <h3>STM32CubeProgrammer 烧录控制台输出</h3>
+          <span v-if="flash.flashLogs.length > 0" class="log-count-badge">
+            {{ flash.flashLogs.length }} 条记录
+          </span>
         </div>
         <button
           class="icon-btn-micro"
@@ -283,9 +314,15 @@ onMounted(() => {
       </div>
 
       <div class="card-body log-console-body">
-        <div class="flash-log-terminal mono-text">
-          <div v-for="(log, i) in flash.flashLogs" :key="i" class="log-line">
-            {{ log }}
+        <div ref="logTerminalRef" class="flash-log-terminal mono-text">
+          <div
+            v-for="log in flash.flashLogs"
+            :key="log.id"
+            class="log-line"
+            :class="`log-${log.type}`"
+          >
+            <span class="log-time">[{{ log.time }}]</span>
+            <span class="log-text">{{ log.text }}</span>
           </div>
           <div v-if="flash.flashLogs.length === 0" class="empty-log-hint">
             准备就绪，点击【开始 SWD 硬件烧录】启动任务并捕获 CLI 实时输出...
@@ -298,11 +335,13 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1100px;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-header {
@@ -310,6 +349,7 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .title-col h2 {
@@ -596,30 +636,90 @@ onMounted(() => {
   color: var(--accent, #3b82f6);
 }
 
+.log-count-badge {
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted, #94a3b8);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+}
+
 .log-console-body {
-  padding: 10px;
-  background: var(--bg-app, #0f111a);
+  padding: 12px;
+  background: #0c0e17;
 }
 
 .flash-log-terminal {
-  height: 180px;
+  height: 220px;
   overflow-y: auto;
+  font-family: var(--font-mono, monospace);
   font-size: 0.78rem;
+  line-height: 1.5;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  color: #cbd5e1;
+  gap: 2px;
+  padding: 2px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .log-line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
   white-space: pre-wrap;
   word-break: break-all;
+  border-radius: 3px;
+  padding: 2px 6px;
+  transition: background 0.1s ease;
+}
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-time {
+  color: #64748b;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.log-text {
+  flex: 1;
+}
+
+.log-line.log-info .log-text {
+  color: #cbd5e1;
+}
+
+.log-line.log-cmd .log-text {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.log-line.log-header .log-text {
+  color: #818cf8;
+}
+
+.log-line.log-success .log-text {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.log-line.log-warn .log-text {
+  color: #fbbf24;
+}
+
+.log-line.log-error .log-text {
+  color: #f87171;
+  font-weight: 600;
 }
 
 .empty-log-hint {
   color: var(--text-muted, #94a3b8);
   text-align: center;
-  padding-top: 60px;
+  padding-top: 80px;
 }
 
 .icon-btn-micro {

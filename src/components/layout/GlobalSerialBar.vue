@@ -1,12 +1,31 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RefreshCw, Activity, Power, Sliders } from 'lucide-vue-next'
 import { useSerialStore } from '../../stores/serialStore'
+import CustomSelect from '../common/CustomSelect.vue'
 
 const serial = useSerialStore()
 const showSettings = ref(false)
 
 const baudRates = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600, 1000000, 2000000]
+
+const portOptions = computed(() =>
+  serial.ports.map((p) => ({
+    label: p.portName.replace('/dev/', ''),
+    value: p.portName,
+  }))
+)
+
+const dataBitOptions = [
+  { label: '8 位', value: 'eight' },
+  { label: '7 位', value: 'seven' },
+]
+
+const parityOptions = [
+  { label: '无 (None)', value: 'none' },
+  { label: '奇 (Odd)', value: 'odd' },
+  { label: '偶 (Even)', value: 'even' },
+]
 
 onMounted(() => {
   serial.refreshPorts()
@@ -45,20 +64,16 @@ onMounted(() => {
 
     <!-- Port Selector & Connect Button -->
     <div class="port-row">
-      <select
-        v-model="serial.selectedPort"
-        class="port-select"
-        :disabled="!!serial.connectedPort"
-      >
-        <option v-if="serial.ports.length === 0" value="" disabled>无可用串口</option>
-        <option
-          v-for="p in serial.ports"
-          :key="p.portName"
-          :value="p.portName"
-        >
-          {{ p.portName.replace('/dev/', '') }}
-        </option>
-      </select>
+      <div class="port-select-wrapper">
+        <CustomSelect
+          v-model="serial.selectedPort"
+          :options="portOptions"
+          :placeholder="serial.ports.length === 0 ? '无可用串口' : '选择串口'"
+          :disabled="!!serial.connectedPort"
+          size="sm"
+          mono
+        />
+      </div>
 
       <button
         class="connect-action-btn"
@@ -76,25 +91,32 @@ onMounted(() => {
     <div v-if="showSettings" class="advanced-config-box">
       <div class="config-item">
         <label>波特率</label>
-        <select v-model="serial.config.baudRate" :disabled="!!serial.connectedPort">
-          <option v-for="r in baudRates" :key="r" :value="r">{{ r }}</option>
-        </select>
+        <CustomSelect
+          v-model="serial.config.baudRate"
+          :options="baudRates"
+          :disabled="!!serial.connectedPort"
+          size="sm"
+          mono
+        />
       </div>
       <div class="config-grid-2">
         <div class="config-item">
           <label>数据位</label>
-          <select v-model="serial.config.dataBits" :disabled="!!serial.connectedPort">
-            <option value="eight">8</option>
-            <option value="seven">7</option>
-          </select>
+          <CustomSelect
+            v-model="serial.config.dataBits"
+            :options="dataBitOptions"
+            :disabled="!!serial.connectedPort"
+            size="sm"
+          />
         </div>
         <div class="config-item">
           <label>校验位</label>
-          <select v-model="serial.config.parity" :disabled="!!serial.connectedPort">
-            <option value="none">无 (None)</option>
-            <option value="odd">奇 (Odd)</option>
-            <option value="even">偶 (Even)</option>
-          </select>
+          <CustomSelect
+            v-model="serial.config.parity"
+            :options="parityOptions"
+            :disabled="!!serial.connectedPort"
+            size="sm"
+          />
         </div>
       </div>
     </div>
@@ -215,16 +237,8 @@ onMounted(() => {
   align-items: center;
 }
 
-.port-select {
+.port-select-wrapper {
   flex: 1;
-  font-size: 0.8rem;
-  padding: 5px 8px;
-  background-color: var(--bg-app, #0f111a);
-  border: 1px solid var(--border, #2a2f42);
-  color: var(--text-main, #e2e8f0);
-  border-radius: 5px;
-  outline: none;
-  font-family: var(--font-mono, monospace);
   min-width: 0;
 }
 

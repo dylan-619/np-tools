@@ -10,7 +10,10 @@ import {
   AlertTriangle,
   Flame,
   Check,
+  Copy,
   Sparkles,
+  Activity,
+  X,
 } from 'lucide-vue-next'
 import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
@@ -23,31 +26,72 @@ const inputSn = ref('430125010001')
 const autoIncrement = ref(true)
 const showConfirmModal = ref(false)
 const isVerifying = ref(false)
+const copiedSn = ref(false)
+
+async function copySn(sn?: string) {
+  const text = sn || sjzd.deviceInfo?.sn
+  if (!text || text === '--') return
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedSn.value = true
+    setTimeout(() => {
+      copiedSn.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('复制 SN 失败:', err)
+  }
+}
+
+function formatUptime(sec?: number): string {
+  if (sec === undefined || sec === null) return '--'
+  if (sec < 60) return `${sec} 秒`
+  if (sec < 3600) {
+    const mins = Math.floor(sec / 60)
+    const rem = sec % 60
+    return `${mins} 分 ${rem} 秒 (${sec}s)`
+  }
+  if (sec < 86400) {
+    const hours = Math.floor(sec / 3600)
+    const mins = Math.floor((sec % 3600) / 60)
+    return `${hours} 小时 ${mins} 分 (${sec}s)`
+  }
+  const days = Math.floor(sec / 86400)
+  const hours = Math.floor((sec % 86400) / 3600)
+  const mins = Math.floor((sec % 3600) / 60)
+  return `${days} 天 ${hours} 小时 ${mins} 分 (${sec}s)`
+}
 
 const isSnValid = computed(() => {
   const clean = inputSn.value.trim()
-  return clean.length === 12 && clean.startsWith('4301') && /^\d+$/.test(clean)
+  return clean.length === 12 && /^\d+$/.test(clean)
 })
 
 const snValidationMessage = computed(() => {
   const clean = inputSn.value.trim()
-  if (!clean) return '请输入 12 位纯数字序列号'
-  if (!clean.startsWith('4301')) return 'SJZDV3 设备 SN 必须以 4301 开头'
-  if (clean.length < 12) return `当前长度 ${clean.length}/12 位，缺少 ${12 - clean.length} 位`
-  if (clean.length > 12) return `当前长度 ${clean.length}/12 位，超出 ${clean.length - 12} 位`
-  if (!/^\d+$/.test(clean)) return 'SN 必须为纯十进制数字'
-  return '格式正确，可点击写入'
+  if (!clean) return '请输入 12 位纯数字序列号 (如 430126070777)'
+  if (!/^\d+$/.test(clean)) return 'SN 序列号必须全部为纯数字'
+  if (clean.length < 12) return `当前输入 ${clean.length}/12 位，缺少 ${12 - clean.length} 位数字`
+  if (clean.length > 12) return `当前输入 ${clean.length}/12 位，超出 ${clean.length - 12} 位`
+  if (!clean.startsWith('4301')) return '提示: SJZDV3 标准产品 SN 建议以 4301 开头，当前格式已满足 12 位可正常烧录'
+  return 'SN 格式正确 (12 位纯数字)，点击右侧按钮即可写入设备'
 })
 
-// Auto-clean input on paste or change
+function fillReadbackSn() {
+  if (sjzd.deviceInfo?.sn && sjzd.deviceInfo.sn !== '--') {
+    inputSn.value = sjzd.deviceInfo.sn
+    localStorage.setItem('np_tools_last_sn', inputSn.value)
+  }
+}
+
+function clearSnInput() {
+  inputSn.value = ''
+}
+
 function handleSnInput(e: Event) {
   const val = (e.target as HTMLInputElement).value
-  const digitsOnly = val.replace(/\D/g, '')
-  if (digitsOnly.length > 12) {
-    inputSn.value = digitsOnly.slice(0, 12)
-  } else {
-    inputSn.value = digitsOnly
-  }
+  // Keep clean alphanumeric/numeric string up to 12 chars
+  const digitsOnly = val.replace(/\D/g, '').slice(0, 12)
+  inputSn.value = digitsOnly
   localStorage.setItem('np_tools_last_sn', inputSn.value)
 }
 
@@ -95,7 +139,7 @@ async function verifySnMatch() {
 
 onMounted(() => {
   const saved = localStorage.getItem('np_tools_last_sn')
-  if (saved && saved.startsWith('4301') && saved.length === 12) {
+  if (saved && saved.length === 12) {
     inputSn.value = saved
   }
   if (serial.connectedPort) {
@@ -140,7 +184,7 @@ onMounted(() => {
 
     <!-- Info Metrics Grid -->
     <div class="metrics-grid">
-      <div class="metric-card">
+      <div class="metric-card metric-card-sn">
         <div class="metric-icon blue">
           <Cpu :size="20" />
         </div>
@@ -148,6 +192,16 @@ onMounted(() => {
           <span class="metric-label">设备序列号 (SN)</span>
           <span class="metric-value">{{ sjzd.deviceInfo?.sn || '--' }}</span>
         </div>
+        <button
+          v-if="sjzd.deviceInfo?.sn"
+          class="card-copy-btn"
+          :class="{ copied: copiedSn }"
+          :title="copiedSn ? '已复制设备 SN' : '一键复制设备 SN 序列号 (用于配置北向上位机)'"
+          @click.stop="copySn(sjzd.deviceInfo.sn)"
+        >
+          <Check v-if="copiedSn" :size="13" class="copy-icon-success" />
+          <Copy v-else :size="13" />
+        </button>
       </div>
 
       <div class="metric-card">
@@ -155,8 +209,14 @@ onMounted(() => {
           <Zap :size="20" />
         </div>
         <div class="metric-content">
-          <span class="metric-label">固件版本 (FW)</span>
-          <span class="metric-value">{{ sjzd.deviceInfo?.fwVersion || '--' }}</span>
+          <span class="metric-label">设备型号 / 现场地址</span>
+          <span class="metric-value">
+            {{
+              sjzd.deviceInfo?.deviceType
+                ? `型号 ${sjzd.deviceInfo.deviceType} | 地址 ${sjzd.deviceInfo.deviceAddr || '默认'}`
+                : (sjzd.deviceInfo?.hwVersion || sjzd.deviceInfo?.fwVersion || '--')
+            }}
+          </span>
         </div>
       </div>
 
@@ -165,7 +225,7 @@ onMounted(() => {
           <RotateCcw :size="20" />
         </div>
         <div class="metric-content">
-          <span class="metric-label">累计上电次数 (POC)</span>
+          <span class="metric-label">累计上电次数 (PwrOnCnt)</span>
           <span class="metric-value">
             {{ sjzd.deviceInfo?.bootCount !== undefined ? `${sjzd.deviceInfo.bootCount} 次` : '--' }}
           </span>
@@ -177,10 +237,78 @@ onMounted(() => {
           <Clock :size="20" />
         </div>
         <div class="metric-content">
-          <span class="metric-label">累计运行时间 (RTM)</span>
+          <span class="metric-label">累计运行时间 (TotRunTim)</span>
           <span class="metric-value">
-            {{ sjzd.deviceInfo?.uptimeSec !== undefined ? `${sjzd.deviceInfo.uptimeSec} 秒` : '--' }}
+            {{ formatUptime(sjzd.deviceInfo?.uptimeSec) }}
           </span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon teal">
+          <Activity :size="20" />
+        </div>
+        <div class="metric-content">
+          <span class="metric-label">周期上报频率 (RptFreq)</span>
+          <span class="metric-value">
+            {{ sjzd.deviceInfo?.reportFreqSec !== undefined ? `${sjzd.deviceInfo.reportFreqSec} 秒` : '--' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Device Info Breakdown Card -->
+    <div v-if="sjzd.deviceInfo" class="section-card">
+      <div class="card-header">
+        <div class="header-left">
+          <Cpu :size="16" class="section-icon" />
+          <h3>智能采集终端已解析参数详情 (DevInfo 回读)</h3>
+        </div>
+        <span class="header-tag-success">已成功解析</span>
+      </div>
+
+      <div class="card-body">
+        <div class="info-breakdown-grid">
+          <div class="breakdown-item">
+            <span class="b-label">设备唯一 SN：</span>
+            <div class="b-value-wrap">
+              <span class="b-value mono-text highlight">{{ sjzd.deviceInfo.sn || '--' }}</span>
+              <button
+                v-if="sjzd.deviceInfo.sn"
+                class="inline-copy-btn"
+                :class="{ copied: copiedSn }"
+                :title="copiedSn ? '已复制' : '复制 SN 序列号'"
+                @click="copySn(sjzd.deviceInfo.sn)"
+              >
+                <Check v-if="copiedSn" :size="12" class="copy-icon-success" />
+                <Copy v-else :size="12" />
+              </button>
+            </div>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label">设备型号 (Type)：</span>
+            <span class="b-value mono-text">{{ sjzd.deviceInfo.deviceType || sjzd.deviceInfo.hwVersion || '--' }}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label">设备现场地址 (Addr)：</span>
+            <span class="b-value mono-text">{{ sjzd.deviceInfo.deviceAddr || '--' }}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label">累计开机次数 (PwrOnCnt)：</span>
+            <span class="b-value mono-text">{{ sjzd.deviceInfo.bootCount !== undefined ? `${sjzd.deviceInfo.bootCount} 次` : '--' }}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label">累计运行时间 (TotRunTim)：</span>
+            <span class="b-value mono-text">{{ formatUptime(sjzd.deviceInfo.uptimeSec) }}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label">周期上报频率 (RptFreq)：</span>
+            <span class="b-value mono-text">{{ sjzd.deviceInfo.reportFreqSec !== undefined ? `${sjzd.deviceInfo.reportFreqSec} 秒` : '--' }}</span>
+          </div>
+          <div v-if="sjzd.deviceInfo.rawText" class="breakdown-item full-width">
+            <span class="b-label">最新回读原始响应：</span>
+            <span class="b-value mono-text raw-line">{{ sjzd.deviceInfo.rawText }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -210,15 +338,35 @@ onMounted(() => {
           <div class="input-with-badge">
             <span class="prefix-badge">SN:</span>
             <input
-              :value="inputSn"
+              v-model="inputSn"
               type="text"
               maxlength="12"
-              placeholder="4301xxxxxxxx"
+              placeholder="请输入 12 位纯数字序列号 (如 4301xxxxxxxx)"
               class="sn-input mono-text"
               :class="{ invalid: !isSnValid && inputSn.length > 0, valid: isSnValid }"
-              :disabled="!serial.connectedPort || sjzd.isBusy"
               @input="handleSnInput"
             />
+          </div>
+
+          <div class="sn-quick-tools">
+            <button
+              v-if="sjzd.deviceInfo?.sn && sjzd.deviceInfo.sn !== '--'"
+              class="btn btn-sm btn-ghost"
+              title="一键填入当前设备回读到的 SN"
+              @click="fillReadbackSn"
+            >
+              <Copy :size="12" />
+              <span>填入当前回读 SN</span>
+            </button>
+            <button
+              v-if="inputSn"
+              class="btn btn-sm btn-ghost"
+              title="清空当前输入框"
+              @click="clearSnInput"
+            >
+              <X :size="12" />
+              <span>清空</span>
+            </button>
           </div>
 
           <button
@@ -310,11 +458,13 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1100px;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-header {
@@ -322,6 +472,7 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .title-col h2 {
@@ -363,6 +514,7 @@ onMounted(() => {
 }
 
 .metric-card {
+  position: relative;
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
   border-radius: 8px;
@@ -370,6 +522,69 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.card-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-input, #232736);
+  color: var(--text-muted, #94a3b8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.card-copy-btn:hover {
+  background: #2e3448;
+  color: #fff;
+  border-color: #3b82f6;
+}
+
+.card-copy-btn.copied {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.copy-icon-success {
+  color: #34d399;
+}
+
+.b-value-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-copy-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted, #94a3b8);
+  border-radius: 4px;
+  padding: 2px 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.inline-copy-btn:hover {
+  background: var(--bg-input, #232736);
+  color: #fff;
+  border-color: var(--border, #2a2f42);
+}
+
+.inline-copy-btn.copied {
+  color: #34d399;
 }
 
 .metric-icon {
@@ -396,6 +611,64 @@ onMounted(() => {
 .metric-icon.amber {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
+}
+.metric-icon.teal {
+  background: rgba(20, 184, 166, 0.15);
+  color: #2dd4bf;
+}
+
+.header-tag-success {
+  font-size: 0.7rem;
+  font-family: var(--font-mono, monospace);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.info-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  background: var(--bg-app, #0f111a);
+  padding: 14px;
+  border-radius: 6px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+
+.breakdown-item.full-width {
+  grid-column: 1 / -1;
+  border-top: 1px dashed var(--border, #2a2f42);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.b-label {
+  color: var(--text-muted, #94a3b8);
+  flex-shrink: 0;
+  min-width: 140px;
+}
+
+.b-value {
+  color: var(--text-main, #e2e8f0);
+  font-weight: 500;
+}
+
+.b-value.highlight {
+  color: #60a5fa;
+  font-weight: 700;
+}
+
+.raw-line {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  word-break: break-all;
 }
 
 .metric-content {
@@ -482,8 +755,33 @@ onMounted(() => {
 .sn-form-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.sn-quick-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border, #2a2f42);
+  color: var(--text-muted, #94a3b8);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: #3b82f6;
 }
 
 .input-with-badge {
@@ -496,6 +794,7 @@ onMounted(() => {
   flex: 1;
   min-width: 260px;
   max-width: 380px;
+  transition: border-color 0.15s;
 }
 
 .prefix-badge {

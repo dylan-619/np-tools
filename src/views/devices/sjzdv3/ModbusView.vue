@@ -24,6 +24,7 @@ import {
   type ModbusPointConfig,
 } from '../../../types/sjzd'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
+import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
@@ -32,6 +33,20 @@ const showResetModal = ref(false)
 const showDebugDrawer = ref(true)
 const activeDebugPoint = ref<ModbusPointConfig | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedPreset = ref('')
+
+const presetOptions = [
+  { label: '⚡ 三相智能电表模版 (电压/电流/功率/电能)', value: 'meter' },
+  { label: '🌡️ 4路工业温湿度变送器模版', value: 'sensor' },
+  { label: '⚙️ 变频器常用运行参数模版', value: 'vfd' },
+]
+
+function onPresetChange(val: string) {
+  if (val) {
+    loadPreset(val as any)
+    selectedPreset.value = ''
+  }
+}
 
 function onDataTypeChanged(pt: ModbusPointConfig) {
   // Smart auto-correction: 32-bit types require length >= 2
@@ -243,12 +258,13 @@ onMounted(() => {
 
         <!-- Industry Presets -->
         <div class="preset-dropdown-wrapper">
-          <select class="form-select-sm" @change="(e) => loadPreset((e.target as HTMLSelectElement).value as any)">
-            <option value="" disabled selected>📦 载入行业点位预设...</option>
-            <option value="meter">⚡ 三相智能电表模版 (电压/电流/功率/电能)</option>
-            <option value="sensor">🌡️ 4路工业温湿度变送器模版</option>
-            <option value="vfd">⚙️ 变频器常用运行参数模版</option>
-          </select>
+          <CustomSelect
+            v-model="selectedPreset"
+            :options="presetOptions"
+            placeholder="📦 载入行业点位预设..."
+            size="sm"
+            @change="onPresetChange"
+          />
         </div>
 
         <button
@@ -370,11 +386,11 @@ onMounted(() => {
 
               <!-- Function Code -->
               <td>
-                <select v-model.number="pt.funcCode" class="cell-select">
-                  <option v-for="f in MODBUS_FUNC_OPTIONS" :key="f.value" :value="f.value">
-                    {{ f.label }}
-                  </option>
-                </select>
+                <CustomSelect
+                  v-model="pt.funcCode"
+                  :options="MODBUS_FUNC_OPTIONS"
+                  size="sm"
+                />
               </td>
 
               <!-- PLC Register Address -->
@@ -402,36 +418,22 @@ onMounted(() => {
 
               <!-- Data Type -->
               <td>
-                <select
-                  v-model.number="pt.dataType"
-                  class="cell-select"
+                <CustomSelect
+                  v-model="pt.dataType"
+                  :options="MODBUS_DATA_TYPE_OPTIONS"
+                  size="sm"
                   @change="onDataTypeChanged(pt)"
-                >
-                  <option
-                    v-for="dt in MODBUS_DATA_TYPE_OPTIONS"
-                    :key="dt.value"
-                    :value="dt.value"
-                  >
-                    {{ dt.label }}
-                  </option>
-                </select>
+                />
               </td>
 
               <!-- Byte Order -->
               <td>
-                <select
-                  v-model.number="pt.byteOrder"
-                  class="cell-select"
+                <CustomSelect
+                  v-model="pt.byteOrder"
+                  :options="MODBUS_BYTE_ORDER_OPTIONS"
                   :disabled="![3, 4, 5].includes(pt.dataType)"
-                >
-                  <option
-                    v-for="bo in MODBUS_BYTE_ORDER_OPTIONS"
-                    :key="bo.value"
-                    :value="bo.value"
-                  >
-                    {{ bo.label }}
-                  </option>
-                </select>
+                  size="sm"
+                />
               </td>
 
               <!-- Unit -->
@@ -554,7 +556,9 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 1400px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-header {

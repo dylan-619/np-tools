@@ -16,6 +16,29 @@ static RE_PERCENT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(\d+)\s*%").unwrap()
 });
 
+static RE_PROGRESS_BAR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\[[=\->\s#█▒░▓■□\.\+]*\]\s*(\d+%)").unwrap()
+});
+
+static RE_ANSI: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\x1B\[[0-9;?]*[a-zA-Z]").unwrap()
+});
+
+fn clean_cli_text(input: &str) -> String {
+    let no_ansi = RE_ANSI.replace_all(input, "");
+    let mut cleaned = String::with_capacity(no_ansi.len());
+    for c in no_ansi.chars() {
+        if c == '\t' || (c >= ' ' && c != '\x7F') || (!c.is_ascii() && !c.is_control()) {
+            cleaned.push(c);
+        }
+    }
+    let trimmed = cleaned.trim();
+    if let Some(caps) = RE_PROGRESS_BAR.captures(trimmed) {
+        return format!("正在传输数据进度: {}", &caps[1]);
+    }
+    trimmed.to_string()
+}
+
 pub struct FlashManager {
     cancel_flag: Arc<AtomicBool>,
 }
@@ -231,30 +254,30 @@ pub async fn execute_flash(
             line = stdout_reader.next_line() => {
                 match line {
                     Ok(Some(text)) => {
-                        let trimmed = text.trim();
-                        if trimmed.is_empty() {
+                        let cleaned = clean_cli_text(&text);
+                        if cleaned.is_empty() {
                             continue;
                         }
 
                         // Parse State & Percent
-                        if trimmed.contains("Memory Programming") || trimmed.contains("Download in Progress") {
+                        if cleaned.contains("Memory Programming") || cleaned.contains("Download in Progress") {
                             current_state = "programming".into();
                             current_percent = current_percent.max(20);
-                        } else if trimmed.contains("Verifying") || trimmed.contains("Verify") {
+                        } else if cleaned.contains("Verifying") || cleaned.contains("Verify") {
                             current_state = "verifying".into();
                             current_percent = current_percent.max(75);
-                        } else if trimmed.contains("Erasing") || trimmed.contains("Mass erase") {
+                        } else if cleaned.contains("Erasing") || cleaned.contains("Mass erase") {
                             current_state = "erasing".into();
                             current_percent = current_percent.max(15);
-                        } else if trimmed.contains("File download complete") || trimmed.contains("Download verified successfully") {
+                        } else if cleaned.contains("File download complete") || cleaned.contains("Download verified successfully") {
                             current_state = "verifying".into();
                             current_percent = 95;
-                        } else if trimmed.contains("Application is running") || trimmed.contains("Software reset") {
+                        } else if cleaned.contains("Application is running") || cleaned.contains("Software reset") {
                             current_state = "success".into();
                             current_percent = 100;
                         }
 
-                        if let Some(caps) = RE_PERCENT.captures(trimmed) {
+                        if let Some(caps) = RE_PERCENT.captures(&cleaned) {
                             if let Ok(pct) = caps[1].parse::<u8>() {
                                 if current_state == "programming" {
                                     // Scale 20% ~ 70%
@@ -266,7 +289,7 @@ pub async fn execute_flash(
                             }
                         }
 
-                        let is_err = trimmed.contains("Error:") || trimmed.contains("ST-LINK error");
+                        let is_err = cleaned.contains("Error:") || cleaned.contains("ST-LINK error");
                         if is_err {
                             current_state = "error".into();
                         }
@@ -274,7 +297,7 @@ pub async fn execute_flash(
                         let _ = progress_tx.send(FlashProgressEvent {
                             state: current_state.clone(),
                             percent: current_percent,
-                            message: trimmed.to_string(),
+                            message: cleaned,
                             is_terminal: false,
                         }).await;
                     }
@@ -292,12 +315,12 @@ pub async fn execute_flash(
             }
             err_line = stderr_reader.next_line() => {
                 if let Ok(Some(text)) = err_line {
-                    let trimmed = text.trim();
-                    if !trimmed.is_empty() {
+                    let cleaned = clean_cli_text(&text);
+                    if !cleaned.is_empty() {
                         let _ = progress_tx.send(FlashProgressEvent {
                             state: "error".into(),
                             percent: current_percent,
-                            message: trimmed.to_string(),
+                            message: cleaned,
                             is_terminal: false,
                         }).await;
                     }

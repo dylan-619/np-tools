@@ -12,6 +12,7 @@ import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
 import { LOG_LEVEL_OPTIONS } from '../../../types/sjzd'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
+import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
@@ -76,15 +77,11 @@ const showEepromModal = ref(false)
         <div class="param-box">
           <label>运行日志输出等级 (LOGLEVEL)</label>
           <div class="input-with-action">
-            <select
-              v-model.number="selectedLogLevel"
-              class="form-select"
+            <CustomSelect
+              v-model="selectedLogLevel"
+              :options="LOG_LEVEL_OPTIONS"
               :disabled="!serial.connectedPort || sjzd.isBusy"
-            >
-              <option v-for="l in LOG_LEVEL_OPTIONS" :key="l.value" :value="l.value">
-                {{ l.label }}
-              </option>
-            </select>
+            />
             <button
               class="btn btn-sm btn-secondary"
               :disabled="!serial.connectedPort || sjzd.isBusy"
@@ -256,17 +253,21 @@ const showEepromModal = ref(false)
 
 <style scoped>
 .view-container {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1100px;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .title-col h2 {

@@ -9,30 +9,59 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldAlert,
+  Zap,
+  Cpu,
+  Check,
+  Copy,
+  Square,
 } from 'lucide-vue-next'
 import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
 import { SLE_TX_POWER_MAP } from '../../../types/sjzd'
+import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
 
 const atInput = ref('SEL_GETNAME?')
 const atHistory = ref<string[]>([])
+const copiedMac = ref(false)
+
+async function copyMac(mac?: string) {
+  const text = mac || sjzd.sleCurrentStatus?.mac
+  if (!text || text === '--') return
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedMac.value = true
+    setTimeout(() => {
+      copiedMac.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('复制 MAC 失败:', err)
+  }
+}
 
 const powerOptions = Object.entries(SLE_TX_POWER_MAP).map(([k, v]) => ({
   value: Number(k),
   label: `${k} 档 -> ${v}`,
 }))
 
-async function sendAtCommand() {
-  const cmd = atInput.value.trim()
+async function sendAtCommand(customCmd?: string) {
+  const cmd = (typeof customCmd === 'string' ? customCmd : atInput.value).trim()
   if (!cmd || !serial.connectedPort) return
   if (!atHistory.value.includes(cmd)) {
     atHistory.value.push(cmd)
   }
-  await serial.sendRaw(cmd, { addCR: true, addLF: true })
-  atInput.value = ''
+  if (cmd === '@WLAN=0') {
+    await sjzd.toggleWlanBridge(false)
+  } else if (cmd === '@WLAN=1') {
+    await sjzd.toggleWlanBridge(true)
+  } else {
+    await serial.sendRaw(cmd, { addCR: true, addLF: true })
+  }
+  if (typeof customCmd !== 'string') {
+    atInput.value = ''
+  }
 }
 
 onMounted(() => {
@@ -65,6 +94,71 @@ onMounted(() => {
       </div>
     </header>
 
+    <!-- Top SLE Metrics Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon blue">
+          <Radio :size="20" />
+        </div>
+        <div class="metric-content">
+          <span class="metric-label">星闪网络名称 (NetName)</span>
+          <span class="metric-value">{{ sjzd.sleCurrentStatus?.netName || '--' }}</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon green">
+          <Sliders :size="20" />
+        </div>
+        <div class="metric-content">
+          <span class="metric-label">星闪 AP ID / 通信地址</span>
+          <span class="metric-value">
+            {{
+              sjzd.sleCurrentStatus?.apId !== undefined
+                ? `APID: ${sjzd.sleCurrentStatus.apId} | 地址: ${sjzd.sleCurrentStatus.devAddr || '默认'}`
+                : '--'
+            }}
+          </span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon amber">
+          <Zap :size="20" />
+        </div>
+        <div class="metric-content">
+          <span class="metric-label">当前发射功率档位</span>
+          <span class="metric-value">
+            {{
+              sjzd.sleCurrentStatus?.txPower
+                ? `${sjzd.sleCurrentStatus.txPower} 档 (${SLE_TX_POWER_MAP[sjzd.sleCurrentStatus.txPower] || ''})`
+                : '--'
+            }}
+          </span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon purple">
+          <Cpu :size="20" />
+        </div>
+        <div class="metric-content">
+          <span class="metric-label">模组物理地址 (MAC)</span>
+          <span class="metric-value mono-text">{{ sjzd.sleCurrentStatus?.mac || '--' }}</span>
+        </div>
+        <button
+          v-if="sjzd.sleCurrentStatus?.mac"
+          class="card-copy-btn"
+          :class="{ copied: copiedMac }"
+          :title="copiedMac ? '已复制 MAC' : '复制星闪模组 MAC 地址'"
+          @click.stop="copyMac(sjzd.sleCurrentStatus.mac)"
+        >
+          <Check v-if="copiedMac" :size="13" class="copy-icon-success" />
+          <Copy v-else :size="13" />
+        </button>
+      </div>
+    </div>
+
     <!-- Two-Column Layout -->
     <div class="config-columns">
       <!-- Left Column: Parameter Form -->
@@ -75,12 +169,20 @@ onMounted(() => {
               <Sliders :size="16" class="icon-blue" />
               <h3>星闪无线参数设置</h3>
             </div>
+            <span v-if="sjzd.sleCurrentStatus?.lastSyncTime" class="header-tag-success">
+              已回读同步 ({{ sjzd.sleCurrentStatus.lastSyncTime }})
+            </span>
           </div>
 
           <div class="card-body form-body">
             <!-- Net Name -->
             <div class="form-group">
-              <label>星闪网络名称 (SLE_NETNAME)</label>
+              <div class="label-with-cur">
+                <label>星闪网络名称 (SLE_NETNAME)</label>
+                <span v-if="sjzd.sleCurrentStatus?.netName" class="cur-badge">
+                  当前回读: {{ sjzd.sleCurrentStatus.netName }}
+                </span>
+              </div>
               <div class="input-with-action">
                 <input
                   v-model="sjzd.sleForm.netName"
@@ -103,7 +205,12 @@ onMounted(() => {
 
             <!-- AP ID -->
             <div class="form-group">
-              <label>星闪 AP ID (SLE_APID)</label>
+              <div class="label-with-cur">
+                <label>星闪 AP ID (SLE_APID)</label>
+                <span v-if="sjzd.sleCurrentStatus?.apId !== undefined" class="cur-badge">
+                  当前回读: {{ sjzd.sleCurrentStatus.apId }}
+                </span>
+              </div>
               <div class="input-with-action">
                 <input
                   v-model.number="sjzd.sleForm.apId"
@@ -126,17 +233,18 @@ onMounted(() => {
 
             <!-- Tx Power -->
             <div class="form-group">
-              <label>当前发射功率档位 (SLE_PWR)</label>
+              <div class="label-with-cur">
+                <label>当前发射功率档位 (SLE_PWR)</label>
+                <span v-if="sjzd.sleCurrentStatus?.txPower" class="cur-badge">
+                  当前回读: {{ sjzd.sleCurrentStatus.txPower }} 档
+                </span>
+              </div>
               <div class="input-with-action">
-                <select
-                  v-model.number="sjzd.sleForm.txPower"
-                  class="form-select"
+                <CustomSelect
+                  v-model="sjzd.sleForm.txPower"
+                  :options="powerOptions"
                   :disabled="!serial.connectedPort || sjzd.isBusy"
-                >
-                  <option v-for="opt in powerOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                />
                 <button
                   class="btn btn-sm btn-secondary"
                   :disabled="!serial.connectedPort || sjzd.isBusy"
@@ -150,17 +258,18 @@ onMounted(() => {
 
             <!-- Max Tx Power -->
             <div class="form-group">
-              <label>最大发射功率上限 (SLE_MAXPWR)</label>
+              <div class="label-with-cur">
+                <label>最大发射功率上限 (SLE_MAXPWR)</label>
+                <span v-if="sjzd.sleCurrentStatus?.maxTxPower" class="cur-badge">
+                  当前回读: {{ sjzd.sleCurrentStatus.maxTxPower }} 档
+                </span>
+              </div>
               <div class="input-with-action">
-                <select
-                  v-model.number="sjzd.sleForm.maxTxPower"
-                  class="form-select"
+                <CustomSelect
+                  v-model="sjzd.sleForm.maxTxPower"
+                  :options="powerOptions"
                   :disabled="!serial.connectedPort || sjzd.isBusy"
-                >
-                  <option v-for="opt in powerOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                />
                 <button
                   class="btn btn-sm btn-secondary"
                   :disabled="!serial.connectedPort || sjzd.isBusy"
@@ -194,17 +303,18 @@ onMounted(() => {
           <div class="card-header">
             <div class="header-left">
               <Radio :size="16" class="icon-green" />
-              <h3>EEPROM 与芯片底层回读比对</h3>
+              <h3>EEPROM 与星闪芯片底层回读比对</h3>
             </div>
+            <span class="header-subtitle-tag">仅比对两者共有参数 (网络名、通信地址、发射功率)</span>
           </div>
 
           <div class="card-body no-padding">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>配置项目</th>
+                  <th>比对项目</th>
                   <th>EEPROM 设定值</th>
-                  <th>芯片实际回读值</th>
+                  <th>星闪芯片底层回读值</th>
                   <th>一致性状态</th>
                 </tr>
               </thead>
@@ -235,6 +345,24 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
+
+            <!-- Exclusive Hardware / EEPROM Properties Bar -->
+            <div v-if="sjzd.sleCurrentStatus?.lastSyncTime" class="extra-prop-bar">
+              <div class="prop-item">
+                <span class="p-name">星闪 AP ID (EEPROM):</span>
+                <span class="p-val mono-text">{{ sjzd.sleCurrentStatus.apId ?? '--' }}</span>
+              </div>
+              <div class="prop-item">
+                <span class="p-name">最大发射功率上限 (EEPROM):</span>
+                <span class="p-val mono-text">
+                  {{ sjzd.sleCurrentStatus.maxTxPower !== undefined ? `${sjzd.sleCurrentStatus.maxTxPower} 档` : '--' }}
+                </span>
+              </div>
+              <div class="prop-item">
+                <span class="p-name">模组 MAC 地址 (芯片):</span>
+                <span class="p-val mono-text">{{ sjzd.sleCurrentStatus.mac || '--' }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -244,40 +372,65 @@ onMounted(() => {
             <div class="header-left">
               <Terminal :size="16" class="icon-purple" />
               <h3>星闪原厂 AT 透传调试</h3>
+              <span
+                class="bridge-status-badge"
+                :class="{ active: sjzd.wlanBridgeEnabled }"
+              >
+                {{ sjzd.wlanBridgeEnabled ? '🟢 透传模式 (@WLAN=1)' : '⚪ 普通命令模式 (@WLAN=0)' }}
+              </span>
             </div>
 
-            <div class="bridge-switch-wrapper">
-              <label class="switch-label">
-                <input
-                  type="checkbox"
-                  :checked="sjzd.wlanBridgeEnabled"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
-                  @change="sjzd.toggleWlanBridge(!sjzd.wlanBridgeEnabled)"
-                />
-                <span>透传模式 (@WLAN)</span>
-              </label>
+            <div class="bridge-actions">
+              <button
+                v-if="sjzd.wlanBridgeEnabled"
+                class="btn btn-sm btn-danger"
+                :disabled="!serial.connectedPort || sjzd.isBusy"
+                title="点击下发 @WLAN=0 退出透传并恢复 MCU 常规指令"
+                @click="sjzd.toggleWlanBridge(false)"
+              >
+                <Square :size="13" />
+                <span>退出透传 (@WLAN=0)</span>
+              </button>
+              <button
+                v-else
+                class="btn btn-sm btn-outline-purple"
+                :disabled="!serial.connectedPort || sjzd.isBusy"
+                title="点击下发 @WLAN=1 进入直通星闪模组的原厂 AT 模式"
+                @click="sjzd.toggleWlanBridge(true)"
+              >
+                <Zap :size="13" />
+                <span>进入透传 (@WLAN=1)</span>
+              </button>
             </div>
           </div>
 
           <div class="card-body">
-            <div v-if="!sjzd.wlanBridgeEnabled" class="bridge-disabled-notice">
-              <ShieldAlert :size="16" />
-              <span>开启【透传模式 (@WLAN=1)】后，USART1 将直通星闪模组 UART2，允许直接交互原厂 AT 指令。</span>
+            <div v-if="sjzd.wlanBridgeEnabled" class="bridge-active-notice">
+              <Zap :size="15" />
+              <span>
+                当前已开启【透传模式 (@WLAN=1)】，USART1 直通星闪模组 UART2。如需恢复 MCU 配置指令（如 SLE:LIST），请随时点击上方【退出透传】或下方快捷键【@WLAN=0】。
+              </span>
+            </div>
+            <div v-else class="bridge-disabled-notice">
+              <ShieldAlert :size="15" />
+              <span>
+                当前处于【普通命令模式 (@WLAN=0)】。点击上方【进入透传 (@WLAN=1)】后可直通星闪模组交互原厂 AT 指令。
+              </span>
             </div>
 
             <div class="at-input-row">
               <input
                 v-model="atInput"
                 type="text"
-                placeholder="键入 AT 指令 (例: SEL_GETNAME?, SEL_RST)..."
+                placeholder="键入 AT 指令 (例: SEL_GETNAME?, @WLAN=0, SEL_RST)..."
                 class="form-input mono-text"
-                :disabled="!serial.connectedPort || !sjzd.wlanBridgeEnabled"
-                @keyup.enter="sendAtCommand"
+                :disabled="!serial.connectedPort"
+                @keyup.enter="sendAtCommand()"
               />
               <button
                 class="btn btn-primary"
-                :disabled="!serial.connectedPort || !sjzd.wlanBridgeEnabled || !atInput.trim()"
-                @click="sendAtCommand"
+                :disabled="!serial.connectedPort || !atInput.trim()"
+                @click="sendAtCommand()"
               >
                 <Send :size="14" />
                 <span>发送</span>
@@ -286,24 +439,40 @@ onMounted(() => {
 
             <!-- Quick AT Presets -->
             <div class="at-presets-row">
-              <span class="preset-label">快捷指令:</span>
+              <span class="preset-label">快捷操作:</span>
+              <button
+                class="preset-chip chip-danger"
+                title="下发 @WLAN=0 退出透传模式"
+                :disabled="!serial.connectedPort"
+                @click="sendAtCommand('@WLAN=0')"
+              >
+                @WLAN=0 (退出透传)
+              </button>
+              <button
+                class="preset-chip chip-primary"
+                title="下发 @WLAN=1 进入透传模式"
+                :disabled="!serial.connectedPort"
+                @click="sendAtCommand('@WLAN=1')"
+              >
+                @WLAN=1 (开启透传)
+              </button>
               <button
                 class="preset-chip"
-                :disabled="!sjzd.wlanBridgeEnabled"
+                :disabled="!serial.connectedPort"
                 @click="atInput = 'SEL_GETNAME?'"
               >
                 SEL_GETNAME?
               </button>
               <button
                 class="preset-chip"
-                :disabled="!sjzd.wlanBridgeEnabled"
+                :disabled="!serial.connectedPort"
                 @click="atInput = 'SEL_GETADDR?'"
               >
                 SEL_GETADDR?
               </button>
               <button
                 class="preset-chip"
-                :disabled="!sjzd.wlanBridgeEnabled"
+                :disabled="!serial.connectedPort"
                 @click="atInput = 'SEL_RST'"
               >
                 SEL_RST
@@ -318,11 +487,13 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1200px;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-header {
@@ -330,6 +501,7 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .title-col h2 {
@@ -346,9 +518,138 @@ onMounted(() => {
 
 .config-columns {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: minmax(360px, 420px) minmax(420px, 1fr);
   gap: 16px;
   align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .config-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.metric-card {
+  position: relative;
+  background: var(--bg-panel, #1a1d27);
+  border: 1px solid var(--border, #2a2f42);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.metric-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.metric-icon.blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+.metric-icon.green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+.metric-icon.amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+.metric-icon.purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.metric-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.metric-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-main, #e2e8f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-input, #232736);
+  color: var(--text-muted, #94a3b8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+.card-copy-btn:hover {
+  background: #2e3448;
+  color: #fff;
+  border-color: #3b82f6;
+}
+.card-copy-btn.copied {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+.copy-icon-success {
+  color: #34d399;
+}
+
+.header-tag-success {
+  font-size: 0.7rem;
+  font-family: var(--font-mono, monospace);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.label-with-cur {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cur-badge {
+  font-size: 0.7rem;
+  font-family: var(--font-mono, monospace);
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 
 .section-card {
@@ -481,24 +782,75 @@ onMounted(() => {
   color: #f87171;
 }
 
+.header-subtitle-tag {
+  font-size: 0.7rem;
+  color: var(--text-muted, #94a3b8);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.extra-prop-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--border, #2a2f42);
+  font-size: 0.76rem;
+}
+.prop-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.p-name {
+  color: var(--text-muted, #94a3b8);
+}
+.p-val {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
 .empty-cell {
   text-align: center;
   padding: 24px;
   color: var(--text-muted, #94a3b8);
 }
 
-.bridge-switch-wrapper {
-  display: flex;
-  align-items: center;
+.bridge-status-badge {
+  font-size: 0.72rem;
+  font-family: var(--font-mono, monospace);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-muted, #94a3b8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.bridge-status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
 }
 
-.switch-label {
+.bridge-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: var(--text-main, #e2e8f0);
-  cursor: pointer;
+  gap: 8px;
+}
+
+.bridge-active-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .bridge-disabled-notice {
@@ -511,6 +863,7 @@ onMounted(() => {
   border: 1px solid rgba(245, 158, 11, 0.25);
   color: #fbbf24;
   font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .at-input-row {
@@ -521,6 +874,7 @@ onMounted(() => {
 .at-presets-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -538,6 +892,7 @@ onMounted(() => {
   font-size: 0.72rem;
   font-family: var(--font-mono, monospace);
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 .preset-chip:hover:not(:disabled) {
   border-color: #3b82f6;
@@ -546,6 +901,30 @@ onMounted(() => {
 .preset-chip:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.preset-chip.chip-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  font-weight: 600;
+}
+.preset-chip.chip-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.preset-chip.chip-primary {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #c084fc;
+  font-weight: 600;
+}
+.preset-chip.chip-primary:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: #a855f7;
+  color: #fff;
 }
 
 .btn {
@@ -578,6 +957,26 @@ onMounted(() => {
 }
 .btn-secondary:hover:not(:disabled) {
   background: #2e3448;
+}
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+.btn-danger:hover:not(:disabled) {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+.btn-outline-purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+.btn-outline-purple:hover:not(:disabled) {
+  background: #a855f7;
+  color: #fff;
+  border-color: #a855f7;
 }
 .btn:disabled {
   opacity: 0.5;

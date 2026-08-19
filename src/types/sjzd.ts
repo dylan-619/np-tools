@@ -23,12 +23,27 @@ export interface SleFieldComparison {
   isMatched: boolean
 }
 
+export interface SleCurrentStatus {
+  netName?: string
+  apId?: number
+  devAddr?: string
+  txPower?: number
+  maxTxPower?: number
+  mac?: string
+  mode?: number
+  bridge?: number
+  lastSyncTime?: string
+}
+
 export interface DeviceInfoResult {
   sn?: string
+  deviceType?: string
+  deviceAddr?: string
   hwVersion?: string
   fwVersion?: string
   bootCount?: number
   uptimeSec?: number
+  reportFreqSec?: number
   rawText: string
 }
 

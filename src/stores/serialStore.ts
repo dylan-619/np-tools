@@ -64,17 +64,45 @@ export const useSerialStore = defineStore('serial', () => {
       .padStart(3, '0')}`
   }
 
+  function cleanAnsiText(raw: string): string {
+    if (!raw) return ''
+    return raw
+      // Strip ANSI escape sequences like \x1b[0;32m or \x1b[0m
+      .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+      // Strip non-printable control characters except \t
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      .trim()
+  }
+
   function parseLogLevel(text: string): 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'RAW' {
-    if (text.includes('[ERROR]') || text.includes('DBGE') || text.includes('Error:')) {
+    const upper = text.toUpperCase()
+    if (
+      upper.includes('[ERROR]') ||
+      upper.includes('ERROR:') ||
+      upper.includes('ERR:') ||
+      upper.includes('DBGE') ||
+      upper.includes('FAILED')
+    ) {
       return 'ERROR'
     }
-    if (text.includes('[WARN]') || text.includes('DBGW') || text.includes('Warning')) {
+    if (
+      upper.includes('[WARN]') ||
+      upper.includes('WARN:') ||
+      upper.includes('WARNING') ||
+      upper.includes('DBGW')
+    ) {
       return 'WARN'
     }
-    if (text.includes('[INFO]') || text.includes('DBGI')) {
+    if (
+      upper.includes('[INFO]') ||
+      upper.includes('INFO:') ||
+      upper.includes('DEVINFO') ||
+      upper.includes('DEVINFO:') ||
+      upper.includes('DBGI')
+    ) {
       return 'INFO'
     }
-    if (text.includes('[DEBUG]') || text.includes('DBG')) {
+    if (upper.includes('[DEBUG]') || upper.includes('DEBUG:') || upper.includes('DBG')) {
       return 'DEBUG'
     }
     return 'RAW'
@@ -82,12 +110,15 @@ export const useSerialStore = defineStore('serial', () => {
 
   function appendLog(direction: 'rx' | 'tx', text: string) {
     const timeStr = getTimeString()
+    const cleanedText = direction === 'rx' ? cleanAnsiText(text) : text
+    if (!cleanedText) return
+
     const logItem: TerminalLogLine = {
       id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       direction,
-      text,
+      text: cleanedText,
       timestamp: timeStr,
-      level: parseLogLevel(text),
+      level: parseLogLevel(cleanedText),
     }
 
     logs.value.push(logItem)
@@ -98,12 +129,12 @@ export const useSerialStore = defineStore('serial', () => {
 
   let flushTimer: number | null = null
   function flushLineBuffer() {
-    if (lineBuffer.trim()) {
-      const trimmed = lineBuffer.trim()
-      appendLog('rx', trimmed)
+    const cleaned = cleanAnsiText(lineBuffer)
+    if (cleaned) {
+      appendLog('rx', cleaned)
       for (const listener of lineListeners.values()) {
         try {
-          listener(trimmed)
+          listener(cleaned)
         } catch (e) {
           console.error('Line listener error:', e)
         }
@@ -164,13 +195,13 @@ export const useSerialStore = defineStore('serial', () => {
             if (lines.length > 1) {
               lineBuffer = lines.pop() || ''
               for (const line of lines) {
-                const trimmed = line.trim()
-                if (trimmed) {
-                  appendLog('rx', trimmed)
+                const cleaned = cleanAnsiText(line)
+                if (cleaned) {
+                  appendLog('rx', cleaned)
                   // Broadcast to registered component listeners
                   for (const listener of lineListeners.values()) {
                     try {
-                      listener(trimmed)
+                      listener(cleaned)
                     } catch (e) {
                       console.error('Line listener error:', e)
                     }
