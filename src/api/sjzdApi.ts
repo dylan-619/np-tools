@@ -73,3 +73,41 @@ export async function sjzdParseAiSample(
 ): Promise<AiSampleDto | null> {
   return await invoke<AiSampleDto | null>('sjzd_parse_ai_sample', { text, timestampMs })
 }
+
+export async function appSaveFile(
+  defaultName: string,
+  content: string,
+  filterName: string,
+  filterExt: string
+): Promise<string | null> {
+  try {
+    return await invoke<string | null>('app_save_file', {
+      defaultName,
+      content,
+      filterName,
+      filterExt,
+    })
+  } catch (err) {
+    console.warn('Tauri app_save_file error, fallback to browser download:', err)
+    return null
+  }
+}
+
+export async function appOpenFile(
+  filterName: string,
+  filterExts: string[]
+): Promise<{ path: string; content: string } | null> {
+  try {
+    const res = await invoke<[string, string] | null>('app_open_file', {
+      filterName,
+      filterExts,
+    })
+    if (res) {
+      return { path: res[0], content: res[1] }
+    }
+    return null
+  } catch (err) {
+    console.warn('Tauri app_open_file error, fallback to browser file input:', err)
+    return null
+  }
+}

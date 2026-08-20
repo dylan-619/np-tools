@@ -24,6 +24,7 @@ import {
   MODBUS_BYTE_ORDER_OPTIONS,
   type ModbusPointConfig,
 } from '../../../types/sjzd'
+import { appSaveFile, appOpenFile } from '../../../api/sjzdApi'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
 
@@ -190,8 +191,47 @@ function loadPreset(presetName: 'meter' | 'sensor' | 'vfd') {
   }
 }
 
+function parsePointsContent(fileName: string, content: string) {
+  if (fileName.endsWith('.json')) {
+    const parsed = JSON.parse(content)
+    if (Array.isArray(parsed)) {
+      sjzd.modbusPoints = parsed.slice(0, 16).map((p: any) => ({
+        slaveAddr: Number(p.slaveAddr) || 1,
+        funcCode: Number(p.funcCode) || 3,
+        regAddr: Number(p.regAddr) || 40001,
+        length: Number(p.length) || 1,
+        dataType: Number(p.dataType) || 0,
+        byteOrder: Number(p.byteOrder) || 0,
+      }))
+      sjzd.showMessage(`已成功导入 ${sjzd.modbusPoints.length} 个点位配置！`)
+    }
+  } else if (fileName.endsWith('.csv')) {
+    const lines = content.split('\n').map((l) => l.trim()).filter(Boolean)
+    const newPoints: ModbusPointConfig[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',')
+      if (parts.length >= 4) {
+        newPoints.push({
+          slaveAddr: Number(parts[0]) || 1,
+          funcCode: Number(parts[1]) || 3,
+          regAddr: Number(parts[2]) || 40001,
+          length: Number(parts[3]) || 1,
+          dataType: Number(parts[4]) || 0,
+          byteOrder: Number(parts[5]) || 0,
+        })
+      }
+    }
+    sjzd.modbusPoints = newPoints.slice(0, 16)
+    sjzd.showMessage(`已从 CSV 成功导入 ${sjzd.modbusPoints.length} 个点位！`)
+  }
+}
+
 // Export template
-function exportJson() {
+async function exportJson() {
+  if (sjzd.modbusPoints.length === 0) {
+    sjzd.showMessage('当前点位表为空，无需导出', false)
+    return
+  }
   const dataToExport = sjzd.modbusPoints.map((p) => ({
     slaveAddr: p.slaveAddr,
     funcCode: p.funcCode,
@@ -200,17 +240,31 @@ function exportJson() {
     dataType: p.dataType,
     byteOrder: p.byteOrder,
   }))
-  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(dataToExport, null, 2))
+  const content = JSON.stringify(dataToExport, null, 2)
+  const defaultName = `SJZDV3_Modbus_Points_${Date.now()}.json`
+
+  const savedPath = await appSaveFile(defaultName, content, 'JSON 文件 (*.json)', 'json')
+  if (savedPath) {
+    sjzd.showMessage(`已成功导出点位 JSON 模板至: ${savedPath}`)
+    return
+  }
+
+  // Web Browser Fallback
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(content)
   const downloadAnchor = document.createElement('a')
   downloadAnchor.setAttribute('href', dataStr)
-  downloadAnchor.setAttribute('download', `SJZDV3_Modbus_Points_${Date.now()}.json`)
+  downloadAnchor.setAttribute('download', defaultName)
   document.body.appendChild(downloadAnchor)
   downloadAnchor.click()
   downloadAnchor.remove()
   sjzd.showMessage('已导出点位 JSON 模板文件')
 }
 
-function exportCsv() {
+async function exportCsv() {
+  if (sjzd.modbusPoints.length === 0) {
+    sjzd.showMessage('当前点位表为空，无需导出', false)
+    return
+  }
   const headers = '从站地址,功能码,PLC寄存器地址,读取长度,数据类型(0-6),字节序(0-3)\n'
   const rows = sjzd.modbusPoints
     .map(
@@ -218,12 +272,21 @@ function exportCsv() {
         `${p.slaveAddr},${p.funcCode},${p.regAddr},${p.length},${p.dataType},${p.byteOrder}`
     )
     .join('\n')
-  // Add UTF-8 BOM \uFEFF for seamless Microsoft Excel compatibility
-  const blob = new Blob(['\uFEFF' + headers + rows], { type: 'text/csv;charset=utf-8;' })
+  const content = '\uFEFF' + headers + rows
+  const defaultName = `SJZDV3_Modbus_Points_${Date.now()}.csv`
+
+  const savedPath = await appSaveFile(defaultName, content, 'CSV 表格文件 (*.csv)', 'csv')
+  if (savedPath) {
+    sjzd.showMessage(`已成功导出点位 CSV 模板至: ${savedPath}`)
+    return
+  }
+
+  // Web Browser Fallback
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `SJZDV3_Modbus_Points_${Date.now()}.csv`
+  a.download = defaultName
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -232,7 +295,18 @@ function exportCsv() {
 }
 
 // Import template
-function triggerImport() {
+async function triggerImport() {
+  // 优先使用桌面端原生打开文件选择框
+  const res = await appOpenFile('Modbus 点位模板 (*.json, *.csv)', ['json', 'csv'])
+  if (res) {
+    try {
+      parsePointsContent(res.path, res.content)
+    } catch (err) {
+      sjzd.showMessage(`导入模板文件解析失败: ${err}`, false)
+    }
+    return
+  }
+
   if (fileInputRef.value) {
     fileInputRef.value.click()
   }
@@ -247,38 +321,7 @@ function handleFileImport(event: Event) {
   reader.onload = (e) => {
     try {
       const content = e.target?.result as string
-      if (file.name.endsWith('.json')) {
-        const parsed = JSON.parse(content)
-        if (Array.isArray(parsed)) {
-          sjzd.modbusPoints = parsed.slice(0, 16).map((p: any) => ({
-            slaveAddr: Number(p.slaveAddr) || 1,
-            funcCode: Number(p.funcCode) || 3,
-            regAddr: Number(p.regAddr) || 40001,
-            length: Number(p.length) || 1,
-            dataType: Number(p.dataType) || 0,
-            byteOrder: Number(p.byteOrder) || 0,
-          }))
-          sjzd.showMessage(`已成功导入 ${sjzd.modbusPoints.length} 个点位配置！`)
-        }
-      } else if (file.name.endsWith('.csv')) {
-        const lines = content.split('\n').map((l) => l.trim()).filter(Boolean)
-        const newPoints: ModbusPointConfig[] = []
-        for (let i = 1; i < lines.length; i++) {
-          const parts = lines[i].split(',')
-          if (parts.length >= 4) {
-            newPoints.push({
-              slaveAddr: Number(parts[0]) || 1,
-              funcCode: Number(parts[1]) || 3,
-              regAddr: Number(parts[2]) || 40001,
-              length: Number(parts[3]) || 1,
-              dataType: Number(parts[4]) || 0,
-              byteOrder: Number(parts[5]) || 0,
-            })
-          }
-        }
-        sjzd.modbusPoints = newPoints.slice(0, 16)
-        sjzd.showMessage(`已从 CSV 成功导入 ${sjzd.modbusPoints.length} 个点位！`)
-      }
+      parsePointsContent(file.name, content)
     } catch (err) {
       sjzd.showMessage(`导入模板文件解析失败: ${err}`, false)
     }

@@ -257,6 +257,50 @@ fn flash_cancel(flash_mgr: tauri::State<'_, Arc<FlashManager>>) {
     flash_mgr.cancel();
 }
 
+#[tauri::command]
+async fn app_save_file(
+    default_name: String,
+    content: String,
+    filter_name: String,
+    filter_ext: String,
+    app: tauri::AppHandle,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    builder = builder.set_file_name(&default_name);
+    builder = builder.add_filter(&filter_name, &[&filter_ext]);
+
+    let path_opt = builder.blocking_save_file();
+    if let Some(file_path) = path_opt {
+        let path_str = file_path.to_string();
+        std::fs::write(&path_str, content.as_bytes()).map_err(|e| e.to_string())?;
+        Ok(Some(path_str))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+async fn app_open_file(
+    filter_name: String,
+    filter_exts: Vec<String>,
+    app: tauri::AppHandle,
+) -> Result<Option<(String, String)>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    let exts: Vec<&str> = filter_exts.iter().map(|s| s.as_str()).collect();
+    builder = builder.add_filter(&filter_name, &exts);
+
+    let path_opt = builder.blocking_pick_file();
+    if let Some(file_path) = path_opt {
+        let path_str = file_path.to_string();
+        let content = std::fs::read_to_string(&path_str).map_err(|e| e.to_string())?;
+        Ok(Some((path_str, content)))
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let flash_mgr = Arc::new(FlashManager::new());
@@ -293,7 +337,10 @@ pub fn run() {
             // Flashing Commands
             flash_probe_tool,
             flash_start,
-            flash_cancel
+            flash_cancel,
+            // File Save & Open Dialogs
+            app_save_file,
+            app_open_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
