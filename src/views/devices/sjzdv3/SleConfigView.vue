@@ -111,11 +111,11 @@ onMounted(() => {
           <Sliders :size="20" />
         </div>
         <div class="metric-content">
-          <span class="metric-label">星闪 AP ID / 通信地址</span>
+          <span class="metric-label">从机通信地址 (DevAddr) / APID</span>
           <span class="metric-value">
             {{
-              sjzd.sleCurrentStatus?.apId !== undefined
-                ? `APID: ${sjzd.sleCurrentStatus.apId} | 地址: ${sjzd.sleCurrentStatus.devAddr || '默认'}`
+              sjzd.sleCurrentStatus?.devAddr || sjzd.sleCurrentStatus?.apId !== undefined
+                ? `${sjzd.sleCurrentStatus?.devAddr ? '地址: ' + sjzd.sleCurrentStatus.devAddr : ''}${sjzd.sleCurrentStatus?.devAddr && sjzd.sleCurrentStatus?.apId !== undefined ? ' | ' : ''}${sjzd.sleCurrentStatus?.apId !== undefined ? 'APID: ' + sjzd.sleCurrentStatus.apId : ''}`
                 : '--'
             }}
           </span>
@@ -348,6 +348,10 @@ onMounted(() => {
 
             <!-- Exclusive Hardware / EEPROM Properties Bar -->
             <div v-if="sjzd.sleCurrentStatus?.lastSyncTime" class="extra-prop-bar">
+              <div class="prop-item">
+                <span class="p-name">从机通信地址 (DevAddr):</span>
+                <span class="p-val mono-text">{{ sjzd.sleCurrentStatus.devAddr || '--' }}</span>
+              </div>
               <div class="prop-item">
                 <span class="p-name">星闪 AP ID (EEPROM):</span>
                 <span class="p-val mono-text">{{ sjzd.sleCurrentStatus.apId ?? '--' }}</span>

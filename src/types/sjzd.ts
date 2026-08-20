@@ -54,27 +54,27 @@ export interface AiSampleDto {
 }
 
 export const MODBUS_FUNC_OPTIONS = [
-  { value: 1, label: '01H 读线圈 (Read Coils)' },
-  { value: 2, label: '02H 读离散输入 (Read Discrete Inputs)' },
-  { value: 3, label: '03H 读保持寄存器 (Read Holding Registers)' },
-  { value: 4, label: '04H 读输入寄存器 (Read Input Registers)' },
+  { value: 1, label: '01 读线圈' },
+  { value: 2, label: '02 读离散输入' },
+  { value: 3, label: '03 读保持寄存器' },
+  { value: 4, label: '04 读输入寄存器' },
 ]
 
 export const MODBUS_DATA_TYPE_OPTIONS = [
-  { value: 0, label: 'RAW_HEX (原始十六进制)', minLen: 1 },
-  { value: 1, label: 'INT16 (16位有符号整型)', minLen: 1 },
-  { value: 2, label: 'UINT16 (16位无符号整型)', minLen: 1 },
-  { value: 3, label: 'INT32 (32位有符号整型)', minLen: 2 },
-  { value: 4, label: 'UINT32 (32位无符号整型)', minLen: 2 },
-  { value: 5, label: 'FLOAT32 (32位单精度浮点)', minLen: 2 },
-  { value: 6, label: 'BOOL (布尔线圈状态)', minLen: 1 },
+  { value: 0, label: 'RAW_HEX', minLen: 1 },
+  { value: 1, label: 'INT16', minLen: 1 },
+  { value: 2, label: 'UINT16', minLen: 1 },
+  { value: 3, label: 'INT32', minLen: 2 },
+  { value: 4, label: 'UINT32', minLen: 2 },
+  { value: 5, label: 'FLOAT32', minLen: 2 },
+  { value: 6, label: 'BOOL', minLen: 1 },
 ]
 
 export const MODBUS_BYTE_ORDER_OPTIONS = [
-  { value: 0, label: 'ABCD (大端 Big-Endian 标准)' },
-  { value: 1, label: 'CDAB (字交换 Word Swap / 主流PLC浮点)' },
-  { value: 2, label: 'BADC (字节交换 Byte Swap)' },
-  { value: 3, label: 'DCBA (小端 Little-Endian)' },
+  { value: 0, label: 'ABCD' },
+  { value: 1, label: 'CDAB' },
+  { value: 2, label: 'BADC' },
+  { value: 3, label: 'DCBA' },
 ]
 
 export const SLE_TX_POWER_MAP: Record<number, string> = {

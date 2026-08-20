@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useSerialStore } from './serialStore'
 import {
   sjzdSendSn,
@@ -11,10 +11,6 @@ import {
   sjzdSendSleApid,
   sjzdSendWlanBridge,
   sjzdSendRawCommand,
-  sjzdParseDevInfo,
-  sjzdParseSleComparisons,
-  sjzdParseModbusPoints,
-  sjzdParseAiSample,
 } from '../api/sjzdApi'
 import type {
   ModbusPointConfig,
@@ -38,38 +34,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
     maxTxPower: 8, // +20 dBm
   })
   const wlanBridgeEnabled = ref(false)
-  const modbusPoints = ref<ModbusPointConfig[]>([
-    {
-      slaveAddr: 1,
-      funcCode: 3,
-      regAddr: 40002,
-      length: 2,
-      dataType: 5, // FLOAT32
-      byteOrder: 1, // CDAB
-      name: '回路1温度',
-      unit: '℃',
-    },
-    {
-      slaveAddr: 1,
-      funcCode: 3,
-      regAddr: 40010,
-      length: 1,
-      dataType: 2, // UINT16
-      byteOrder: 0, // ABCD
-      name: '回路1压力',
-      unit: 'kPa',
-    },
-    {
-      slaveAddr: 1,
-      funcCode: 1,
-      regAddr: 10001,
-      length: 1,
-      dataType: 6, // BOOL
-      byteOrder: 0, // ABCD
-      name: '运行指示',
-      unit: '',
-    },
-  ])
+  const modbusPoints = ref<ModbusPointConfig[]>([])
 
   // AI Sampling State
   const isSamplingAi = ref(false)
@@ -88,175 +53,310 @@ export const useSjzdStore = defineStore('sjzd', () => {
     lastOpMessage.value = { success, text, time: Date.now() }
   }
 
+  function appendModbusDebugLog(text: string) {
+    const d = new Date()
+    const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
+    modbusDebugLogs.value.push({ timestamp: timeStr, text })
+    if (modbusDebugLogs.value.length > 50) {
+      modbusDebugLogs.value.shift()
+    }
+  }
+
+  // 彻底重置设备运行时状态（不留任何旧设备缓存与脏数据）
+  function resetDeviceState() {
+    deviceInfo.value = null
+    sleComparisons.value = []
+    sleCurrentStatus.value = {}
+    modbusPoints.value = []
+    modbusDebugLogs.value = []
+    aiHistory.value = []
+    currentAi.value = { ai1Ma: 0, ai2Ma: 0, timestampMs: Date.now() }
+  }
+
+  // 当串口断开、重连或切换端口时，立即彻底清除所有上一台设备的数据缓存
+  watch(
+    () => serialStore.connectedPort,
+    () => {
+      resetDeviceState()
+    }
+  )
+
   // Setup stream listener for real-time sample parsing
-  serialStore.registerLineListener('sjzd_parser', async (line: string) => {
-    // Check for AI Samples: AI1: x.xxx mA, AI2: x.xxx mA
-    const sample = await sjzdParseAiSample(line, Date.now())
-    if (sample) {
-      currentAi.value = sample
-      const d = new Date(sample.timestampMs)
-      const timeStr = `${d.getMinutes().toString().padStart(2, '0')}:${d
-        .getSeconds()
-        .toString()
-        .padStart(2, '0')}.${Math.floor(d.getMilliseconds() / 100)}`
-      aiHistory.value.push({
-        timestamp: sample.timestampMs,
-        timeStr,
-        ai1: sample.ai1Ma,
-        ai2: sample.ai2Ma,
-      })
-      if (aiHistory.value.length > 100) {
-        aiHistory.value.shift()
-      }
-    }
-
-    // Check for DEVINFO responses
-    if (
-      line.includes('SN:') ||
-      line.includes('DEVINFO') ||
-      line.includes('DevInfo') ||
-      line.includes('HW:') ||
-      line.includes('PwrOnCnt') ||
-      line.includes('TotRunTim') ||
-      line.includes('RptFreq')
-    ) {
-      const parsed = await sjzdParseDevInfo(line)
-      if (
-        parsed.sn ||
-        parsed.hwVersion ||
-        parsed.fwVersion ||
-        parsed.deviceType ||
-        parsed.deviceAddr ||
-        parsed.bootCount !== undefined ||
-        parsed.uptimeSec !== undefined
-      ) {
-        deviceInfo.value = {
-          sn: parsed.sn || deviceInfo.value?.sn,
-          deviceType: parsed.deviceType || deviceInfo.value?.deviceType,
-          deviceAddr: parsed.deviceAddr || deviceInfo.value?.deviceAddr,
-          hwVersion:
-            parsed.hwVersion ||
-            deviceInfo.value?.hwVersion ||
-            (parsed.deviceType ? `SJZDV3-${parsed.deviceType}` : undefined),
-          fwVersion: parsed.fwVersion || deviceInfo.value?.fwVersion,
-          bootCount: parsed.bootCount ?? deviceInfo.value?.bootCount,
-          uptimeSec: parsed.uptimeSec ?? deviceInfo.value?.uptimeSec,
-          reportFreqSec: parsed.reportFreqSec ?? deviceInfo.value?.reportFreqSec,
-          rawText: line,
-        }
-      }
-    }
-
-    // Check for SLE:LIST responses
-    if (
-      line.includes('[EEPROM]') ||
-      line.includes('[CHIP]') ||
-      line.includes('SLE_NETNAME') ||
-      line.includes('SLE:') ||
-      line.includes('PWR:') ||
-      line.includes('APID:') ||
-      line.includes('Configuration Comparison')
-    ) {
-      // 1. Direct Regex extraction for sleCurrentStatus & sleForm
-      const netNameMatch = line.match(/(?:NetName|Net_Name|Name)=['"]?([^,'"\s\(\)]+)['"]?/i)
-      if (netNameMatch) {
-        sleForm.value.netName = netNameMatch[1]
-        sleCurrentStatus.value.netName = netNameMatch[1]
-      }
-
-      const apIdMatch = line.match(/(?:APID|AP_ID)=(\d+)/i)
-      if (apIdMatch) {
-        const ap = parseInt(apIdMatch[1], 10)
-        if (!isNaN(ap)) {
-          sleForm.value.apId = ap
-          sleCurrentStatus.value.apId = ap
-        }
-      }
-
-      const addrMatch = line.match(/(?:DevAddr|DeviceAddr|Addr)=(\d+)/i)
-      if (addrMatch) {
-        sleCurrentStatus.value.devAddr = addrMatch[1]
-      }
-
-      const txPwrMatch = line.match(/(?:TxPwr|Tx_Pwr|PWR|Power)=(\d+)/i)
-      if (txPwrMatch) {
-        const pwr = parseInt(txPwrMatch[1], 10)
-        if (!isNaN(pwr) && pwr >= 1 && pwr <= 8) {
-          sleForm.value.txPower = pwr
-          sleCurrentStatus.value.txPower = pwr
-        }
-      }
-
-      const maxPwrMatch = line.match(/(?:MaxTxPwr|Max_Tx_Pwr|MaxPwr|MAX_PWR)=(\d+)/i)
-      if (maxPwrMatch) {
-        const mp = parseInt(maxPwrMatch[1], 10)
-        if (!isNaN(mp) && mp >= 1 && mp <= 8) {
-          sleForm.value.maxTxPower = mp
-          sleCurrentStatus.value.maxTxPower = mp
-        }
-      }
-
-      const macMatch = line.match(/(?:Mac|MAC)=([0-9A-Fa-f:]{17}|[0-9A-Fa-f-]{17})/i)
-      if (macMatch) {
-        sleCurrentStatus.value.mac = macMatch[1]
-      }
-
-      const bridgeMatch = line.match(/(?:Bridge|Wlan|WlanBridge)=(\d+)/i)
-      if (bridgeMatch) {
-        wlanBridgeEnabled.value = bridgeMatch[1] === '1'
-        sleCurrentStatus.value.bridge = parseInt(bridgeMatch[1], 10)
-      }
-
-      sleCurrentStatus.value.lastSyncTime = new Date().toLocaleTimeString()
-
-      // 2. Parse dual-read comparison rows (NetName, DevAddr, Tx Power)
-      const newComparisons = await sjzdParseSleComparisons(line)
-      if (newComparisons.length > 0) {
-        if (sleComparisons.value.length === 0) {
-          sleComparisons.value = newComparisons
-        } else {
-          for (const nc of newComparisons) {
-            const existing = sleComparisons.value.find((c) => c.fieldName === nc.fieldName)
-            if (existing) {
-              if (nc.eepromVal !== '--') existing.eepromVal = nc.eepromVal
-              if (nc.chipVal !== '--') existing.chipVal = nc.chipVal
-              // Match only if both values are present and identical, or still waiting for one side
-              existing.isMatched =
-                existing.eepromVal === '--' ||
-                existing.chipVal === '--' ||
-                existing.eepromVal === existing.chipVal
-            } else {
-              sleComparisons.value.push(nc)
-            }
+  serialStore.registerLineListener('sjzd_parser', (line: string) => {
+    try {
+      // 1. Check for AI Samples: AI1: x.xxx mA, AI2: x.xxx mA
+      if (line.includes('AI1:') && line.includes('AI2:')) {
+        const aiM = line.match(/AI1:\s*([0-9.]+)\s*mA,\s*AI2:\s*([0-9.]+)\s*mA/i)
+        if (aiM) {
+          const ai1 = parseFloat(aiM[1])
+          const ai2 = parseFloat(aiM[2])
+          const now = Date.now()
+          currentAi.value = { ai1Ma: ai1, ai2Ma: ai2, timestampMs: now }
+          const d = new Date(now)
+          const timeStr = `${d.getMinutes().toString().padStart(2, '0')}:${d
+            .getSeconds()
+            .toString()
+            .padStart(2, '0')}.${Math.floor(d.getMilliseconds() / 100)}`
+          aiHistory.value.push({
+            timestamp: now,
+            timeStr,
+            ai1,
+            ai2,
+          })
+          if (aiHistory.value.length > 100) {
+            aiHistory.value.shift()
           }
         }
       }
-    }
 
-    // Check for Modbus return list
-    if (line.startsWith('RS485DEV:') && line.includes(',')) {
-      const pts = await sjzdParseModbusPoints(line)
-      if (pts.length > 0) {
-        modbusPoints.value = pts
-      }
-    }
+      // 2. Check for DEVINFO responses
+      if (
+        line.includes('SN:') ||
+        line.includes('DEVINFO') ||
+        line.includes('DevInfo') ||
+        line.includes('HW:') ||
+        line.includes('PwrOnCnt') ||
+        line.includes('TotRunTim') ||
+        line.includes('RptFreq')
+      ) {
+        const snM = line.match(/(?:SN|DeviceSN|Device\s*SN)[:=]\s*([0-9A-Za-z]+)/i)
+        const typeM = line.match(/(?:Type|DevType|Model)[:=]\s*([0-9A-Za-z._-]+)/i)
+        const addrM = line.match(/(?:Addr|Address)[:=]\s*([0-9A-Za-z]+)/i)
+        const hwM = line.match(/(?:HW|Hardware|HwVer)[:=]\s*([0-9A-Za-z._-]+)/i)
+        const fwM = line.match(/(?:FW|Firmware|AppVersion|Version|FwVer)[:=]\s*([0-9A-Za-z._-]+)/i)
+        const bootM = line.match(/(?:BOOT|BootCount|PwrOnCnt|POC|PowerOnCount)[:=]\s*(\d+)/i)
+        const uptimeM = line.match(/(?:UPTIME|Runtime|TotRunTim|TotRunTime|RTM)[:=]\s*(\d+)/i)
+        const freqM = line.match(/(?:RptFreq|ReportFreq|RTFRE)[:=]\s*(\d+)/i)
 
-    // Check for Modbus Debug Response or RS485DEV returns
-    if (
-      line.includes('RS485DEV') ||
-      line.includes('MB_RX') ||
-      line.includes('MB_TX') ||
-      line.includes('DEBUG')
-    ) {
-      const d = new Date()
-      const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d
-        .getMinutes()
-        .toString()
-        .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
-      modbusDebugLogs.value.push({ timestamp: timeStr, text: line })
-      if (modbusDebugLogs.value.length > 50) {
-        modbusDebugLogs.value.shift()
+        if (snM || typeM || addrM || hwM || fwM || bootM || uptimeM || freqM) {
+          deviceInfo.value = {
+            sn: snM ? snM[1] : deviceInfo.value?.sn,
+            deviceType: typeM ? typeM[1] : deviceInfo.value?.deviceType,
+            deviceAddr: addrM ? addrM[1] : deviceInfo.value?.deviceAddr,
+            hwVersion: hwM ? hwM[1] : deviceInfo.value?.hwVersion || (typeM ? `SJZDV3-${typeM[1]}` : undefined),
+            fwVersion: fwM ? fwM[1] : deviceInfo.value?.fwVersion,
+            bootCount: bootM ? parseInt(bootM[1], 10) : deviceInfo.value?.bootCount,
+            uptimeSec: uptimeM ? parseInt(uptimeM[1], 10) : deviceInfo.value?.uptimeSec,
+            reportFreqSec: freqM ? parseInt(freqM[1], 10) : deviceInfo.value?.reportFreqSec,
+            rawText: line,
+          }
+        }
       }
+
+      // 3. Check for SLE / StarFlash responses
+      if (
+        line.includes('NetName') ||
+        line.includes('Net_Name') ||
+        line.includes('TxPwr') ||
+        line.includes('MaxTxPwr') ||
+        line.includes('APID') ||
+        line.includes('AP_ID') ||
+        line.includes('DevAddr') ||
+        (line.includes('Addr=') && line.includes('Mac=')) ||
+        line.includes('[EEPROM]') ||
+        line.includes('[CHIP]') ||
+        line.includes('SLE')
+      ) {
+        const netNameMatch = line.match(/(?:NetName|Net_Name|Name)=['"]?([^,'"\s\(\)]+)['"]?/i)
+        if (netNameMatch) {
+          sleForm.value.netName = netNameMatch[1]
+          sleCurrentStatus.value.netName = netNameMatch[1]
+        }
+
+        const apIdMatch = line.match(/(?:APID|AP_ID)=(\d+)/i)
+        if (apIdMatch) {
+          const ap = parseInt(apIdMatch[1], 10)
+          if (!isNaN(ap)) {
+            sleForm.value.apId = ap
+            sleCurrentStatus.value.apId = ap
+          }
+        }
+
+        const addrMatch = line.match(/(?:DevAddr|DeviceAddr|Addr)=(\d+)/i)
+        if (addrMatch) {
+          sleCurrentStatus.value.devAddr = addrMatch[1]
+        }
+
+        const txPwrMatch = line.match(/(?:TxPwr|Tx_Pwr|PWR|Power)=(\d+)/i)
+        if (txPwrMatch) {
+          const pwr = parseInt(txPwrMatch[1], 10)
+          if (!isNaN(pwr) && pwr >= 1 && pwr <= 8) {
+            sleForm.value.txPower = pwr
+            sleCurrentStatus.value.txPower = pwr
+          }
+        }
+
+        const maxPwrMatch = line.match(/(?:MaxTxPwr|Max_Tx_Pwr|MaxPwr|MAX_PWR)=(\d+)/i)
+        if (maxPwrMatch) {
+          const mp = parseInt(maxPwrMatch[1], 10)
+          if (!isNaN(mp) && mp >= 1 && mp <= 8) {
+            sleForm.value.maxTxPower = mp
+            sleCurrentStatus.value.maxTxPower = mp
+          }
+        }
+
+        const macMatch = line.match(/(?:Mac|MAC)=([0-9A-Fa-f:]{17}|[0-9A-Fa-f-]{17})/i)
+        if (macMatch) {
+          sleCurrentStatus.value.mac = macMatch[1]
+        }
+
+        const bridgeMatch = line.match(/(?:Bridge|Wlan|WlanBridge)=(\d+)/i)
+        if (bridgeMatch) {
+          wlanBridgeEnabled.value = bridgeMatch[1] === '1'
+          sleCurrentStatus.value.bridge = parseInt(bridgeMatch[1], 10)
+        }
+
+        sleCurrentStatus.value.lastSyncTime = new Date().toLocaleTimeString()
+
+        // 维护与芯片回读参数比对表
+        const updateComparison = (fieldName: string, eepromVal: string, chipVal: string) => {
+          const list = [...sleComparisons.value]
+          const existing = list.find((c) => c.fieldName === fieldName)
+          if (existing) {
+            if (eepromVal !== '--') existing.eepromVal = eepromVal
+            if (chipVal !== '--') existing.chipVal = chipVal
+            existing.isMatched =
+              existing.eepromVal === '--' ||
+              existing.chipVal === '--' ||
+              existing.eepromVal === existing.chipVal
+          } else {
+            list.push({
+              fieldName,
+              eepromVal,
+              chipVal,
+              isMatched:
+                eepromVal === '--' ||
+                chipVal === '--' ||
+                eepromVal === chipVal,
+            })
+          }
+          sleComparisons.value = list
+        }
+
+        const isEepromLine = line.includes('[EEPROM]')
+        const isChipLine = line.includes('[CHIP]') || (line.includes('Mac=') && line.includes('Addr='))
+
+        if (netNameMatch) {
+          updateComparison(
+            '星闪网络名称 (NetName)',
+            isEepromLine ? netNameMatch[1] : '--',
+            isChipLine || !isEepromLine ? netNameMatch[1] : '--'
+          )
+        }
+        if (addrMatch) {
+          updateComparison(
+            '从机通信地址 (DevAddr)',
+            isEepromLine ? addrMatch[1] : '--',
+            isChipLine || !isEepromLine ? addrMatch[1] : '--'
+          )
+        }
+        if (txPwrMatch) {
+          const pwrStr = `${txPwrMatch[1]} 档`
+          updateComparison(
+            '当前发射功率 (Tx Power)',
+            isEepromLine ? pwrStr : '--',
+            isChipLine || !isEepromLine ? pwrStr : '--'
+          )
+        }
+      }
+
+      // 4. Check for Modbus return list / count
+      const countMatch = line.match(/Modbus points:\s*(\d+)/i)
+      if (countMatch) {
+        const total = parseInt(countMatch[1], 10)
+        if (total === 0) {
+          modbusPoints.value = []
+          showMessage('已回读点位配置：当前设备未配置任何点位')
+        }
+      }
+
+      // 5. Check for single Modbus point item: "[0] addr=3 func=3 reg=42761 len=2 type=5 order=0"
+      const addrM = line.match(/\baddr\s*[:=]\s*(\d+)/i)
+      const funcM = line.match(/\bfunc\s*[:=]\s*(\d+)/i)
+      const regM = line.match(/\breg\s*[:=]\s*(\d+)/i)
+      const lenM = line.match(/\blen(?:gth)?\s*[:=]\s*(\d+)/i)
+      const typeM = line.match(/\btype\s*[:=]\s*(\d+)/i)
+      const orderM = line.match(/\border\s*[:=]\s*(\d+)/i)
+
+      if (addrM && funcM && regM && lenM) {
+        // 精准匹配位于 addr 前面的点位索引 [0]，严防误捕获文件名行号如 userMain.c[286] 或时间戳
+        const idxM = line.match(/\[(\d+)\]\s*addr/i) || line.match(/INFO:\s*\[(\d+)\]/i)
+        const idx = idxM ? parseInt(idxM[1], 10) : undefined
+
+        const pt: ModbusPointConfig = {
+          slaveAddr: parseInt(addrM[1], 10),
+          funcCode: parseInt(funcM[1], 10),
+          regAddr: parseInt(regM[1], 10),
+          length: parseInt(lenM[1], 10),
+          dataType: typeM ? parseInt(typeM[1], 10) : 0,
+          byteOrder: orderM ? parseInt(orderM[1], 10) : 0,
+        }
+
+        const nextList = [...modbusPoints.value]
+        if (idx !== undefined && idx < nextList.length) {
+          nextList[idx] = pt
+        } else if (idx !== undefined) {
+          while (nextList.length < idx) {
+            nextList.push({ slaveAddr: 1, funcCode: 3, regAddr: 40001, length: 1, dataType: 0, byteOrder: 0 })
+          }
+          nextList[idx] = pt
+        } else {
+          const exists = nextList.some(
+            (p) =>
+              p.slaveAddr === pt.slaveAddr &&
+              p.funcCode === pt.funcCode &&
+              p.regAddr === pt.regAddr &&
+              p.length === pt.length
+          )
+          if (!exists) {
+            nextList.push(pt)
+          }
+        }
+        modbusPoints.value = nextList
+        showMessage(`已回读从站点位: 从站${pt.slaveAddr}, 寄存器${pt.regAddr}`)
+      }
+
+      // 6. Check for standard RS485DEV: return list
+      if (line.includes('RS485DEV:') && line.includes(',')) {
+        const body = line.split('RS485DEV:')[1]
+        if (body) {
+          const pts: ModbusPointConfig[] = []
+          for (const item of body.split(';')) {
+            const parts = item.split(',').map((s) => s.trim())
+            if (parts.length >= 4) {
+              pts.push({
+                slaveAddr: parseInt(parts[0], 10) || 1,
+                funcCode: parseInt(parts[1], 10) || 3,
+                regAddr: parseInt(parts[2], 10) || 40001,
+                length: parseInt(parts[3], 10) || 1,
+                dataType: parts[4] ? parseInt(parts[4], 10) : 0,
+                byteOrder: parts[5] ? parseInt(parts[5], 10) : 0,
+              })
+            }
+          }
+          if (pts.length > 0) {
+            modbusPoints.value = pts
+          }
+        }
+      }
+
+      // 7. 将所有 Modbus 相关的回读信息、点位详情、调试报文和指令返回实时推送到抓包监控面板
+      if (
+        line.includes('Modbus points') ||
+        (line.includes('addr=') && line.includes('func=')) ||
+        line.includes('RS485DEV') ||
+        line.includes('MB_RX') ||
+        line.includes('MB_TX') ||
+        line.includes('MB_') ||
+        line.includes('DEBUG')
+      ) {
+        appendModbusDebugLog(`[RX] ${line}`)
+      }
+    } catch (err) {
+      console.error('Error in sjzd_parser:', err)
     }
   })
 
@@ -408,6 +508,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
     isBusy.value = true
     try {
+      appendModbusDebugLog('[TX] RS485DEV:LIST')
       await sjzdSendRawCommand(serialStore.connectedPort, 'RS485DEV:LIST', false)
       showMessage('已发送 Modbus 点位查询指令 (RS485DEV:LIST)')
     } catch (e: any) {
@@ -424,7 +525,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
     isBusy.value = true
     try {
-      await sjzdSendModbusPoints(serialStore.connectedPort, modbusPoints.value)
+      const cmd = await sjzdSendModbusPoints(serialStore.connectedPort, modbusPoints.value)
+      appendModbusDebugLog(`[TX] ${cmd}`)
       showMessage(`已下发 ${modbusPoints.value.length} 个点位配置到设备！`)
     } catch (e: any) {
       showMessage(`保存点位失败: ${e}`, false)
@@ -441,13 +543,14 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
     isBusy.value = true
     try {
-      await sjzdSendModbusDebug(
+      const sentCmd = await sjzdSendModbusDebug(
         serialStore.connectedPort,
         pt.slaveAddr,
         pt.funcCode,
         pt.regAddr,
         pt.length
       )
+      appendModbusDebugLog(`[TX] ${sentCmd}`)
       showMessage(`已发送单点调试指令: 从站${pt.slaveAddr}, 寄存器${pt.regAddr}`)
     } catch (e: any) {
       showMessage(`单点调试失败: ${e}`, false)
@@ -460,6 +563,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
     if (!serialStore.connectedPort) return
     isBusy.value = true
     try {
+      appendModbusDebugLog('[TX] RS485DEV:RESET')
       await sjzdSendRawCommand(serialStore.connectedPort, 'RS485DEV:RESET', false)
       modbusPoints.value = []
       showMessage('已清空 Modbus 点位表 (RS485DEV:RESET)')
@@ -607,5 +711,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
     clearRuntime,
     resetSystem,
     clearEeprom,
+    resetDeviceState,
   }
 })

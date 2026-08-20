@@ -313,6 +313,10 @@ pub fn parse_dev_info(text: &str) -> DeviceInfoResult {
     }
 }
 
+static RE_MODBUS_POINT_ITEM: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:\[\d+\]\s*)?addr=(\d+)\s+func=(\d+)\s+reg=(\d+)\s+len=(\d+)\s+type=(\d+)\s+order=(\d+)").unwrap()
+});
+
 pub fn parse_modbus_points_str(text: &str) -> Vec<ModbusPointConfig> {
     let mut result = Vec::new();
     let cleaned = text.trim();
@@ -320,6 +324,35 @@ pub fn parse_modbus_points_str(text: &str) -> Vec<ModbusPointConfig> {
 
     for line in lines {
         let line = line.trim();
+
+        // 1. 尝试匹配嵌入式下位机日志格式: [0] addr=3 func=3 reg=42761 len=2 type=5 order=0
+        if let Some(caps) = RE_MODBUS_POINT_ITEM.captures(line) {
+            if let (Ok(a), Ok(f), Ok(r), Ok(l), Ok(dt), Ok(bo)) = (
+                caps[1].parse::<u8>(),
+                caps[2].parse::<u8>(),
+                caps[3].parse::<u32>(),
+                caps[4].parse::<u8>(),
+                caps[5].parse::<u8>(),
+                caps[6].parse::<u8>(),
+            ) {
+                let pt = ModbusPointConfig {
+                    slave_addr: a,
+                    func_code: f,
+                    reg_addr: r,
+                    length: l,
+                    data_type: dt,
+                    byte_order: bo,
+                    name: None,
+                    unit: None,
+                };
+                if let Ok(valid) = validate_point(&pt) {
+                    result.push(valid);
+                    continue;
+                }
+            }
+        }
+
+        // 2. 尝试匹配传统的 RS485DEV: 或 POINTS: 格式
         let target = if let Some(stripped) = line.strip_prefix("RS485DEV:") {
             stripped
         } else if let Some(stripped) = line.strip_prefix("POINTS:") {
@@ -476,4 +509,25 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
     }
 
     comparisons
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_modbus_points_embedded_log() {
+        let sample = r#"
+[2300.642] /Users/Dylan/work_project/new-yunteng/iot-project/SJZDV3/User/Src/userMain.c[283]: INFO: Modbus points: 1
+[2300.642] /Users/Dylan/work_project/new-yunteng/iot-project/SJZDV3/User/Src/userMain.c[286]: INFO:   [0] addr=3 func=3 reg=42761 len=2 type=5 order=0
+"#;
+        let points = parse_modbus_points_str(sample);
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].slave_addr, 3);
+        assert_eq!(points[0].func_code, 3);
+        assert_eq!(points[0].reg_addr, 42761);
+        assert_eq!(points[0].length, 2);
+        assert_eq!(points[0].data_type, 5);
+        assert_eq!(points[0].byte_order, 0);
+    }
 }

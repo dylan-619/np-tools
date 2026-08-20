@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import {
   Plus,
   Trash2,
@@ -14,6 +14,7 @@ import {
   Terminal,
   FileSpreadsheet,
   Copy,
+  Check,
 } from 'lucide-vue-next'
 import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
@@ -34,6 +35,20 @@ const showDebugDrawer = ref(true)
 const activeDebugPoint = ref<ModbusPointConfig | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedPreset = ref('')
+const copiedAll = ref(false)
+const copiedLineIndex = ref<number | null>(null)
+const debugLogsRef = ref<HTMLElement | null>(null)
+
+watch(
+  () => sjzd.modbusDebugLogs.length,
+  () => {
+    nextTick(() => {
+      if (debugLogsRef.value) {
+        debugLogsRef.value.scrollTop = debugLogsRef.value.scrollHeight
+      }
+    })
+  }
+)
 
 const presetOptions = [
   { label: '⚡ 三相智能电表模版 (电压/电流/功率/电能)', value: 'meter' },
@@ -67,8 +82,6 @@ function addPoint() {
     length: 1,
     dataType: 2, // UINT16
     byteOrder: 0, // ABCD
-    name: `点位_${sjzd.modbusPoints.length + 1}`,
-    unit: '',
   })
 }
 
@@ -88,9 +101,52 @@ function movePointDown(index: number) {
   sjzd.modbusPoints.splice(index + 1, 0, item)
 }
 
+async function handleReadFromDevice() {
+  showDebugDrawer.value = true
+  await sjzd.queryModbusPoints()
+}
+
 async function triggerSinglePointDebug(pt: ModbusPointConfig) {
+  showDebugDrawer.value = true
   activeDebugPoint.value = pt
   await sjzd.debugModbusPoint(pt)
+}
+
+async function copyAllDebugLogs() {
+  if (sjzd.modbusDebugLogs.length === 0) return
+  try {
+    const textToCopy = sjzd.modbusDebugLogs
+      .map((l) => `[${l.timestamp}] ${l.text}`)
+      .join('\n')
+    await navigator.clipboard.writeText(textToCopy)
+    copiedAll.value = true
+    sjzd.showMessage('已复制全部调试报文到剪贴板')
+    setTimeout(() => {
+      copiedAll.value = false
+    }, 2000)
+  } catch (err) {
+    sjzd.showMessage(`复制失败: ${err}`, false)
+  }
+}
+
+async function copyLogLine(text: string, index: number) {
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedLineIndex.value = index
+    sjzd.showMessage('已复制报文内容到剪贴板')
+    setTimeout(() => {
+      if (copiedLineIndex.value === index) {
+        copiedLineIndex.value = null
+      }
+    }, 2000)
+  } catch (err) {
+    sjzd.showMessage(`复制失败: ${err}`, false)
+  }
+}
+
+function clearDebugLogs() {
+  sjzd.modbusDebugLogs = []
+  sjzd.showMessage('已清空调试报文日志')
 }
 
 function clonePoint(index: number) {
@@ -101,7 +157,6 @@ function clonePoint(index: number) {
   const source = sjzd.modbusPoints[index]
   sjzd.modbusPoints.splice(index + 1, 0, {
     ...source,
-    name: `${source.name || '点位'}_副本`,
     regAddr: source.regAddr + source.length,
   })
 }
@@ -109,27 +164,27 @@ function clonePoint(index: number) {
 function loadPreset(presetName: 'meter' | 'sensor' | 'vfd') {
   if (presetName === 'meter') {
     sjzd.modbusPoints = [
-      { slaveAddr: 1, funcCode: 3, regAddr: 40001, length: 2, dataType: 5, byteOrder: 1, name: 'A相电压', unit: 'V' },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40003, length: 2, dataType: 5, byteOrder: 1, name: 'B相电压', unit: 'V' },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40005, length: 2, dataType: 5, byteOrder: 1, name: 'C相电压', unit: 'V' },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40007, length: 2, dataType: 5, byteOrder: 1, name: '总有功功率', unit: 'kW' },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40009, length: 2, dataType: 5, byteOrder: 1, name: '有功总电能', unit: 'kWh' },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40001, length: 2, dataType: 5, byteOrder: 1 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40003, length: 2, dataType: 5, byteOrder: 1 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40005, length: 2, dataType: 5, byteOrder: 1 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40007, length: 2, dataType: 5, byteOrder: 1 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40009, length: 2, dataType: 5, byteOrder: 1 },
     ]
     sjzd.showMessage('已载入【三相智能电表】标准点位预设')
   } else if (presetName === 'sensor') {
     sjzd.modbusPoints = [
-      { slaveAddr: 2, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0, name: '环境温度1', unit: '0.1℃' },
-      { slaveAddr: 2, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0, name: '环境湿度1', unit: '0.1%RH' },
-      { slaveAddr: 3, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0, name: '环境温度2', unit: '0.1℃' },
-      { slaveAddr: 3, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0, name: '环境湿度2', unit: '0.1%RH' },
+      { slaveAddr: 2, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 2, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 3, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 3, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 },
     ]
     sjzd.showMessage('已载入【温湿度变送器】标准点位预设')
   } else if (presetName === 'vfd') {
     sjzd.modbusPoints = [
-      { slaveAddr: 1, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0, name: '运行频率', unit: '0.01Hz' },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0, name: '输出电流', unit: '0.1A' },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40003, length: 1, dataType: 2, byteOrder: 0, name: '母线电压', unit: 'V' },
-      { slaveAddr: 1, funcCode: 1, regAddr: 10001, length: 1, dataType: 6, byteOrder: 0, name: '故障指示', unit: '' },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40003, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 1, funcCode: 1, regAddr: 10001, length: 1, dataType: 6, byteOrder: 0 },
     ]
     sjzd.showMessage('已载入【变频器运行监测】标准点位预设')
   }
@@ -137,7 +192,15 @@ function loadPreset(presetName: 'meter' | 'sensor' | 'vfd') {
 
 // Export template
 function exportJson() {
-  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(sjzd.modbusPoints, null, 2))
+  const dataToExport = sjzd.modbusPoints.map((p) => ({
+    slaveAddr: p.slaveAddr,
+    funcCode: p.funcCode,
+    regAddr: p.regAddr,
+    length: p.length,
+    dataType: p.dataType,
+    byteOrder: p.byteOrder,
+  }))
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(dataToExport, null, 2))
   const downloadAnchor = document.createElement('a')
   downloadAnchor.setAttribute('href', dataStr)
   downloadAnchor.setAttribute('download', `SJZDV3_Modbus_Points_${Date.now()}.json`)
@@ -148,11 +211,11 @@ function exportJson() {
 }
 
 function exportCsv() {
-  const headers = '从站地址,功能码,PLC寄存器地址,读取长度,数据类型(0-6),字节序(0-3),点位名称,单位\n'
+  const headers = '从站地址,功能码,PLC寄存器地址,读取长度,数据类型(0-6),字节序(0-3)\n'
   const rows = sjzd.modbusPoints
     .map(
       (p) =>
-        `${p.slaveAddr},${p.funcCode},${p.regAddr},${p.length},${p.dataType},${p.byteOrder},"${p.name || ''}","${p.unit || ''}"`
+        `${p.slaveAddr},${p.funcCode},${p.regAddr},${p.length},${p.dataType},${p.byteOrder}`
     )
     .join('\n')
   // Add UTF-8 BOM \uFEFF for seamless Microsoft Excel compatibility
@@ -164,6 +227,7 @@ function exportCsv() {
   document.body.appendChild(a)
   a.click()
   a.remove()
+  URL.revokeObjectURL(url)
   sjzd.showMessage('已导出点位 CSV 模板文件 (含 Excel UTF-8 BOM)')
 }
 
@@ -193,13 +257,11 @@ function handleFileImport(event: Event) {
             length: Number(p.length) || 1,
             dataType: Number(p.dataType) || 0,
             byteOrder: Number(p.byteOrder) || 0,
-            name: p.name || '',
-            unit: p.unit || '',
           }))
           sjzd.showMessage(`已成功导入 ${sjzd.modbusPoints.length} 个点位配置！`)
         }
       } else if (file.name.endsWith('.csv')) {
-        const lines = content.split('\n').filter((l) => l.trim())
+        const lines = content.split('\n').map((l) => l.trim()).filter(Boolean)
         const newPoints: ModbusPointConfig[] = []
         for (let i = 1; i < lines.length; i++) {
           const parts = lines[i].split(',')
@@ -211,8 +273,6 @@ function handleFileImport(event: Event) {
               length: Number(parts[3]) || 1,
               dataType: Number(parts[4]) || 0,
               byteOrder: Number(parts[5]) || 0,
-              name: parts[6]?.replace(/"/g, '') || '',
-              unit: parts[7]?.replace(/"/g, '') || '',
             })
           }
         }
@@ -229,7 +289,10 @@ function handleFileImport(event: Event) {
 
 onMounted(() => {
   if (serial.connectedPort) {
+    sjzd.modbusPoints = []
     sjzd.queryModbusPoints()
+  } else {
+    sjzd.modbusPoints = []
   }
 })
 </script>
@@ -249,7 +312,7 @@ onMounted(() => {
         <button
           class="btn btn-secondary"
           :disabled="!serial.connectedPort || sjzd.isBusy"
-          @click="sjzd.queryModbusPoints"
+          @click="handleReadFromDevice"
           title="从设备回读当前点位表 (RS485DEV:LIST)"
         >
           <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
@@ -347,31 +410,19 @@ onMounted(() => {
         <table class="grid-table">
           <thead>
             <tr>
-              <th width="48">序号</th>
-              <th width="140">点位名称</th>
-              <th width="90">从站地址</th>
-              <th width="160">功能码</th>
-              <th width="110">PLC 寄存器</th>
-              <th width="90">读取长度</th>
-              <th width="180">数据类型</th>
-              <th width="180">字节序 (ABCD)</th>
-              <th width="80">单位</th>
-              <th width="140">操作</th>
+              <th width="48" class="center-text">序号</th>
+              <th width="80" class="center-text">从站地址</th>
+              <th width="140">功能码</th>
+              <th width="180">PLC 寄存器地址</th>
+              <th width="80" class="center-text">读取长度</th>
+              <th width="110">数据类型</th>
+              <th width="90">字节序</th>
+              <th width="140" class="center-text">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(pt, idx) in sjzd.modbusPoints" :key="idx">
               <td class="center-text index-cell">{{ idx + 1 }}</td>
-
-              <!-- Point Name -->
-              <td>
-                <input
-                  v-model="pt.name"
-                  type="text"
-                  placeholder="例如: 管道压力"
-                  class="cell-input"
-                />
-              </td>
 
               <!-- Slave Addr -->
               <td>
@@ -400,7 +451,8 @@ onMounted(() => {
                   type="number"
                   min="1"
                   max="65535"
-                  class="cell-input mono-text"
+                  placeholder="例如: 40001"
+                  class="cell-input mono-text reg-input"
                 />
               </td>
 
@@ -433,16 +485,6 @@ onMounted(() => {
                   :options="MODBUS_BYTE_ORDER_OPTIONS"
                   :disabled="![3, 4, 5].includes(pt.dataType)"
                   size="sm"
-                />
-              </td>
-
-              <!-- Unit -->
-              <td>
-                <input
-                  v-model="pt.unit"
-                  type="text"
-                  placeholder="℃/kPa"
-                  class="cell-input center-text"
                 />
               </td>
 
@@ -493,8 +535,8 @@ onMounted(() => {
             </tr>
 
             <tr v-if="sjzd.modbusPoints.length === 0">
-              <td colspan="10" class="empty-table">
-                暂无点位配置，点击上方【添加点位】或【导入模板】开始创建
+              <td colspan="8" class="empty-table">
+                设备当前未配置点位，可点击上方【添加点位】、【导入模板】或连接串口后点击【从设备回读】
               </td>
             </tr>
           </tbody>
@@ -512,18 +554,52 @@ onMounted(() => {
             当前测试: 从站 {{ activeDebugPoint.slaveAddr }} | 寄存器 {{ activeDebugPoint.regAddr }}
           </span>
         </div>
-        <span class="toggle-hint">{{ showDebugDrawer ? '折叠' : '展开' }}</span>
+        <div class="debug-header-right">
+          <div class="debug-actions" @click.stop>
+            <button
+              v-if="sjzd.modbusDebugLogs.length > 0"
+              class="debug-btn copy-btn"
+              :class="{ success: copiedAll }"
+              title="一键复制全部调试报文"
+              @click="copyAllDebugLogs"
+            >
+              <component :is="copiedAll ? Check : Copy" :size="13" />
+              <span>{{ copiedAll ? '已复制全部' : '复制全部报文' }}</span>
+            </button>
+            <button
+              v-if="sjzd.modbusDebugLogs.length > 0"
+              class="debug-btn clear-btn"
+              title="清空调试日志"
+              @click="clearDebugLogs"
+            >
+              <Trash2 :size="13" />
+              <span>清空</span>
+            </button>
+          </div>
+          <span class="toggle-hint">{{ showDebugDrawer ? '折叠' : '展开' }}</span>
+        </div>
       </div>
 
       <div v-if="showDebugDrawer" class="debug-body">
-        <div class="debug-logs">
+        <div ref="debugLogsRef" class="debug-logs">
           <div
             v-for="(log, i) in sjzd.modbusDebugLogs"
             :key="i"
             class="debug-log-line"
           >
-            <span class="log-time">[{{ log.timestamp }}]</span>
-            <span class="log-text">{{ log.text }}</span>
+            <div class="log-content">
+              <span class="log-time">[{{ log.timestamp }}]</span>
+              <span class="log-text">{{ log.text }}</span>
+            </div>
+            <button
+              class="copy-line-btn"
+              :class="{ success: copiedLineIndex === i }"
+              :title="copiedLineIndex === i ? '已复制' : '复制该条报文'"
+              @click.stop="copyLogLine(log.text, i)"
+            >
+              <component :is="copiedLineIndex === i ? Check : Copy" :size="12" />
+              <span v-if="copiedLineIndex === i" class="copied-tip">已复制</span>
+            </button>
           </div>
           <div v-if="sjzd.modbusDebugLogs.length === 0" class="empty-debug-text">
             点击表格操作栏的【测试】按钮发起单点探测，返回的原始 HEX 与解析报文将在此处呈现...
@@ -678,12 +754,19 @@ onMounted(() => {
   border: 1px solid var(--border, #2a2f42);
   color: var(--text-main, #e2e8f0);
   border-radius: 4px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   outline: none;
+  box-sizing: border-box;
 }
 .cell-input:focus,
 .cell-select:focus {
   border-color: var(--accent, #3b82f6);
+}
+
+.reg-input {
+  color: #38bdf8;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 .row-actions {
@@ -763,6 +846,53 @@ onMounted(() => {
   font-family: var(--font-mono, monospace);
 }
 
+.debug-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.debug-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  background: var(--bg-input, #232736);
+  border: 1px solid var(--border, #2a2f42);
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.debug-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main, #e2e8f0);
+}
+
+.debug-btn.copy-btn:hover {
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.debug-btn.copy-btn.success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.debug-btn.clear-btn:hover {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
 .toggle-hint {
   font-size: 0.72rem;
   color: var(--text-muted, #94a3b8);
@@ -774,19 +904,81 @@ onMounted(() => {
 }
 
 .debug-logs {
-  height: 140px;
+  min-height: 220px;
+  height: 280px;
+  max-height: 520px;
   overflow-y: auto;
+  resize: vertical;
   font-family: var(--font-mono, monospace);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  padding-right: 4px;
 }
 
 .debug-log-line {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  line-height: 1.5;
+  transition: background 0.15s ease;
 }
+
+.debug-log-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-content {
+  display: flex;
+  gap: 8px;
+  word-break: break-all;
+  flex: 1;
+}
+
+.copy-line-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  opacity: 0.3;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.debug-log-line:hover .copy-line-btn {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border, #2a2f42);
+}
+
+.copy-line-btn:hover {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.copy-line-btn.success {
+  opacity: 1;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.copied-tip {
+  font-size: 0.68rem;
+  font-family: sans-serif;
+}
+
 .log-time {
   color: var(--text-muted, #94a3b8);
   flex-shrink: 0;
