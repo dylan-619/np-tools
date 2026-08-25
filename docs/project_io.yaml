@@ -1,0 +1,110 @@
+schema: kz3-project-io/v2
+
+project:
+  name: 扩展DO北向启停跑马灯
+  id: expansion_marquee_di01_north_command
+  version: 1.0.0
+  board: kz3_f427_standard
+  required_profiles: [sp4055_702]
+  scan_period_ms: 10
+
+  features:
+    pid: false
+    counter: false
+    retained: false
+
+  # 702 扩展 DO 模块的通信参数沿用已冻结的软件基线；端子极性、站号和
+  # 输出确认仍需按本项目实板 HIL 记录确认。
+  rs485_ports:
+    rs485_1:
+      baud: 9600
+      parity: none
+      stop_bits: 1
+      response_timeout_ms: 100
+      retry_count: 1
+      offline_backoff_ms: 5000
+
+  devices:
+    - name: expansion
+      profile: sp4055_702
+      port: rs485_1
+      slave_address: 1
+      poll_period_ms: 500
+      stale_after_ms: 1500
+      use:
+        outputs:
+          do01: {safe_value: false}
+          do02: {safe_value: false}
+          do03: {safe_value: false}
+          do04: {safe_value: false}
+          do05: {safe_value: false}
+          do06: {safe_value: false}
+          do07: {safe_value: false}
+          do08: {safe_value: false}
+
+  points:
+    inputs: []
+    outputs:
+      # DO1 保存北向按键翻转后的启停状态，也是扩展跑马灯唯一运行判断。
+      - {name: marquee_enable, source: board.do01,
+         description: 板载 DO1 扩展跑马灯启停标志，true 时运行扩展 DO 跑马灯}
+      - {name: expansion_marquee_01, source: rtu.expansion.do01, description: 702 扩展模块 DO1 跑马灯输出}
+      - {name: expansion_marquee_02, source: rtu.expansion.do02, description: 702 扩展模块 DO2 跑马灯输出}
+      - {name: expansion_marquee_03, source: rtu.expansion.do03, description: 702 扩展模块 DO3 跑马灯输出}
+      - {name: expansion_marquee_04, source: rtu.expansion.do04, description: 702 扩展模块 DO4 跑马灯输出}
+      - {name: expansion_marquee_05, source: rtu.expansion.do05, description: 702 扩展模块 DO5 跑马灯输出}
+      - {name: expansion_marquee_06, source: rtu.expansion.do06, description: 702 扩展模块 DO6 跑马灯输出}
+      - {name: expansion_marquee_07, source: rtu.expansion.do07, description: 702 扩展模块 DO7 跑马灯输出}
+      - {name: expansion_marquee_08, source: rtu.expansion.do08, description: 702 扩展模块 DO8 跑马灯输出}
+
+  application_variables:
+    # 北向保存的启停状态：true 保持运行，false 保持停止。
+    parameters:
+      - {name: marquee_enable, c_type: bool, default: false}
+    commands: []
+    states:
+      - {name: marquee_running, c_type: bool, default: false}
+      - {name: marquee_step, c_type: u32, default: 0}
+      - {name: marquee_last_ms, c_type: u32, default: 0}
+
+  pids: []
+
+  logic_blocks:
+    timers: []
+    edges: []
+    counters: []
+    latches: []
+    debounces: []
+    filters: []
+    rate_limits: []
+
+  northbound:
+    protocols: [sle, http, modbus_tcp]
+    modbus_tcp:
+      address_style: modicon_5_digit
+      word_order_32: abcd
+    fields:
+      # 保留既有北向 JSON 键以兼容路由；其值实际绑定为持久参数：
+      # true 启动、false 停止。禁止北向直接写 DO1/扩展 DO。
+      - {name: command.marquee_toggle, bind: parameter.marquee_enable,
+         c_type: bool, access: read_write, reference: "00001"}
+      - {name: board.do01, bind: point.marquee_enable,
+         c_type: bool, access: read, reference: "00011"}
+      - {name: state.marquee_running, bind: state.marquee_running,
+         c_type: bool, access: read, reference: "10001"}
+      - {name: expansion_marquee_01, bind: point.expansion_marquee_01,
+         c_type: bool, access: read, reference: "00012"}
+      - {name: expansion_marquee_02, bind: point.expansion_marquee_02,
+         c_type: bool, access: read, reference: "00013"}
+      - {name: expansion_marquee_03, bind: point.expansion_marquee_03,
+         c_type: bool, access: read, reference: "00014"}
+      - {name: expansion_marquee_04, bind: point.expansion_marquee_04,
+         c_type: bool, access: read, reference: "00015"}
+      - {name: expansion_marquee_05, bind: point.expansion_marquee_05,
+         c_type: bool, access: read, reference: "00016"}
+      - {name: expansion_marquee_06, bind: point.expansion_marquee_06,
+         c_type: bool, access: read, reference: "00017"}
+      - {name: expansion_marquee_07, bind: point.expansion_marquee_07,
+         c_type: bool, access: read, reference: "00018"}
+      - {name: expansion_marquee_08, bind: point.expansion_marquee_08,
+         c_type: bool, access: read, reference: "00019"}

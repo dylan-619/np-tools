@@ -46,8 +46,8 @@ const router = createRouter({
     {
       path: '/devices/controller',
       name: 'ControllerProduct',
-      component: () => import('../views/devices/ControllerPlaceholderView.vue'),
-      meta: { title: '智能控制器产品' },
+      component: () => import('../views/devices/controller/ControllerView.vue'),
+      meta: { title: 'KZ3 控制器 I/O 可视化配置' },
     },
     {
       path: '/flashing',

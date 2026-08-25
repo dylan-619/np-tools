@@ -9,7 +9,6 @@ import {
   Wrench,
   Flame,
   Settings,
-  Gamepad2,
 } from 'lucide-vue-next'
 import GlobalSerialBar from './GlobalSerialBar.vue'
 
@@ -91,20 +90,20 @@ function navigateTo(path: string) {
         </nav>
       </div>
 
-      <!-- Section 2: Controller Placeholder -->
+      <!-- Section 2: Smart Controller I/O Tool -->
       <div class="nav-group">
         <div class="group-label">
-          <span>智能控制器</span>
+          <span>智能控制器 (KZ3)</span>
+          <span class="tag-badge-purple">工艺组态</span>
         </div>
         <nav class="nav-list">
           <button
-            class="nav-item disabled-preview"
+            class="nav-item"
             :class="{ active: route.path === '/devices/controller' }"
             @click="navigateTo('/devices/controller')"
           >
-            <Gamepad2 :size="16" class="nav-icon" />
-            <span class="nav-text">控制器调试</span>
-            <span class="coming-soon-pill">规划中</span>
+            <Cpu :size="16" class="nav-icon" />
+            <span class="nav-text">I/O 可视化配置工作台</span>
           </button>
         </nav>
       </div>
@@ -242,6 +241,15 @@ function navigateTo(path: string) {
   font-size: 0.6rem;
   background: rgba(59, 130, 246, 0.15);
   color: #60a5fa;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: normal;
+}
+
+.tag-badge-purple {
+  font-size: 0.6rem;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
   padding: 1px 4px;
   border-radius: 4px;
   font-weight: normal;
