@@ -272,8 +272,9 @@ async fn app_save_file(
 
     let path_opt = builder.blocking_save_file();
     if let Some(file_path) = path_opt {
-        let path_str = file_path.to_string();
-        std::fs::write(&path_str, content.as_bytes()).map_err(|e| e.to_string())?;
+        let path = file_path.into_path().map_err(|e| format!("{:?}", e))?;
+        let path_str = path.to_string_lossy().to_string();
+        std::fs::write(&path, content.as_bytes()).map_err(|e| e.to_string())?;
         Ok(Some(path_str))
     } else {
         Ok(None)
@@ -293,8 +294,9 @@ async fn app_open_file(
 
     let path_opt = builder.blocking_pick_file();
     if let Some(file_path) = path_opt {
-        let path_str = file_path.to_string();
-        let content = std::fs::read_to_string(&path_str).map_err(|e| e.to_string())?;
+        let path = file_path.into_path().map_err(|e| format!("{:?}", e))?;
+        let path_str = path.to_string_lossy().to_string();
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         Ok(Some((path_str, content)))
     } else {
         Ok(None)

@@ -47,7 +47,7 @@ function cleanLogText(raw: string): string {
     // Remove non-printable control chars except tab
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     // Clean progress bar chars
-    .replace(/^\[[=\->\s#█▒░▓■□\.\+]*\]\s*(\d+%)/, '正在传输固件数据进度: $1')
+    .replace(/\[[=\->\s#█▒░▓■□\.\+\u{FFFD}]*\]\s*(\d+%)/u, '正在传输固件数据进度: $1')
     .trim()
 }
 
