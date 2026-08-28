@@ -738,4 +738,13 @@ const directionOptions = [
 }
 .btn-primary { background: #2563eb; color: #fff; }
 .btn-primary:hover { background: #1d4ed8; }
+/* Compact engineering workspace pass */
+.tab-content { gap: 10px; }
+.panel-card { border-radius: var(--radius-sm); }
+.panel-header { min-height: 38px; padding: 8px 12px; gap: 8px; }
+.data-table th { padding: 7px 8px; }
+.data-table td { padding: 5px 8px; }
+.table-cell-input { min-height: var(--control-height-dense); padding: 4px 7px; }
+.empty-cell { padding: 20px; }
+.btn { min-height: var(--control-height-dense); padding: 4px 9px; border-radius: var(--radius-xs); }
 </style>

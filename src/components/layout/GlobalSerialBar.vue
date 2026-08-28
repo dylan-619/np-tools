@@ -4,6 +4,8 @@ import { RefreshCw, Activity, Power, Sliders } from 'lucide-vue-next'
 import { useSerialStore } from '../../stores/serialStore'
 import CustomSelect from '../common/CustomSelect.vue'
 
+defineProps<{ compact?: boolean }>()
+
 const serial = useSerialStore()
 const showSettings = ref(false)
 
@@ -33,16 +35,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="global-serial-card">
+  <div class="global-serial-card" :class="{ compact }">
     <div class="card-header">
       <div class="status-indicator">
         <span class="status-dot" :class="{ connected: !!serial.connectedPort }" />
-        <span class="status-title">
+        <span v-if="!compact" class="status-title">
           {{ serial.connectedPort ? '串口已连接' : '串口未连接' }}
         </span>
       </div>
 
-      <div class="header-actions">
+      <div v-if="!compact" class="header-actions">
         <button
           class="icon-btn-micro"
           :title="showSettings ? '隐藏配置' : '展开参数配置'"
@@ -63,7 +65,7 @@ onMounted(() => {
     </div>
 
     <!-- Port Selector & Connect Button -->
-    <div class="port-row">
+    <div v-if="!compact" class="port-row">
       <div class="port-select-wrapper">
         <CustomSelect
           v-model="serial.selectedPort"
@@ -88,7 +90,7 @@ onMounted(() => {
     </div>
 
     <!-- Expandable Advanced Config -->
-    <div v-if="showSettings" class="advanced-config-box">
+    <div v-if="showSettings && !compact" class="advanced-config-box">
       <div class="config-item">
         <label>波特率</label>
         <CustomSelect
@@ -122,7 +124,7 @@ onMounted(() => {
     </div>
 
     <!-- Active Details: RX/TX Counters & Pins -->
-    <div v-if="serial.connectedPort" class="live-status-bar">
+    <div v-if="serial.connectedPort && !compact" class="live-status-bar">
       <div class="rx-tx-metrics">
         <Activity :size="12" class="activity-icon" />
         <span>RX: {{ serial.rxBytes }}B</span>
@@ -150,7 +152,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="serial.errorMsg" class="serial-error-hint">
+    <div v-if="serial.errorMsg && !compact" class="serial-error-hint">
       {{ serial.errorMsg }}
     </div>
   </div>
@@ -158,13 +160,23 @@ onMounted(() => {
 
 <style scoped>
 .global-serial-card {
-  background-color: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
-  padding: 10px;
+  background-color: var(--color-surface-2, #17212b);
+  border: 1px solid var(--color-border-subtle, #24323d);
+  border-radius: var(--radius-sm, 5px);
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.global-serial-card.compact {
+  padding: 6px;
+  align-items: center;
+}
+
+.global-serial-card.compact .card-header {
+  width: 100%;
+  justify-content: center;
 }
 
 .card-header {
@@ -187,8 +199,8 @@ onMounted(() => {
   transition: all 0.2s ease;
 }
 .status-dot.connected {
-  background-color: var(--success, #10b981);
-  box-shadow: 0 0 6px var(--success, #10b981);
+  background-color: var(--color-success, #38b276);
+  box-shadow: 0 0 0 3px rgba(56, 178, 118, 0.12);
 }
 
 .status-title {
@@ -208,6 +220,8 @@ onMounted(() => {
   border: 1px solid transparent;
   color: var(--text-muted, #94a3b8);
   border-radius: 4px;
+  min-width: 24px;
+  min-height: 24px;
   padding: 2px 4px;
   cursor: pointer;
   display: flex;
@@ -243,7 +257,8 @@ onMounted(() => {
 }
 
 .connect-action-btn {
-  padding: 5px 10px;
+  min-height: var(--control-height-dense, 28px);
+  padding: 4px 9px;
   background-color: var(--accent, #3b82f6);
   color: #fff;
   border: none;
@@ -261,13 +276,17 @@ onMounted(() => {
   background-color: var(--accent-hover, #2563eb);
 }
 .connect-action-btn.connected {
-  background-color: var(--danger, #ef4444);
+  background-color: var(--color-surface-3, #1d2a35);
+  border: 1px solid rgba(223, 91, 91, 0.42);
+  color: #f19a9a;
 }
 .connect-action-btn.connected:hover:not(:disabled) {
-  background-color: #dc2626;
+  background-color: rgba(223, 91, 91, 0.14);
 }
 .connect-action-btn:disabled {
-  opacity: 0.5;
+  background: var(--color-surface-1, #111820);
+  color: var(--color-text-disabled, #586874);
+  opacity: 1;
   cursor: not-allowed;
 }
 
@@ -351,10 +370,10 @@ onMounted(() => {
 
 .serial-error-hint {
   font-size: 0.7rem;
-  color: #ef4444;
+  color: #f19a9a;
   word-break: break-all;
   padding: 4px;
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(223, 91, 91, 0.1);
   border-radius: 4px;
 }
 </style>

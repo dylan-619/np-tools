@@ -77,7 +77,7 @@ async function executeSend() {
       addCR: sendAddCR.value,
       addLF: sendAddLF.value,
     })
-  } catch (err) {
+  } catch {
     if (loopTimer.value) {
       clearInterval(loopTimer.value)
       loopTimer.value = null
@@ -350,21 +350,23 @@ async function copyCurrentLogs() {
 }
 
 .terminal-header {
-  height: 48px;
-  background: var(--bg-panel, #1a1d27);
+  min-height: 40px;
+  height: auto;
+  background: var(--color-surface-1, #111820);
   border-bottom: 1px solid var(--border, #2a2f42);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  gap: 12px;
+  padding: 5px 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .stats-box {
@@ -382,6 +384,8 @@ async function copyCurrentLogs() {
   display: flex;
   align-items: center;
   gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .filter-label {
   font-size: 0.72rem;
@@ -393,6 +397,7 @@ async function copyCurrentLogs() {
 }
 
 .chip {
+  min-height: 24px;
   padding: 2px 7px;
   border-radius: 4px;
   font-size: 0.7rem;
@@ -475,10 +480,10 @@ async function copyCurrentLogs() {
 .terminal-body {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 16px;
+  padding: 8px 12px;
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 0.82rem;
-  line-height: 22px;
+  font-size: 0.78rem;
+  line-height: 20px;
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
@@ -533,7 +538,7 @@ async function copyCurrentLogs() {
 .send-dock {
   background: var(--bg-panel, #1a1d27);
   border-top: 1px solid var(--border, #2a2f42);
-  padding: 10px 16px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -546,7 +551,7 @@ async function copyCurrentLogs() {
 .send-options-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .divider-v {
@@ -609,8 +614,8 @@ async function copyCurrentLogs() {
 
 .send-textarea {
   flex: 1;
-  height: 48px;
-  padding: 8px 12px;
+  height: 40px;
+  padding: 7px 10px;
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
   color: #fff;
@@ -624,7 +629,7 @@ async function copyCurrentLogs() {
 }
 
 .btn-send-main {
-  width: 90px;
+  width: 82px;
   background: var(--accent, #3b82f6);
   color: #fff;
   border: none;
@@ -636,6 +641,22 @@ async function copyCurrentLogs() {
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+@media (max-width: 960px) {
+  .terminal-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .header-right {
+    margin-left: auto;
+  }
+
+  .filter-label,
+  .stats-box .mono-text {
+    display: none;
+  }
 }
 .btn-send-main:hover:not(:disabled) {
   background: var(--accent-hover, #2563eb);

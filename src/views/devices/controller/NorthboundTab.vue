@@ -504,4 +504,14 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .btn-primary:hover { background: #1d4ed8; }
 .btn-outline { background: transparent; border-color: var(--border, #2a2f42); color: var(--text-main, #cbd5e1); }
 .btn-outline:hover { background: rgba(255, 255, 255, 0.05); color: #60a5fa; }
+/* Compact engineering workspace pass */
+.northbound-tab-wrapper { gap: 10px; }
+.protocol-spec-card { padding: 9px 12px; gap: 10px; border-radius: var(--radius-sm); box-shadow: none; }
+.panel-card { border-radius: var(--radius-sm); }
+.panel-header { min-height: 38px; padding: 8px 12px; gap: 8px; }
+.data-table th { padding: 7px 8px; }
+.data-table td { padding: 5px 8px; }
+.table-cell-input { min-height: var(--control-height-dense); padding: 4px 7px; }
+.empty-cell { padding: 20px; }
+.btn { min-height: var(--control-height-dense); padding: 4px 9px; border-radius: var(--radius-xs); }
 </style>

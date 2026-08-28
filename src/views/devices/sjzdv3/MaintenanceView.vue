@@ -253,10 +253,10 @@ const showEepromModal = ref(false)
 
 <style scoped>
 .view-container {
-  padding: 20px;
+  padding: var(--page-gutter, 12px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -266,31 +266,36 @@ const showEepromModal = ref(false)
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle, #24323d);
+  background: var(--color-surface-1, #111820);
+  border-radius: var(--radius-sm, 5px);
 }
 
 .title-col h2 {
-  margin: 0 0 6px 0;
-  font-size: 1.25rem;
+  margin: 0 0 3px 0;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-main, #e2e8f0);
 }
 .subtitle {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   color: var(--text-muted, #94a3b8);
 }
 
 .section-card {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
 
 .card-header {
-  padding: 12px 16px;
+  min-height: 38px;
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid var(--border, #2a2f42);
   display: flex;
@@ -321,13 +326,13 @@ const showEepromModal = ref(false)
 }
 
 .card-body {
-  padding: 18px;
+  padding: 10px 12px;
 }
 
 .params-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+  gap: 10px;
 }
 
 .param-box {
@@ -335,8 +340,8 @@ const showEepromModal = ref(false)
   flex-direction: column;
   gap: 6px;
   background: var(--bg-input, #232736);
-  padding: 14px;
-  border-radius: 6px;
+  padding: 10px;
+  border-radius: var(--radius-xs, 3px);
   border: 1px solid var(--border, #2a2f42);
 }
 .param-box label {
@@ -354,7 +359,8 @@ const showEepromModal = ref(false)
 .form-input,
 .form-select {
   flex: 1;
-  padding: 8px 10px;
+  min-height: var(--control-height, 32px);
+  padding: 6px 9px;
   background: var(--bg-app, #0f111a);
   border: 1px solid var(--border, #2a2f42);
   color: #fff;
@@ -379,14 +385,14 @@ const showEepromModal = ref(false)
 .actions-grid-3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  gap: 10px;
 }
 
 .action-card {
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 6px;
-  padding: 14px;
+  border-radius: var(--radius-xs, 3px);
+  padding: 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -454,9 +460,10 @@ const showEepromModal = ref(false)
 }
 
 .btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  min-height: var(--control-height, 32px);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -504,7 +511,10 @@ const showEepromModal = ref(false)
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  background: var(--color-surface-1, #111820);
+  border-color: var(--color-border-subtle, #24323d);
+  color: var(--color-text-disabled, #586874);
+  opacity: 1;
   cursor: not-allowed;
 }
 </style>

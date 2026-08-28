@@ -593,4 +593,17 @@ const controller = useControllerStore()
   border-color: #3b82f6;
   color: #60a5fa;
 }
+/* Compact engineering workspace pass */
+.tab-content { gap: 10px; }
+.metrics-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.metric-card { border-radius: var(--radius-sm); padding: 9px 10px; gap: 9px; box-shadow: none; }
+.metric-icon-box { width: 32px; height: 32px; border-radius: var(--radius-sm); }
+.metric-val { font-size: 1rem; }
+.overview-grid { gap: 10px; }
+.panel-card { border-radius: var(--radius-sm); }
+.panel-header { min-height: 38px; padding: 8px 12px; }
+.panel-body { padding: 10px 12px; gap: 10px; }
+.form-body, .form-row { gap: 10px; }
+.form-input { min-height: var(--control-height); padding: 6px 9px; border-radius: var(--radius-xs); }
+.board-spec-box { padding: 10px; border-radius: var(--radius-xs); }
 </style>

@@ -491,10 +491,10 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 20px;
+  padding: var(--page-gutter, 12px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -504,26 +504,30 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle, #24323d);
+  background: var(--color-surface-1, #111820);
+  border-radius: var(--radius-sm, 5px);
 }
 
 .title-col h2 {
-  margin: 0 0 6px 0;
-  font-size: 1.25rem;
+  margin: 0 0 3px 0;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-main, #e2e8f0);
 }
 .subtitle {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   color: var(--text-muted, #94a3b8);
 }
 
 .config-columns {
   display: grid;
-  grid-template-columns: minmax(360px, 420px) minmax(420px, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(320px, 380px) minmax(400px, 1fr);
+  gap: 10px;
   align-items: start;
   width: 100%;
 }
@@ -545,17 +549,17 @@ onMounted(() => {
   position: relative;
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-radius: var(--radius-sm, 5px);
+  padding: 9px 10px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 9px;
 }
 
 .metric-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -659,14 +663,15 @@ onMounted(() => {
 .section-card {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 5px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .card-header {
-  padding: 12px 16px;
+  min-height: 38px;
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid var(--border, #2a2f42);
   display: flex;
@@ -681,7 +686,7 @@ onMounted(() => {
 }
 .header-left h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-main, #e2e8f0);
 }
@@ -697,10 +702,10 @@ onMounted(() => {
 }
 
 .card-body {
-  padding: 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 .card-body.no-padding {
   padding: 0;
@@ -725,7 +730,8 @@ onMounted(() => {
 .form-input,
 .form-select {
   flex: 1;
-  padding: 8px 10px;
+  min-height: var(--control-height, 32px);
+  padding: 6px 9px;
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
   color: #fff;
@@ -749,7 +755,7 @@ onMounted(() => {
   font-size: 0.82rem;
 }
 .data-table th {
-  padding: 10px 14px;
+  padding: 7px 10px;
   background: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid var(--border, #2a2f42);
   text-align: left;
@@ -757,7 +763,7 @@ onMounted(() => {
   color: var(--text-muted, #94a3b8);
 }
 .data-table td {
-  padding: 10px 14px;
+  padding: 7px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   color: var(--text-main, #e2e8f0);
 }
@@ -932,9 +938,10 @@ onMounted(() => {
 }
 
 .btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  min-height: var(--control-height, 32px);
+  padding: 5px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.76rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -983,7 +990,10 @@ onMounted(() => {
   border-color: #a855f7;
 }
 .btn:disabled {
-  opacity: 0.5;
+  background: var(--color-surface-1, #111820);
+  border-color: var(--color-border-subtle, #24323d);
+  color: var(--color-text-disabled, #586874);
+  opacity: 1;
   cursor: not-allowed;
 }
 

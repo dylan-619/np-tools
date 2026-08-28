@@ -323,43 +323,48 @@ onUnmounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 24px;
+  padding: var(--page-gutter, 12px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1200px;
+  gap: 12px;
+  max-width: none;
 }
 
 .view-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle, #24323d);
+  background: var(--color-surface-1, #111820);
+  border-radius: var(--radius-sm, 5px);
 }
 
 .title-col h2 {
-  margin: 0 0 6px 0;
-  font-size: 1.25rem;
+  margin: 0 0 3px 0;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-main, #e2e8f0);
 }
 .subtitle {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   color: var(--text-muted, #94a3b8);
 }
 
 .gauges-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 10px;
 }
 
 .gauge-card {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: var(--radius-sm, 5px);
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -430,7 +435,7 @@ onUnmounted(() => {
 }
 
 .gauge-number {
-  font-size: 2rem;
+  font-size: 1.65rem;
   font-weight: 700;
   font-family: var(--font-mono, monospace);
   color: var(--text-main, #e2e8f0);
@@ -463,12 +468,13 @@ onUnmounted(() => {
 .section-card {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
 
 .card-header {
-  padding: 12px 16px;
+  min-height: 38px;
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid var(--border, #2a2f42);
   display: flex;
@@ -513,18 +519,18 @@ onUnmounted(() => {
 }
 
 .card-body {
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .chart-container {
   width: 100%;
-  height: 260px;
+  height: 230px;
 }
 
 .led-actions-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  gap: 10px;
 }
 
 .led-action-item {
@@ -534,9 +540,10 @@ onUnmounted(() => {
 }
 
 .led-btn {
-  padding: 12px 16px;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  min-height: var(--control-height, 32px);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -584,9 +591,10 @@ onUnmounted(() => {
 }
 
 .btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  min-height: var(--control-height, 32px);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -609,7 +617,10 @@ onUnmounted(() => {
   background: #dc2626;
 }
 .btn:disabled {
-  opacity: 0.5;
+  background: var(--color-surface-1, #111820);
+  border-color: var(--color-border-subtle, #24323d);
+  color: var(--color-text-disabled, #586874);
+  opacity: 1;
   cursor: not-allowed;
 }
 </style>

@@ -1373,4 +1373,15 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .btn-danger-outline:hover {
   background: rgba(239, 68, 68, 0.12);
 }
+/* Compact engineering workspace pass */
+.hardware-workbench { grid-template-columns: 260px 1fr; gap: 10px; height: calc(100vh - 154px); min-height: 500px; }
+.topology-sidebar, .workbench-main { border-radius: var(--radius-sm); }
+.sidebar-header { min-height: 38px; padding: 8px 10px; }
+.rack-section { padding: 8px; gap: 6px; }
+.rack-node-card { gap: 8px; padding: 7px 8px; border-radius: var(--radius-xs); }
+.workbench-main { padding: 10px; }
+.view-panel { gap: 10px; }
+.module-header-card { padding: 10px; border-radius: var(--radius-xs); gap: 8px; }
+.terminal-group-card, .terminal-pin-card { border-radius: var(--radius-xs); }
+@media (max-width: 1024px) { .hardware-workbench { height: auto; min-height: 0; } }
 </style>

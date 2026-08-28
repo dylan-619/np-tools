@@ -458,10 +458,10 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 20px;
+  padding: var(--page-gutter, 12px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -471,20 +471,24 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle, #24323d);
+  background: var(--color-surface-1, #111820);
+  border-radius: var(--radius-sm, 5px);
 }
 
 .title-col h2 {
-  margin: 0 0 6px 0;
-  font-size: 1.25rem;
+  margin: 0 0 3px 0;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-main, #e2e8f0);
 }
 
 .subtitle {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   color: var(--text-muted, #94a3b8);
 }
 
@@ -492,9 +496,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.76rem;
 }
 .notice-bar.success {
   background: rgba(16, 185, 129, 0.1);
@@ -509,19 +513,19 @@ onMounted(() => {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
 }
 
 .metric-card {
   position: relative;
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-radius: var(--radius-sm, 5px);
+  padding: 9px 10px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 9px;
 }
 
 .card-copy-btn {
@@ -588,9 +592,9 @@ onMounted(() => {
 }
 
 .metric-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -629,10 +633,10 @@ onMounted(() => {
 .info-breakdown-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
+  gap: 8px;
   background: var(--bg-app, #0f111a);
-  padding: 14px;
-  border-radius: 6px;
+  padding: 10px;
+  border-radius: var(--radius-xs, 3px);
 }
 
 .breakdown-item {
@@ -684,7 +688,7 @@ onMounted(() => {
 }
 
 .metric-value {
-  font-size: 1.1rem;
+  font-size: 0.98rem;
   font-weight: 700;
   font-family: var(--font-mono, monospace);
   color: var(--text-main, #e2e8f0);
@@ -696,12 +700,13 @@ onMounted(() => {
 .section-card {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
 
 .card-header {
-  padding: 12px 16px;
+  min-height: 38px;
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid var(--border, #2a2f42);
   display: flex;
@@ -717,7 +722,7 @@ onMounted(() => {
 
 .header-left h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-main, #e2e8f0);
 }
@@ -739,15 +744,15 @@ onMounted(() => {
 }
 
 .card-body {
-  padding: 18px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .burn-intro p {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--text-muted, #94a3b8);
   line-height: 1.5;
 }
@@ -789,7 +794,7 @@ onMounted(() => {
   align-items: center;
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 6px;
+  border-radius: var(--radius-xs, 3px);
   overflow: hidden;
   flex: 1;
   min-width: 260px;
@@ -798,7 +803,7 @@ onMounted(() => {
 }
 
 .prefix-badge {
-  padding: 8px 12px;
+  padding: 7px 10px;
   background: rgba(0, 0, 0, 0.2);
   font-weight: 700;
   color: #fb923c;
@@ -811,7 +816,8 @@ onMounted(() => {
   flex: 1;
   background: transparent;
   border: none;
-  padding: 8px 12px;
+  min-height: var(--control-height, 32px);
+  padding: 6px 10px;
   color: #fff;
   font-size: 1rem;
   font-weight: 600;
@@ -861,9 +867,9 @@ onMounted(() => {
   flex-direction: column;
   gap: 6px;
   background: var(--bg-app, #0f111a);
-  padding: 12px;
-  border-radius: 6px;
-  font-size: 0.78rem;
+  padding: 9px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.74rem;
 }
 
 .hex-item {
@@ -895,9 +901,10 @@ onMounted(() => {
 }
 
 .btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  min-height: var(--control-height, 32px);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -934,7 +941,10 @@ onMounted(() => {
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  background: var(--color-surface-1, #111820);
+  border-color: var(--color-border-subtle, #24323d);
+  color: var(--color-text-disabled, #586874);
+  opacity: 1;
   cursor: not-allowed;
 }
 

@@ -163,10 +163,11 @@ const controller = useControllerStore()
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow-y: auto;
-  background: var(--bg-app, #12141c);
-  padding: 16px 20px;
-  gap: 16px;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-canvas, #0b1016);
+  padding: 12px;
+  gap: 8px;
 }
 
 /* Header */
@@ -176,25 +177,26 @@ const controller = useControllerStore()
   justify-content: space-between;
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 10px;
-  padding: 14px 18px;
-  gap: 16px;
+  border-radius: var(--radius-sm, 5px);
+  padding: 10px 12px;
+  gap: 12px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .header-left-box {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .header-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm, 5px);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  color: var(--color-info, #4aa3ff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -214,7 +216,7 @@ const controller = useControllerStore()
 }
 
 .main-title {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-main, #e2e8f0);
   margin: 0;
@@ -240,7 +242,7 @@ const controller = useControllerStore()
 }
 
 .sub-desc {
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   color: var(--text-muted, #94a3b8);
   margin: 0;
 }
@@ -249,6 +251,8 @@ const controller = useControllerStore()
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .status-btn {
@@ -257,8 +261,9 @@ const controller = useControllerStore()
   gap: 6px;
   font-size: 0.78rem;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
+  min-height: var(--control-height-dense, 28px);
+  padding: 4px 9px;
+  border-radius: var(--radius-xs, 3px);
   border: 1px solid transparent;
   cursor: pointer;
 }
@@ -280,16 +285,20 @@ const controller = useControllerStore()
   gap: 6px;
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
-  padding: 6px;
+  border-radius: var(--radius-sm, 5px);
+  padding: 4px;
   overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 38px;
+  scrollbar-width: thin;
 }
 
 .tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  min-height: var(--control-height-dense, 28px);
+  padding: 5px 9px;
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -324,6 +333,9 @@ const controller = useControllerStore()
 
 .tab-viewport {
   flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 /* Buttons */
@@ -332,8 +344,9 @@ const controller = useControllerStore()
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: 6px;
+  min-height: var(--control-height-dense, 28px);
+  padding: 5px 10px;
+  border-radius: var(--radius-xs, 3px);
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;

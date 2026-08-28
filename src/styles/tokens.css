@@ -1,0 +1,54 @@
+:root {
+  color-scheme: dark;
+
+  /* Industrial graphite surfaces */
+  --color-canvas: #0b1016;
+  --color-surface-1: #111820;
+  --color-surface-2: #17212b;
+  --color-surface-3: #1d2a35;
+  --color-overlay: #22313d;
+
+  --color-border-subtle: #24323d;
+  --color-border-default: #31424f;
+  --color-border-strong: #425766;
+
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #a8b6c2;
+  --color-text-tertiary: #718391;
+  --color-text-disabled: #586874;
+
+  --color-accent: #3b82f6;
+  --color-accent-hover: #5593f7;
+  --color-accent-active: #2f6fd2;
+  --color-focus-ring: #79a9ff;
+  --color-info: #4aa3ff;
+  --color-success: #38b276;
+  --color-warning: #d89b31;
+  --color-danger: #df5b5b;
+
+  /* Backwards-compatible aliases; migrate components progressively. */
+  --bg-app: var(--color-canvas);
+  --bg-panel: var(--color-surface-1);
+  --bg-input: var(--color-surface-2);
+  --bg-hover: var(--color-surface-3);
+  --text-main: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --border: var(--color-border-default);
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --success: var(--color-success);
+  --danger: var(--color-danger);
+  --danger-hover: #c94747;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --control-height-dense: 28px;
+  --control-height: 32px;
+  --control-height-comfortable: 36px;
+  --page-gutter: 12px;
+  --panel-padding: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}

@@ -155,23 +155,18 @@ async function handleTitlebarDblClick() {
 <style>
 /* Global CSS variables & Reset */
 :root {
-  --bg-app: #0f111a;
-  --bg-panel: #1a1d27;
-  --bg-input: #232736;
-  --bg-hover: #2a2f42;
-  --text-main: #e2e8f0;
-  --text-muted: #94a3b8;
-  --border: #2a2f42;
-
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --success: #10b981;
-  --danger: #ef4444;
-  --danger-hover: #dc2626;
-
-  --radius: 6px;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  --bg-app: var(--color-canvas);
+  --bg-panel: var(--color-surface-1);
+  --bg-input: var(--color-surface-2);
+  --bg-hover: var(--color-surface-3);
+  --text-main: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --border: var(--color-border-default);
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --success: var(--color-success);
+  --danger: var(--color-danger);
+  --danger-hover: #c94747;
 }
 
 html,
@@ -180,7 +175,7 @@ body {
   padding: 0;
   height: 100%;
   width: 100%;
-  background-color: var(--bg-app);
+  background-color: var(--color-canvas);
   color: var(--text-main);
   font-family: var(--font-sans);
   overflow: hidden;
@@ -220,9 +215,9 @@ body {
 }
 
 .app-top-drag-bar {
-  height: 38px;
-  background: var(--bg-panel, #1a1d27);
-  border-bottom: 1px solid var(--border, #2a2f42);
+  height: 34px;
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -248,7 +243,7 @@ select {
 }
 
 .mac-traffic-lights-spacer {
-  width: 68px;
+  width: 62px;
   flex-shrink: 0;
   height: 100%;
 }
@@ -282,8 +277,8 @@ select {
 .brand-version {
   font-size: 0.65rem;
   font-family: var(--font-mono, monospace);
-  color: #60a5fa;
-  background: rgba(59, 130, 246, 0.12);
+  color: var(--color-info);
+  background: rgba(74, 163, 255, 0.12);
   padding: 1px 4px;
   border-radius: 3px;
 }
@@ -291,7 +286,7 @@ select {
 .titlebar-sep {
   width: 1px;
   height: 14px;
-  background: var(--border, #2a2f42);
+  background: var(--color-border-default);
 }
 
 .route-badge {
@@ -324,34 +319,33 @@ select {
   font-size: 0.72rem;
   font-family: var(--font-mono, monospace);
   padding: 2px 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border, #2a2f42);
-  color: var(--text-muted, #94a3b8);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
   transition: all 0.2s ease;
 }
 .top-port-badge.connected {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.35);
-  color: #34d399;
+  background: rgba(56, 178, 118, 0.12);
+  border-color: rgba(56, 178, 118, 0.36);
+  color: var(--color-success);
 }
 
 .badge-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: var(--text-muted, #94a3b8);
+  background-color: var(--color-text-tertiary);
 }
 .top-port-badge.connected .badge-dot {
-  background-color: #34d399;
-  box-shadow: 0 0 6px rgba(52, 211, 153, 0.8);
+  background-color: var(--color-success);
 }
 
 .app-body-container {
   flex: 1;
   display: flex;
   overflow: hidden;
-  height: calc(100vh - 38px);
+  height: calc(100vh - 34px);
   width: 100%;
 }
 
@@ -368,30 +362,31 @@ select {
 
 /* Global Floating Toast */
 .global-toast-container {
-  position: absolute;
-  top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  top: 46px;
+  right: 16px;
   z-index: 999;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 8px 16px;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
   font-size: 0.82rem;
   font-weight: 500;
   backdrop-filter: blur(12px);
   border: 1px solid transparent;
 }
 .global-toast-container.success {
-  background: rgba(16, 185, 129, 0.9);
-  color: #ffffff;
+  background: #154634;
+  border-color: rgba(56, 178, 118, 0.48);
+  color: var(--color-text-primary);
 }
 .global-toast-container.error {
-  background: rgba(239, 68, 68, 0.9);
-  color: #ffffff;
+  background: #4a2426;
+  border-color: rgba(223, 91, 91, 0.5);
+  color: var(--color-text-primary);
 }
 
 .toast-content {
@@ -419,13 +414,14 @@ select {
 .toast-slide-enter-from,
 .toast-slide-leave-to {
   opacity: 0;
-  transform: translate(-50%, -16px);
+  transform: translateY(-8px);
 }
 
 .view-content-area {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  scrollbar-gutter: stable;
 }
 
 /* Page transitions */
@@ -464,25 +460,28 @@ select,
 
 select:hover:not(:disabled),
 .form-select:hover:not(:disabled) {
-  border-color: #3b82f6;
-  background-color: #272c3d;
+  border-color: var(--color-accent);
+  background-color: var(--color-surface-3);
 }
 
 select:focus,
 .form-select:focus {
-  border-color: var(--accent, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
+  border-color: var(--color-focus-ring);
+  box-shadow: 0 0 0 2px rgba(121, 169, 255, 0.22);
 }
 
 select:disabled,
 .form-select:disabled {
-  opacity: 0.5;
+  background: var(--color-surface-1);
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-disabled);
+  opacity: 1;
   cursor: not-allowed;
 }
 
 select option {
-  background-color: #1a1d29;
-  color: #e2e8f0;
+  background-color: var(--color-surface-2);
+  color: var(--color-text-primary);
   padding: 8px;
 }
 </style>

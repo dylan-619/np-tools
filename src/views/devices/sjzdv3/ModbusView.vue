@@ -32,7 +32,8 @@ const sjzd = useSjzdStore()
 const serial = useSerialStore()
 
 const showResetModal = ref(false)
-const showDebugDrawer = ref(true)
+// Keep the capture console out of the way until a test starts or the user opens it.
+const showDebugDrawer = ref(false)
 const activeDebugPoint = ref<ModbusPointConfig | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedPreset = ref('')
@@ -352,79 +353,64 @@ onMounted(() => {
       </div>
 
       <div class="toolbar-actions">
-        <button
-          class="btn btn-secondary"
-          :disabled="!serial.connectedPort || sjzd.isBusy"
-          @click="handleReadFromDevice"
-          title="从设备回读当前点位表 (RS485DEV:LIST)"
-        >
-          <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
-          <span>从设备回读</span>
-        </button>
+        <div class="toolbar-group">
+          <button
+            class="btn btn-secondary"
+            :disabled="!serial.connectedPort || sjzd.isBusy"
+            @click="handleReadFromDevice"
+            title="从设备回读当前点位表 (RS485DEV:LIST)"
+          >
+            <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
+            <span>从设备回读</span>
+          </button>
 
-        <!-- Industry Presets -->
-        <div class="preset-dropdown-wrapper">
-          <CustomSelect
-            v-model="selectedPreset"
-            :options="presetOptions"
-            placeholder="📦 载入行业点位预设..."
-            size="sm"
-            @change="onPresetChange"
-          />
+          <div class="preset-dropdown-wrapper">
+            <CustomSelect
+              v-model="selectedPreset"
+              :options="presetOptions"
+              placeholder="载入行业点位预设..."
+              size="sm"
+              @change="onPresetChange"
+            />
+          </div>
+
+          <button class="btn btn-secondary" @click="triggerImport" title="从 JSON/CSV 文件导入点位">
+            <Upload :size="14" />
+            <span>导入</span>
+          </button>
+          <input ref="fileInputRef" type="file" accept=".json,.csv" style="display: none" @change="handleFileImport" />
+
+          <button class="btn btn-secondary" @click="exportCsv" title="导出当前点位为 CSV 表格">
+            <FileSpreadsheet :size="14" />
+            <span>CSV</span>
+          </button>
+
+          <button class="btn btn-secondary" @click="exportJson" title="导出当前点位为 JSON 配置文件">
+            <Download :size="14" />
+            <span>JSON</span>
+          </button>
         </div>
 
-        <button
-          class="btn btn-secondary"
-          @click="triggerImport"
-          title="从 JSON/CSV 文件导入点位"
-        >
-          <Upload :size="14" />
-          <span>导入模板</span>
-        </button>
-        <input
-          ref="fileInputRef"
-          type="file"
-          accept=".json,.csv"
-          style="display: none"
-          @change="handleFileImport"
-        />
+        <div class="toolbar-group toolbar-group-primary">
+          <button
+            class="btn btn-primary"
+            :disabled="!serial.connectedPort || sjzd.modbusPoints.length === 0 || sjzd.isBusy"
+            @click="sjzd.saveModbusPoints"
+          >
+            <Send :size="14" />
+            <span>下发 ({{ sjzd.modbusPoints.length }})</span>
+          </button>
 
-        <button
-          class="btn btn-secondary"
-          @click="exportCsv"
-          title="导出当前点位为 CSV 表格"
-        >
-          <FileSpreadsheet :size="14" />
-          <span>导出 CSV</span>
-        </button>
-
-        <button
-          class="btn btn-secondary"
-          @click="exportJson"
-          title="导出当前点位为 JSON 配置文件"
-        >
-          <Download :size="14" />
-          <span>导出 JSON</span>
-        </button>
-
-        <button
-          class="btn btn-primary"
-          :disabled="!serial.connectedPort || sjzd.modbusPoints.length === 0 || sjzd.isBusy"
-          @click="sjzd.saveModbusPoints"
-        >
-          <Send :size="14" />
-          <span>批量下发到设备 ({{ sjzd.modbusPoints.length }})</span>
-        </button>
-
-        <button
-          class="btn btn-danger-soft"
-          :disabled="!serial.connectedPort || sjzd.isBusy"
-          @click="showResetModal = true"
-          title="清空所有从站点位 (RS485DEV:RESET)"
-        >
-          <Trash2 :size="14" />
-          <span>清空</span>
-        </button>
+          <button
+            class="btn btn-danger-soft"
+            :disabled="!serial.connectedPort || sjzd.isBusy"
+            @click="showResetModal = true"
+            title="清空所有从站点位 (RS485DEV:RESET)"
+          >
+            <Trash2 :size="14" />
+            <span>清空</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -671,10 +657,10 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
-  padding: 20px;
+  padding: var(--page-gutter, 12px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -684,40 +670,58 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle, #24323d);
+  background: var(--color-surface-1, #111820);
+  border-radius: var(--radius-sm, 5px);
 }
 
 .title-col h2 {
   margin: 0 0 4px 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-main, #e2e8f0);
 }
 .subtitle {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--text-muted, #94a3b8);
 }
 
 .toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.toolbar-group-primary {
+  padding-left: 6px;
+  border-left: 1px solid var(--color-border-subtle, #24323d);
 }
 
 .table-card {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 5px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .table-top-bar {
-  padding: 10px 14px;
+  min-height: 38px;
+  padding: 6px 10px;
   background: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid var(--border, #2a2f42);
   display: flex;
@@ -742,7 +746,7 @@ onMounted(() => {
 }
 
 .instruction-hint {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted, #94a3b8);
   display: flex;
   align-items: center;
@@ -760,7 +764,7 @@ onMounted(() => {
 }
 
 .grid-table th {
-  padding: 8px 10px;
+  padding: 7px 8px;
   background: rgba(0, 0, 0, 0.25);
   border-bottom: 1px solid var(--border, #2a2f42);
   text-align: left;
@@ -770,7 +774,7 @@ onMounted(() => {
 }
 
 .grid-table td {
-  padding: 6px 8px;
+  padding: 4px 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 .grid-table tr:hover {
@@ -792,7 +796,8 @@ onMounted(() => {
 .cell-input,
 .cell-select {
   width: 100%;
-  padding: 5px 8px;
+  min-height: var(--control-height-dense, 28px);
+  padding: 4px 7px;
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
   color: var(--text-main, #e2e8f0);
@@ -819,7 +824,10 @@ onMounted(() => {
 }
 
 .action-btn {
-  padding: 4px 6px;
+  width: 26px;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
   background: var(--bg-input, #232736);
   border: 1px solid var(--border, #2a2f42);
   color: var(--text-muted, #94a3b8);
@@ -851,19 +859,20 @@ onMounted(() => {
 
 .empty-table {
   text-align: center;
-  padding: 32px;
+  padding: 18px;
   color: var(--text-muted, #94a3b8);
 }
 
 .debug-panel {
   background: var(--bg-panel, #1a1d27);
   border: 1px solid var(--border, #2a2f42);
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
 
 .debug-header {
-  padding: 10px 14px;
+  min-height: 38px;
+  padding: 7px 10px;
   background: rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
@@ -942,13 +951,13 @@ onMounted(() => {
 }
 
 .debug-body {
-  padding: 12px;
+  padding: 8px 10px;
   background: var(--bg-app, #0f111a);
 }
 
 .debug-logs {
-  min-height: 220px;
-  height: 280px;
+  min-height: 150px;
+  height: 220px;
   max-height: 520px;
   overflow-y: auto;
   resize: vertical;
@@ -1050,9 +1059,10 @@ onMounted(() => {
 }
 
 .btn {
-  padding: 7px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  min-height: var(--control-height, 32px);
+  padding: 5px 9px;
+  border-radius: var(--radius-xs, 3px);
+  font-size: 0.76rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -1061,7 +1071,8 @@ onMounted(() => {
   border: 1px solid transparent;
 }
 .btn-sm {
-  padding: 5px 10px;
+  min-height: var(--control-height-dense, 28px);
+  padding: 4px 8px;
   font-size: 0.75rem;
 }
 .btn-primary {
@@ -1096,7 +1107,10 @@ onMounted(() => {
   background: rgba(239, 68, 68, 0.22);
 }
 .btn:disabled {
-  opacity: 0.45;
+  background: var(--color-surface-1, #111820);
+  border-color: var(--color-border-subtle, #24323d);
+  color: var(--color-text-disabled, #586874);
+  opacity: 1;
   cursor: not-allowed;
 }
 
@@ -1106,6 +1120,21 @@ onMounted(() => {
 @keyframes spin {
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1160px) {
+  .view-header {
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .instruction-hint {
+    display: none;
   }
 }
 </style>
