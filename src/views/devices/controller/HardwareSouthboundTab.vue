@@ -712,8 +712,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 
 /* Sidebar Rack */
 .topology-sidebar {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -722,11 +722,11 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 
 .sidebar-header {
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.02);
+  background: #f7f9fb;
 }
 
 .title-row {
@@ -738,13 +738,13 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .sidebar-title {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .count-badge {
   font-size: 0.7rem;
   background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  color: #0f5f9e;
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -767,14 +767,14 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .section-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .bus-baud-hint {
   font-size: 0.68rem;
-  color: #60a5fa;
+  color: #0f5f9e;
   font-family: monospace;
 }
 
@@ -792,8 +792,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   gap: 10px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -804,7 +804,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 }
 
 .rack-node-card.active {
-  border-color: #3b82f6;
+  border-color: #1769aa;
   background: rgba(59, 130, 246, 0.12);
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
 }
@@ -819,10 +819,10 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   flex-shrink: 0;
 }
 
-.bg-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.bg-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-.bg-green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.bg-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.bg-blue { background: rgba(59, 130, 246, 0.15); color: #0f5f9e; }
+.bg-purple { background: rgba(168, 85, 247, 0.15); color: #6f3a96; }
+.bg-green { background: rgba(16, 185, 129, 0.15); color: #176b45; }
+.bg-amber { background: rgba(245, 158, 11, 0.15); color: #7a4b00; }
 
 .node-meta {
   flex: 1;
@@ -835,7 +835,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .node-main-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .node-main-name-row {
@@ -849,7 +849,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   font-family: monospace;
   font-weight: 700;
   background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  color: #6f3a96;
   padding: 1px 4px;
   border-radius: 3px;
 }
@@ -857,7 +857,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .node-name-text {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .node-sub-info {
@@ -865,12 +865,12 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   align-items: center;
   gap: 6px;
   font-size: 0.7rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .mono-code { font-family: monospace; }
-.profile-name { color: #94a3b8; font-size: 0.68rem; }
-.port-name { color: #60a5fa; font-size: 0.66rem; }
+.profile-name { color: #40515f; font-size: 0.68rem; }
+.port-name { color: #0f5f9e; font-size: 0.66rem; }
 
 .node-badges-row {
   display: flex;
@@ -885,10 +885,10 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   padding: 1px 5px;
   border-radius: 3px;
 }
-.pill-in { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
-.pill-out { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
-.pill-ai { background: rgba(245, 158, 11, 0.15); color: #fde68a; }
-.pill-ao { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; }
+.pill-in { background: rgba(59, 130, 246, 0.15); color: #1769aa; }
+.pill-out { background: rgba(16, 185, 129, 0.15); color: #176b45; }
+.pill-ai { background: rgba(245, 158, 11, 0.15); color: #7a4b00; }
+.pill-ao { background: rgba(168, 85, 247, 0.15); color: #6f3a96; }
 
 .channels-summary-bar {
   display: flex;
@@ -901,12 +901,12 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   padding: 1px 4px;
   border-radius: 3px;
 }
-.use-count.in { background: rgba(59, 130, 246, 0.1); color: #93c5fd; }
-.use-count.out { background: rgba(16, 185, 129, 0.1); color: #6ee7b7; }
+.use-count.in { background: rgba(59, 130, 246, 0.1); color: #1769aa; }
+.use-count.out { background: rgba(16, 185, 129, 0.1); color: #176b45; }
 
 .no-dev-hint {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   padding: 14px;
   text-align: center;
 }
@@ -914,8 +914,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .sidebar-footer-add {
   margin-top: auto;
   padding: 12px 10px;
-  background: rgba(0, 0, 0, 0.15);
-  border-top: 1px solid var(--border, #2a2f42);
+  background: #eef3f7;
+  border-top: 1px solid var(--border, #b9c5cf);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -931,8 +931,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 
 /* Right Column Workbench */
 .workbench-main {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 10px;
   overflow-y: auto;
   padding: 16px;
@@ -947,8 +947,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 }
 
 .module-header-card {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 8px;
   padding: 14px;
   display: flex;
@@ -967,7 +967,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   height: 44px;
   border-radius: 8px;
   background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  color: #0f5f9e;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -984,14 +984,14 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .module-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #fff;
+  color: #17212b;
   margin: 0;
 }
 
 .tag-board-fixed {
   font-size: 0.7rem;
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: #176b45;
   padding: 2px 8px;
   border-radius: 4px;
   border: 1px solid rgba(16, 185, 129, 0.3);
@@ -999,13 +999,13 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 
 .module-desc, .dev-desc-text {
   font-size: 0.76rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   margin: 4px 0 0 0;
   line-height: 1.4;
 }
 
 .board-ports-quick {
-  background: rgba(0, 0, 0, 0.25);
+  background: #e8edf2;
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 6px;
   padding: 10px 12px;
@@ -1020,7 +1020,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   gap: 6px;
   font-size: 0.76rem;
   font-weight: 600;
-  color: var(--text-main, #cbd5e1);
+  color: var(--text-main, #314654);
 }
 
 .port-params-row {
@@ -1037,16 +1037,16 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 
 .param-cell label {
   font-size: 0.7rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .compact-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 0.78rem;
-  color: #fff;
+  color: #17212b;
   outline: none;
 }
 
@@ -1065,13 +1065,13 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 }
 
 .dev-name-title-input {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid #3b82f6;
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid #1769aa;
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #fff;
+  color: #17212b;
   outline: none;
 }
 
@@ -1079,21 +1079,21 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   font-size: 0.72rem;
   font-family: monospace;
   background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  color: #6f3a96;
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .profile-desc-badge {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .dev-properties-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
-  background: rgba(0, 0, 0, 0.2);
+  background: #f7f9fb;
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.04);
@@ -1107,16 +1107,16 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 
 .prop-item label {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .form-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 0.8rem;
-  color: #fff;
+  color: #17212b;
   outline: none;
 }
 
@@ -1126,7 +1126,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   align-items: center;
 }
 .input-unit input { padding-right: 28px; width: 100%; }
-.input-unit span { position: absolute; right: 8px; font-size: 0.72rem; color: var(--text-muted, #94a3b8); }
+.input-unit span { position: absolute; right: 8px; font-size: 0.72rem; color: var(--text-muted, #40515f); }
 
 /* Terminals Board UI */
 .terminals-container {
@@ -1136,8 +1136,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 }
 
 .terminal-group-card {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 8px;
   overflow: hidden;
   display: flex;
@@ -1168,12 +1168,12 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .group-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .group-spec-pill {
   font-size: 0.68rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .bg-blue-subtle { background: rgba(59, 130, 246, 0.08); }
@@ -1206,8 +1206,8 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 }
 
 .terminal-pin-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 6px;
   padding: 8px;
   display: flex;
@@ -1247,20 +1247,20 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   font-size: 0.78rem;
   font-family: monospace;
   font-weight: 700;
-  color: #60a5fa;
+  color: #0f5f9e;
 }
 
 .pin-driver, .pin-type-tag {
   font-size: 0.65rem;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-muted, #94a3b8);
+  background: #eef3f7;
+  color: var(--text-muted, #40515f);
   padding: 1px 4px;
   border-radius: 3px;
 }
 
 .pin-signal-name {
   font-size: 0.72rem;
-  color: var(--text-main, #cbd5e1);
+  color: var(--text-main, #314654);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1270,7 +1270,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(0, 0, 0, 0.25);
+  background: #e8edf2;
   padding: 3px 6px;
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.04);
@@ -1281,14 +1281,14 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   align-items: center;
   gap: 3px;
   font-size: 0.68rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .safe-mini-select, .safe-mini-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 3px;
-  color: #fff;
+  color: #17212b;
   font-size: 0.68rem;
   padding: 1px 4px;
 }
@@ -1313,7 +1313,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
 .point-tag {
   font-size: 0.68rem;
   font-family: monospace;
-  color: #34d399;
+  color: #176b45;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -1326,15 +1326,15 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   gap: 3px;
   font-size: 0.66rem;
   background: transparent;
-  border: 1px dashed var(--border, #2a2f42);
+  border: 1px dashed var(--border, #b9c5cf);
   border-radius: 3px;
-  color: #60a5fa;
+  color: #0f5f9e;
   padding: 2px 6px;
   cursor: pointer;
 }
 .btn-quick-bind:hover {
   background: rgba(59, 130, 246, 0.1);
-  border-color: #3b82f6;
+  border-color: #1769aa;
 }
 
 .text-muted-xs {
@@ -1342,10 +1342,10 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   color: rgba(148, 163, 184, 0.5);
 }
 
-.text-blue { color: #60a5fa; }
-.text-green { color: #34d399; }
-.text-amber { color: #fbbf24; }
-.text-purple { color: #c084fc; }
+.text-blue { color: #0f5f9e; }
+.text-green { color: #176b45; }
+.text-amber { color: #7a4b00; }
+.text-purple { color: #6f3a96; }
 .font-bold { font-weight: 700; }
 .text-mono { font-family: monospace; }
 .flex-1 { flex: 1; }
@@ -1362,13 +1362,13 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   cursor: pointer;
   border: 1px solid transparent;
 }
-.btn-primary { background: #2563eb; color: #fff; }
-.btn-primary:hover { background: #1d4ed8; }
+.btn-primary { background: #1769aa; color: #fff; }
+.btn-primary:hover { background: #0e568e; }
 
 .btn-danger-outline {
   background: transparent;
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  color: #a12d34;
 }
 .btn-danger-outline:hover {
   background: rgba(239, 68, 68, 0.12);

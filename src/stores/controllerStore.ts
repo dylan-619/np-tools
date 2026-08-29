@@ -107,7 +107,7 @@ project:
 `
 
 export const useControllerStore = defineStore('controller', () => {
-  const activeTab = ref<'overview' | 'hardware' | 'points' | 'variables' | 'northbound' | 'yaml'>('overview')
+  const activeTab = ref<'overview' | 'hardware' | 'points' | 'variables' | 'northbound' | 'debug' | 'yaml'>('overview')
   const doc = ref<ProjectIoDocument>(deserializeProjectIoYaml(DEFAULT_MARQUEE_YAML))
   const toastMessage = ref<{ text: string; isSuccess: boolean } | null>(null)
   let toastTimer: number | null = null

@@ -192,7 +192,7 @@ export type ValidationSeverity = 'error' | 'warning' | 'info'
 export interface ValidationIssue {
   code: string
   severity: ValidationSeverity
-  tab: 'overview' | 'hardware' | 'points' | 'variables' | 'northbound' | 'yaml'
+  tab: 'overview' | 'hardware' | 'points' | 'variables' | 'northbound' | 'debug' | 'yaml'
   entity: string
   message: string
   yamlPath?: string

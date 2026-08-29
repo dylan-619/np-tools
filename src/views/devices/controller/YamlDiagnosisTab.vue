@@ -257,8 +257,8 @@ function jumpToTab(tabName: any) {
 }
 
 .panel-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -267,11 +267,11 @@ function jumpToTab(tabName: any) {
 
 .panel-header {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.015);
+  background: #f7f9fb;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -289,21 +289,21 @@ function jumpToTab(tabName: any) {
   gap: 8px;
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
-.text-danger { color: #f87171; }
-.text-success { color: #34d399; }
-.text-blue { color: #60a5fa; }
-.text-green { color: #4ade80; }
+.text-danger { color: #a12d34; }
+.text-success { color: #176b45; }
+.text-blue { color: #0f5f9e; }
+.text-green { color: #176b45; }
 .text-mono { font-family: monospace; }
 .font-bold { font-weight: 600; }
-.text-muted { color: var(--text-muted, #94a3b8); }
+.text-muted { color: var(--text-muted, #40515f); }
 
 .view-mode-pill {
   display: flex;
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   padding: 2px;
   border-radius: 6px;
   gap: 2px;
@@ -318,13 +318,13 @@ function jumpToTab(tabName: any) {
   border-radius: 4px;
   background: transparent;
   border: none;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .mode-btn.active {
-  background: #3b82f6;
+  background: #1769aa;
   color: #fff;
   font-weight: 600;
 }
@@ -338,7 +338,7 @@ function jumpToTab(tabName: any) {
 .badge-err {
   font-size: 0.72rem;
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: #a12d34;
   border: 1px solid rgba(239, 68, 68, 0.3);
   padding: 2px 8px;
   border-radius: 4px;
@@ -348,7 +348,7 @@ function jumpToTab(tabName: any) {
 .badge-warn {
   font-size: 0.72rem;
   background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  color: #7a4b00;
   border: 1px solid rgba(245, 158, 11, 0.3);
   padding: 2px 8px;
   border-radius: 4px;
@@ -358,7 +358,7 @@ function jumpToTab(tabName: any) {
 .badge-ok {
   font-size: 0.72rem;
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: #176b45;
   border: 1px solid rgba(16, 185, 129, 0.3);
   padding: 2px 8px;
   border-radius: 4px;
@@ -386,7 +386,7 @@ function jumpToTab(tabName: any) {
   justify-content: center;
   padding: 24px;
   gap: 10px;
-  color: var(--text-main, #cbd5e1);
+  color: var(--text-main, #314654);
   font-size: 0.82rem;
 }
 
@@ -398,12 +398,12 @@ function jumpToTab(tabName: any) {
 }
 
 .data-table th {
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-muted, #94a3b8);
+  background: #f7f9fb;
+  color: var(--text-muted, #40515f);
   font-weight: 600;
   font-size: 0.74rem;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
 }
 
 .data-table td {
@@ -418,25 +418,25 @@ function jumpToTab(tabName: any) {
   padding: 2px 6px;
   border-radius: 4px;
 }
-.severity-pill.error { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-.severity-pill.warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-.severity-pill.info { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+.severity-pill.error { background: rgba(239, 68, 68, 0.15); color: #a12d34; border: 1px solid rgba(239, 68, 68, 0.3); }
+.severity-pill.warning { background: rgba(245, 158, 11, 0.15); color: #7a4b00; border: 1px solid rgba(245, 158, 11, 0.3); }
+.severity-pill.info { background: rgba(59, 130, 246, 0.15); color: #0f5f9e; border: 1px solid rgba(59, 130, 246, 0.3); }
 
 .btn-link {
   background: transparent;
   border: none;
-  color: #60a5fa;
+  color: #0f5f9e;
   font-size: 0.75rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.btn-link:hover { text-decoration: underline; color: #93c5fd; }
+.btn-link:hover { text-decoration: underline; color: #1769aa; }
 
 /* Code Viewer & Syntax Highlighting */
 .code-panel-container {
-  background: #0d1117;
+  background: #f7f9fb;
 }
 
 .code-viewer-wrapper {
@@ -455,14 +455,14 @@ function jumpToTab(tabName: any) {
   width: 48px;
   flex-shrink: 0;
   text-align: right;
-  background: #090d13;
-  border-right: 1px solid #21262d;
+  background: #eef3f7;
+  border-right: 1px solid #b9c5cf;
   user-select: none;
 }
 
 .gutter-line-no {
   font-size: 0.74rem;
-  color: #484f58;
+  color: #5f6f7d;
   padding-right: 12px;
   height: 20px;
   line-height: 20px;
@@ -478,32 +478,32 @@ function jumpToTab(tabName: any) {
 .code-line {
   height: 20px;
   line-height: 20px;
-  color: #c9d1d9;
+  color: #314654;
 }
 
-/* VS Code Dark+ / GitHub Dark YAML Syntax Highlighting Tokens */
+/* 浅色工程代码预览：语法色保持语义，不以高亮亮度补偿暗色背景。 */
 :deep(.hljs-attr) {
-  color: #79c0ff; /* YAML Keys */
+  color: #0f5f9e; /* YAML Keys */
   font-weight: 600;
 }
 :deep(.hljs-string) {
-  color: #a5d6ff; /* Strings */
+  color: #24577a; /* Strings */
 }
 :deep(.hljs-number) {
-  color: #d2a8ff; /* Numbers */
+  color: #6f3a96; /* Numbers */
 }
 :deep(.hljs-literal),
 :deep(.hljs-keyword) {
-  color: #ff7b72; /* Booleans / keywords */
+  color: #a12d34; /* Booleans / keywords */
   font-weight: 700;
 }
 :deep(.hljs-comment) {
-  color: #8b949e; /* Comments */
+  color: #5f6f7d; /* Comments */
   font-style: italic;
 }
 :deep(.hljs-bullet),
 :deep(.hljs-punctuation) {
-  color: #7ee787; /* Bullets */
+  color: #176b45; /* Bullets */
 }
 
 /* Code Editor */
@@ -517,7 +517,7 @@ function jumpToTab(tabName: any) {
 
 .editor-notice {
   font-size: 0.74rem;
-  color: #93c5fd;
+  color: #1769aa;
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.2);
   padding: 6px 10px;
@@ -526,11 +526,11 @@ function jumpToTab(tabName: any) {
 
 .yaml-raw-textarea {
   flex: 1;
-  background: #090d13;
-  border: 1px solid #30363d;
+  background: #ffffff;
+  border: 1px solid #b9c5cf;
   border-radius: 6px;
   padding: 14px;
-  color: #c9d1d9;
+  color: #314654;
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
   font-size: 0.82rem;
   line-height: 1.5;
@@ -539,7 +539,7 @@ function jumpToTab(tabName: any) {
   white-space: pre;
 }
 .yaml-raw-textarea:focus {
-  border-color: #58a6ff;
+  border-color: #2f82c4;
 }
 
 .btn {
@@ -554,15 +554,15 @@ function jumpToTab(tabName: any) {
   cursor: pointer;
   border: 1px solid transparent;
 }
-.btn-primary { background: #2563eb; color: #fff; }
-.btn-primary:hover { background: #1d4ed8; }
+.btn-primary { background: #1769aa; color: #fff; }
+.btn-primary:hover { background: #0e568e; }
 
 .btn-outline {
   background: transparent;
-  border-color: var(--border, #2a2f42);
-  color: var(--text-main, #cbd5e1);
+  border-color: var(--border, #b9c5cf);
+  color: var(--text-main, #314654);
 }
-.btn-outline:hover { background: rgba(255, 255, 255, 0.05); color: #60a5fa; }
+.btn-outline:hover { background: #eef3f7; color: #0f5f9e; }
 /* Compact engineering workspace pass */
 .yaml-tab-wrapper { gap: 10px; }
 .panel-card { border-radius: var(--radius-sm); }

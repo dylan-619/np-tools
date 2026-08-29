@@ -15,6 +15,28 @@ import type {
   TerminalLogLine,
   IoChunk,
 } from '../types/serial'
+import { formatSerialConfig } from '../utils/serialFormat'
+
+const SERIAL_CONFIG_STORAGE_KEY = 'np_tools_serial_config'
+
+const DEFAULT_SERIAL_CONFIG: SerialOpenConfig = {
+  path: '',
+  baudRate: 115200,
+  dataBits: 'eight',
+  stopBits: 'one',
+  parity: 'none',
+  flowControl: 'none',
+}
+
+function loadPersistedSerialConfig(): SerialOpenConfig {
+  if (typeof localStorage === 'undefined') return { ...DEFAULT_SERIAL_CONFIG }
+  try {
+    const stored = JSON.parse(localStorage.getItem(SERIAL_CONFIG_STORAGE_KEY) || '{}')
+    return { ...DEFAULT_SERIAL_CONFIG, ...stored, path: '' }
+  } catch {
+    return { ...DEFAULT_SERIAL_CONFIG }
+  }
+}
 
 export const useSerialStore = defineStore('serial', () => {
   const ports = ref<SerialPortDescriptor[]>([])
@@ -31,14 +53,7 @@ export const useSerialStore = defineStore('serial', () => {
   const rtsState = ref(false)
   const isRecording = ref(false)
 
-  const config = ref<SerialOpenConfig>({
-    path: '',
-    baudRate: 115200,
-    dataBits: 'eight',
-    stopBits: 'one',
-    parity: 'none',
-    flowControl: 'none',
-  })
+  const config = ref<SerialOpenConfig>(loadPersistedSerialConfig())
 
   // Decoder & buffer
   const decoder = new TextDecoder()
@@ -226,7 +241,7 @@ export const useSerialStore = defineStore('serial', () => {
       lineBuffer = ''
       rxBytes.value = 0
       txBytes.value = 0
-      appendLog('rx', `=== 已成功打开串口 ${target} (波特率: ${config.value.baudRate} 8N1) ===`)
+      appendLog('rx', `=== 已成功打开串口 ${target} (${formatSerialConfig(config.value)}) ===`)
     } catch (err: any) {
       errorMsg.value = `打开串口失败: ${String(err)}`
       connectedPort.value = null
@@ -321,6 +336,15 @@ export const useSerialStore = defineStore('serial', () => {
     logs.value = []
   }
 
+  function persistConfig() {
+    if (typeof localStorage === 'undefined') return
+    const { baudRate, dataBits, stopBits, parity, flowControl } = config.value
+    localStorage.setItem(
+      SERIAL_CONFIG_STORAGE_KEY,
+      JSON.stringify({ baudRate, dataBits, stopBits, parity, flowControl })
+    )
+  }
+
   return {
     ports,
     loading,
@@ -342,6 +366,7 @@ export const useSerialStore = defineStore('serial', () => {
     toggleDtr,
     toggleRts,
     clearLogs,
+    persistConfig,
     registerLineListener,
     unregisterLineListener,
   }

@@ -4,10 +4,15 @@ import vueParser from 'vue-eslint-parser'
 
 export default tseslint.config(
   {
-    ignores: ['**/*.d.ts', 'apps/desktop/dist/**', 'apps/desktop/src-tauri/**']
+    ignores: ['**/*.d.ts', 'dist/**', 'target/**', 'src-tauri/target/**']
   },
   ...tseslint.configs.recommended,
   ...eslintPluginVue.configs['flat/recommended'],
+  {
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off'
+    }
+  },
   {
     files: ['*.vue', '**/*.vue'],
     languageOptions: {

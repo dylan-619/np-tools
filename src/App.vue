@@ -1,19 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch } from 'vue'
 import AppSidebar from './components/layout/AppSidebar.vue'
-import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useSerialStore } from './stores/serialStore'
 import { useSjzdStore } from './stores/sjzdStore'
 import { CheckCircle2, AlertTriangle, X } from 'lucide-vue-next'
 
-const route = useRoute()
-const serial = useSerialStore()
 const sjzd = useSjzdStore()
-
-const currentTitle = computed(() => {
-  return (route.meta?.title as string) || 'NP-Tools 硬件调试平台'
-})
 
 const activeToast = ref<{ success: boolean; text: string } | null>(null)
 let toastTimer: number | null = null
@@ -36,85 +27,11 @@ function dismissToast() {
   if (toastTimer) clearTimeout(toastTimer)
 }
 
-async function handleTitlebarMouseDown(e: MouseEvent) {
-  if (e.button === 0) {
-    const target = e.target as HTMLElement
-    if (
-      target &&
-      (target.tagName === 'BUTTON' ||
-        target.closest('button') ||
-        target.tagName === 'INPUT' ||
-        target.closest('.no-drag'))
-    ) {
-      return
-    }
-    try {
-      await getCurrentWindow().startDragging()
-    } catch (err) {
-      console.error('startDragging 失败:', err)
-    }
-  }
-}
-
-async function handleTitlebarDblClick() {
-  try {
-    const win = getCurrentWindow()
-    const isMax = await win.isMaximized()
-    if (isMax) {
-      await win.unmaximize()
-    } else {
-      await win.maximize()
-    }
-  } catch (err) {
-    console.error('窗口最大化切换失败:', err)
-  }
-}
 </script>
 
 <template>
   <div class="app-layout">
-    <!-- Top Dedicated Full-Width Window Titlebar / Drag Strip -->
-    <header
-      class="app-top-drag-bar"
-      data-tauri-drag-region
-      @mousedown="handleTitlebarMouseDown"
-      @dblclick="handleTitlebarDblClick"
-    >
-      <!-- macOS traffic lights space placeholder (approx 74px) -->
-      <div class="mac-traffic-lights-spacer" data-tauri-drag-region />
-
-      <!-- Left App Branding & Route Breadcrumb -->
-      <div class="titlebar-left" data-tauri-drag-region>
-        <div class="brand-badge" data-tauri-drag-region>
-          <img src="./assets/app-icon.png" alt="Logo" class="brand-mini-icon" data-tauri-drag-region />
-          <span class="brand-text" data-tauri-drag-region>NP-Tools</span>
-          <span class="brand-version" data-tauri-drag-region>v2.0</span>
-        </div>
-        <div class="titlebar-sep" data-tauri-drag-region />
-        <div class="route-badge" data-tauri-drag-region>
-          <span class="route-name" data-tauri-drag-region>{{ currentTitle }}</span>
-        </div>
-      </div>
-
-      <!-- Center Wide Draggable Area -->
-      <div class="titlebar-drag-spacer" data-tauri-drag-region />
-
-      <!-- Right Connection Status Badge -->
-      <div class="titlebar-right" data-tauri-drag-region>
-        <div
-          class="top-port-badge"
-          :class="{ connected: !!serial.connectedPort }"
-          :title="serial.connectedPort ? `已连接硬件串口: ${serial.connectedPort}` : '硬件串口未连接'"
-        >
-          <span class="badge-dot" />
-          <span class="port-label">
-            {{ serial.connectedPort ? serial.connectedPort.replace('/dev/', '') : '未连接硬件串口' }}
-          </span>
-        </div>
-      </div>
-    </header>
-
-    <!-- App Body Container below Top Titlebar -->
+    <!-- 使用系统原生标题栏：macOS 红黄绿按钮 / Windows 最小化、最大化与关闭按钮。 -->
     <div class="app-body-container">
       <!-- Left Product Line & Global Serial Sidebar -->
       <AppSidebar />
@@ -166,7 +83,7 @@ async function handleTitlebarDblClick() {
   --accent-hover: var(--color-accent-hover);
   --success: var(--color-success);
   --danger: var(--color-danger);
-  --danger-hover: #c94747;
+  --danger-hover: #84242a;
 }
 
 html,
@@ -214,27 +131,6 @@ body {
   background-color: var(--bg-app);
 }
 
-.app-top-drag-bar {
-  height: 34px;
-  background: var(--color-surface-1);
-  border-bottom: 1px solid var(--color-border-subtle);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-app-region: drag;
-  app-region: drag;
-  cursor: grab;
-  flex-shrink: 0;
-  z-index: 100;
-}
-.app-top-drag-bar:active {
-  cursor: grabbing;
-}
-
-.no-drag,
-.top-port-badge,
 button,
 input,
 select {
@@ -242,110 +138,29 @@ select {
   app-region: no-drag;
 }
 
-.mac-traffic-lights-spacer {
-  width: 62px;
-  flex-shrink: 0;
-  height: 100%;
+input:not([type='checkbox']):not([type='radio']),
+textarea {
+  color: var(--color-text-primary) !important;
 }
 
-.titlebar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 100%;
+input:not([type='checkbox']):not([type='radio'])::placeholder,
+textarea::placeholder {
+  color: var(--color-text-tertiary) !important;
+  opacity: 1;
 }
 
-.brand-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.brand-mini-icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-}
-
-.brand-text {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--text-main, #e2e8f0);
-  letter-spacing: 0.02em;
-}
-
-.brand-version {
-  font-size: 0.65rem;
-  font-family: var(--font-mono, monospace);
-  color: var(--color-info);
-  background: rgba(74, 163, 255, 0.12);
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-.titlebar-sep {
-  width: 1px;
-  height: 14px;
-  background: var(--color-border-default);
-}
-
-.route-badge {
-  display: flex;
-  align-items: center;
-}
-
-.route-name {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--text-muted, #94a3b8);
-}
-
-.titlebar-drag-spacer {
-  flex: 1;
-  height: 100%;
-  min-width: 20px;
-}
-
-.titlebar-right {
-  display: flex;
-  align-items: center;
-  height: 100%;
-}
-
-.top-port-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  font-family: var(--font-mono, monospace);
-  padding: 2px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-secondary);
-  transition: all 0.2s ease;
-}
-.top-port-badge.connected {
-  background: rgba(56, 178, 118, 0.12);
-  border-color: rgba(56, 178, 118, 0.36);
-  color: var(--color-success);
-}
-
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--color-text-tertiary);
-}
-.top-port-badge.connected .badge-dot {
-  background-color: var(--color-success);
+input:not([type='checkbox']):not([type='radio']):disabled,
+textarea:disabled {
+  color: var(--color-text-disabled) !important;
+  -webkit-text-fill-color: var(--color-text-disabled);
+  opacity: 1;
 }
 
 .app-body-container {
   flex: 1;
   display: flex;
   overflow: hidden;
-  height: calc(100vh - 34px);
+  height: 100%;
   width: 100%;
 }
 
@@ -372,21 +187,21 @@ select {
   gap: 12px;
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 10px 28px rgba(27, 45, 58, 0.18);
   font-size: 0.82rem;
   font-weight: 500;
   backdrop-filter: blur(12px);
   border: 1px solid transparent;
 }
 .global-toast-container.success {
-  background: #154634;
-  border-color: rgba(56, 178, 118, 0.48);
-  color: var(--color-text-primary);
+  background: #e7f5ed;
+  border-color: #8bc5a8;
+  color: #0f5f9e;
 }
 .global-toast-container.error {
-  background: #4a2426;
-  border-color: rgba(223, 91, 91, 0.5);
-  color: var(--color-text-primary);
+  background: #fdebed;
+  border-color: #d58b90;
+  color: #8f2028;
 }
 
 .toast-content {
@@ -397,14 +212,14 @@ select {
 .toast-close-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.8);
+  color: currentColor;
   cursor: pointer;
   padding: 2px;
   display: flex;
   align-items: center;
 }
 .toast-close-btn:hover {
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .toast-slide-enter-active,
@@ -443,14 +258,14 @@ select,
 .form-select {
   appearance: none;
   -webkit-appearance: none;
-  background-color: var(--bg-input, #232736);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-color: var(--bg-input, #f7f9fb);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2340515f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 14px;
-  border: 1px solid var(--border, #2a2f42);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 6px;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
   padding: 7px 32px 7px 10px;
   font-size: 0.84rem;
   outline: none;

@@ -5,6 +5,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { useFlashStore } from '../stores/flashStore'
 import { useSerialStore } from '../stores/serialStore'
 import CustomSelect from '../components/common/CustomSelect.vue'
+import { formatSerialConfig } from '../utils/serialFormat'
 
 const flash = useFlashStore()
 const serial = useSerialStore()
@@ -32,6 +33,17 @@ const parityOptions = [
   { label: '偶校验 (Even)', value: 'even' },
 ]
 
+const stopBitOptions = [
+  { label: '1 停止位', value: 'one' },
+  { label: '2 停止位', value: 'two' },
+]
+
+const flowControlOptions = [
+  { label: '无流控 (None)', value: 'none' },
+  { label: '软件流控 (XON/XOFF)', value: 'software' },
+  { label: '硬件流控 (RTS/CTS)', value: 'hardware' },
+]
+
 async function chooseCliPath() {
   try {
     const selected = await open({
@@ -49,6 +61,8 @@ async function chooseCliPath() {
 }
 
 function saveSettings() {
+  serial.persistConfig()
+  flash.persistCustomCliPath()
   savedSuccess.value = true
   setTimeout(() => {
     savedSuccess.value = false
@@ -119,7 +133,7 @@ function saveSettings() {
       <div class="card-header">
         <div class="header-left">
           <Settings :size="16" class="icon-blue" />
-          <h3>默认串口连接参数 (标准: 115200 8N1)</h3>
+          <h3>默认串口连接参数（当前：{{ formatSerialConfig(serial.config) }}）</h3>
         </div>
       </div>
 
@@ -146,6 +160,22 @@ function saveSettings() {
           <CustomSelect
             v-model="serial.config.parity"
             :options="parityOptions"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>默认停止位</label>
+          <CustomSelect
+            v-model="serial.config.stopBits"
+            :options="stopBitOptions"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>默认流控</label>
+          <CustomSelect
+            v-model="serial.config.flowControl"
+            :options="flowControlOptions"
           />
         </div>
       </div>
@@ -196,8 +226,8 @@ function saveSettings() {
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 12px;
-  border: 1px solid var(--color-border-subtle, #24323d);
-  background: var(--color-surface-1, #111820);
+  border: 1px solid var(--color-border-subtle, #d5dde4);
+  background: var(--color-surface-1, #ffffff);
   border-radius: var(--radius-sm, 5px);
 }
 
@@ -205,12 +235,12 @@ function saveSettings() {
   margin: 0 0 3px 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 .subtitle {
   margin: 0;
   font-size: 0.74rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .success-bar {
@@ -221,13 +251,13 @@ function saveSettings() {
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: 6px;
-  color: #34d399;
+  color: #176b45;
   font-size: 0.82rem;
 }
 
 .section-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
@@ -235,8 +265,8 @@ function saveSettings() {
 .card-header {
   min-height: 38px;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid var(--border, #2a2f42);
+  background: #eef3f7;
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -251,14 +281,14 @@ function saveSettings() {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .icon-blue {
-  color: #3b82f6;
+  color: #1769aa;
 }
 .icon-purple {
-  color: #a855f7;
+  color: #6f3a96;
 }
 
 .card-body {
@@ -282,7 +312,7 @@ function saveSettings() {
 .form-group label {
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .input-with-button {
@@ -295,16 +325,16 @@ function saveSettings() {
   width: 100%;
   min-height: var(--control-height, 32px);
   padding: 6px 9px;
-  background: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
-  color: #fff;
+  background: var(--bg-input, #f7f9fb);
+  border: 1px solid var(--border, #b9c5cf);
+  color: #17212b;
   border-radius: 6px;
   font-size: 0.85rem;
   outline: none;
 }
 .form-input:focus,
 .form-select:focus {
-  border-color: var(--accent, #3b82f6);
+  border-color: var(--accent, #1769aa);
 }
 
 .mono-text {
@@ -313,10 +343,10 @@ function saveSettings() {
 
 .field-hint {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .field-hint code {
-  color: #93c5fd;
+  color: #1769aa;
   font-family: var(--font-mono, monospace);
 }
 
@@ -332,12 +362,12 @@ function saveSettings() {
   gap: 10px;
 }
 .about-label {
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   width: 140px;
   flex-shrink: 0;
 }
 .about-val {
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
   font-weight: 500;
 }
 
@@ -354,18 +384,18 @@ function saveSettings() {
   border: 1px solid transparent;
 }
 .btn-primary {
-  background: var(--accent, #3b82f6);
+  background: var(--accent, #1769aa);
   color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover, #2563eb);
+  background: var(--accent-hover, #1769aa);
 }
 .btn-secondary {
-  background: var(--bg-input, #232736);
-  color: var(--text-main, #e2e8f0);
-  border-color: var(--border, #2a2f42);
+  background: var(--bg-input, #f7f9fb);
+  color: var(--text-main, #17212b);
+  border-color: var(--border, #b9c5cf);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: #2e3448;
+  background: #e5ebf0;
 }
 </style>

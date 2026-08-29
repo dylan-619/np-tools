@@ -9,6 +9,8 @@ use serial_core::list_ports;
 use std::sync::Arc;
 use tauri::ipc::Channel;
 
+mod kz3_http;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -311,6 +313,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(ConnectionManager::new())
+        .manage(kz3_http::Kz3HttpClient::new())
         .manage(flash_mgr)
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -340,6 +343,10 @@ pub fn run() {
             flash_probe_tool,
             flash_start,
             flash_cancel,
+            // KZ3 HTTP 在线调试
+            kz3_http::kz3_http_get_diagnostic,
+            kz3_http::kz3_http_get_point,
+            kz3_http::kz3_http_write_point,
             // File Save & Open Dialogs
             app_save_file,
             app_open_file

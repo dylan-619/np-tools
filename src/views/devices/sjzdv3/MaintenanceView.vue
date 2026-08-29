@@ -269,8 +269,8 @@ const showEepromModal = ref(false)
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 12px;
-  border: 1px solid var(--color-border-subtle, #24323d);
-  background: var(--color-surface-1, #111820);
+  border: 1px solid var(--color-border-subtle, #d5dde4);
+  background: var(--color-surface-1, #ffffff);
   border-radius: var(--radius-sm, 5px);
 }
 
@@ -278,17 +278,17 @@ const showEepromModal = ref(false)
   margin: 0 0 3px 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 .subtitle {
   margin: 0;
   font-size: 0.74rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .section-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
@@ -296,8 +296,8 @@ const showEepromModal = ref(false)
 .card-header {
   min-height: 38px;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid var(--border, #2a2f42);
+  background: #eef3f7;
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -312,17 +312,17 @@ const showEepromModal = ref(false)
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .icon-blue {
-  color: #3b82f6;
+  color: #1769aa;
 }
 .icon-amber {
-  color: #f59e0b;
+  color: #8a5700;
 }
 .icon-danger {
-  color: #ef4444;
+  color: #a12d34;
 }
 
 .card-body {
@@ -339,15 +339,15 @@ const showEepromModal = ref(false)
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: var(--bg-input, #232736);
+  background: var(--bg-input, #f7f9fb);
   padding: 10px;
   border-radius: var(--radius-xs, 3px);
-  border: 1px solid var(--border, #2a2f42);
+  border: 1px solid var(--border, #b9c5cf);
 }
 .param-box label {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .input-with-action {
@@ -361,25 +361,25 @@ const showEepromModal = ref(false)
   flex: 1;
   min-height: var(--control-height, 32px);
   padding: 6px 9px;
-  background: var(--bg-app, #0f111a);
-  border: 1px solid var(--border, #2a2f42);
-  color: #fff;
+  background: var(--bg-app, #edf1f4);
+  border: 1px solid var(--border, #b9c5cf);
+  color: #17212b;
   border-radius: 6px;
   font-size: 0.85rem;
   outline: none;
 }
 .form-input:focus,
 .form-select:focus {
-  border-color: var(--accent, #3b82f6);
+  border-color: var(--accent, #1769aa);
 }
 
 .unit-text {
   font-size: 0.8rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .field-hint {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .actions-grid-3 {
@@ -389,8 +389,8 @@ const showEepromModal = ref(false)
 }
 
 .action-card {
-  background: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-input, #f7f9fb);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: var(--radius-xs, 3px);
   padding: 10px;
   display: flex;
@@ -407,11 +407,11 @@ const showEepromModal = ref(false)
 .action-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 .action-desc {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   line-height: 1.4;
 }
 
@@ -424,7 +424,7 @@ const showEepromModal = ref(false)
 .danger-tag {
   font-size: 0.72rem;
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: #a12d34;
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: 600;
@@ -444,12 +444,12 @@ const showEepromModal = ref(false)
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.25);
   border-radius: 6px;
-  color: #fca5a5;
+  color: #a12d34;
   font-size: 0.82rem;
   line-height: 1.5;
 }
 .warning-icon {
-  color: #ef4444;
+  color: #a12d34;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -482,22 +482,22 @@ const showEepromModal = ref(false)
   width: 100%;
 }
 .btn-secondary {
-  background: var(--bg-app, #0f111a);
-  color: var(--text-main, #e2e8f0);
-  border-color: var(--border, #2a2f42);
+  background: var(--bg-app, #edf1f4);
+  color: var(--text-main, #17212b);
+  border-color: var(--border, #b9c5cf);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: #2e3448;
+  background: #e5ebf0;
 }
 
 .btn-warning {
   background: rgba(245, 158, 11, 0.15);
   border-color: rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
+  color: #7a4b00;
 }
 .btn-warning:hover:not(:disabled) {
   background: rgba(245, 158, 11, 0.25);
-  border-color: #f59e0b;
+  border-color: #8a5700;
 }
 
 .btn-critical {
@@ -507,13 +507,13 @@ const showEepromModal = ref(false)
   font-weight: 600;
 }
 .btn-critical:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #a12d34 0%, #dc2626 100%);
 }
 
 .btn:disabled {
-  background: var(--color-surface-1, #111820);
-  border-color: var(--color-border-subtle, #24323d);
-  color: var(--color-text-disabled, #586874);
+  background: var(--color-surface-1, #ffffff);
+  border-color: var(--color-border-subtle, #d5dde4);
+  color: var(--color-text-disabled, #667784);
   opacity: 1;
   cursor: not-allowed;
 }

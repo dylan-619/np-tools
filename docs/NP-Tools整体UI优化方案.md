@@ -26,7 +26,7 @@ NP-Tools 不是单一串口助手，而是一个面向生产、现场调试和�
 
 ### 2.1 已有优点
 
-- 已采用统一暗色基调，适合终端、日志和现场弱光环境；
+- 已采用统一浅色高对比基调，适合现场长时间读表、核对参数和排故；
 - 全局串口连接由 Pinia 共享，产品页切换不会打断物理连接；
 - 主要页面已经形成标题区、操作区、内容区的基本层次；
 - 串口终端采用“顶部过滤工具栏 + 中部日志 + 底部发送坞”，符合专业调试工具心智；
@@ -91,7 +91,7 @@ NP-Tools 不是单一串口助手，而是一个面向生产、现场调试和�
 
 ### 3.1 视觉方向
 
-采用“克制的工业仪表工作台”方向：深色石墨背景、冷灰层级、单一蓝色交互强调、严格的状态色和少量设备类别色。
+采用“克制的工业仪表工作台”方向：白色/浅灰工作面、深灰文字、单一蓝色交互强调、严格的状态色和少量设备类别色。
 
 界面应让用户首先记住：**这是一个信息密集、状态明确、操作可靠的工程工具，而不是由大卡片组成的后台系统。**
 
@@ -196,38 +196,38 @@ NP-Tools 不是单一串口助手，而是一个面向生产、现场调试和�
 ```css
 :root {
   /* Surfaces */
-  --color-canvas: #0b1016;
-  --color-surface-1: #111820;
-  --color-surface-2: #17212b;
-  --color-surface-3: #1d2a35;
-  --color-overlay: #22313d;
+  --color-canvas: #edf1f4;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f7f9fb;
+  --color-surface-3: #eef3f7;
+  --color-overlay: #e5ebf0;
 
   /* Borders */
-  --color-border-subtle: #24323d;
-  --color-border-default: #31424f;
-  --color-border-strong: #425766;
+  --color-border-subtle: #d5dde4;
+  --color-border-default: #b9c5cf;
+  --color-border-strong: #8fa2b0;
 
   /* Text */
-  --color-text-primary: #e6edf3;
-  --color-text-secondary: #a8b6c2;
-  --color-text-tertiary: #718391;
-  --color-text-disabled: #586874;
+  --color-text-primary: #17212b;
+  --color-text-secondary: #40515f;
+  --color-text-tertiary: #5f6f7d;
+  --color-text-disabled: #667784;
 
   /* Interaction */
-  --color-accent: #3b82f6;
-  --color-accent-hover: #5593f7;
-  --color-accent-active: #2f6fd2;
-  --color-focus-ring: #79a9ff;
+  --color-accent: #1769aa;
+  --color-accent-hover: #0e568e;
+  --color-accent-active: #0b4776;
+  --color-focus-ring: #2f82c4;
 
   /* Semantic status */
-  --color-info: #4aa3ff;
-  --color-success: #38b276;
-  --color-warning: #d89b31;
-  --color-danger: #df5b5b;
+  --color-info: #0f5f9e;
+  --color-success: #176b45;
+  --color-warning: #7a4b00;
+  --color-danger: #a12d34;
 }
 ```
 
-色面之间应依靠亮度层级和边框区分，不大量使用阴影。暗色背景不使用纯黑，正文不使用纯白，以降低长时间观看疲劳。
+色面之间依靠白/浅灰亮度层级和明确边框区分，不大量使用阴影。正文使用深灰黑而非纯黑，次要文字仍保持至少 WCAG AA 普通文本对比度；禁用态依靠边框、底色和交互状态区分，不通过把文字淡到不可读来表达。
 
 ### 6.2 状态色规则
 
@@ -291,7 +291,7 @@ src/styles/
 ├── tokens.css       # 颜色、字号、间距、圆角、层级
 ├── reset.css        # 全局基础样式
 ├── utilities.css    # 少量布局与文本工具类
-└── themes.css       # 后续主题扩展，首期只保留工业暗色
+└── themes.css       # 后续主题扩展，当前默认工业浅色
 
 src/components/ui/
 ├── UiPageBar.vue
@@ -561,14 +561,19 @@ src/components/ui/
 
 本方案已在前端完成以下对应实现，未修改协议、Store 数据结构或 Tauri/Rust 调用：
 
-- 新增 `src/styles/tokens.css` 与 `src/styles/base.css`，统一工业暗色 Token、焦点环、字体、数字等宽与滚动条；
+- 新增 `src/styles/tokens.css` 与 `src/styles/base.css`，统一工业浅色 Token、焦点环、字体、数字等宽与滚动条；
 - 标题栏收紧为 34px，侧栏收紧为 220px，并提供 52px 可折叠模式；在 960px 以下自动进入紧凑导航；
 - 侧栏移除重复品牌区，图标模式保留 Tooltip 与可访问名称；
 - 串口连接区支持紧凑态，断开连接改为中性危险提示而不是不可逆操作红色；
 - KZ3 工作台修复页签 Flex 收缩，页签固定为可横向滚动的 38px 工作流条；
 - SJZDV3 概览、SLE、Modbus、监测、维护页迁移到统一紧凑基线；Modbus 将工具栏拆为普通/主操作分组，并使抓包抽屉默认折叠、单点测试后自动展开；
 - 串口终端、固件烧录、设置页以及 KZ3 六个工作页完成面板、表格、输入和按钮密度统一；
-- 已完成 1100×760 与 850×600 本地界面回归，验证侧栏、KZ3 页签、Modbus 工具栏、串口终端和页面横向溢出。
+- 已完成设备概览、SLE、Modbus、监测、维护、KZ3 组态、KZ3 在线调试、串口终端、固件烧录和设置共 10 个主路由的 1100×760 与 850×600 本地界面回归；两档尺寸均未出现页面级横向溢出；
+- 上述 10 个主路由完成可见文本自动对比度审计，未发现低于 WCAG AA 普通文本 4.5:1 的组合；禁用文字在白色背景上的最低对比度为 4.63:1；
+- 全局侧栏、输入框、下拉菜单、确认弹窗、Toast、日志控制台和 YAML 代码预览均已迁移到白色/浅灰工作面；页面大面积暗色工作面扫描结果为 0；
+- KZ3 在线调试页另在 850×600 下核对工作台、监视表、操作 Dock 和诊断侧栏，页面宽度保持 850px，诊断侧栏独立滚动，不挤压主工作区；
+- `pnpm build`、`pnpm lint` 和 `git diff --check` 均通过；全量 Lint 为 0 error、69 条既有模板风格 warning，本轮未用自动修复扩大变更范围；
+- 重新生成 macOS arm64 `.app` 与 `.dmg`，`codesign --verify --deep --strict` 和 `hdiutil verify` 均通过。
 
 ## 附录 A：本次审查依据
 

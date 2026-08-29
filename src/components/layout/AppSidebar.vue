@@ -12,7 +12,7 @@ import {
   Flame,
   Settings,
   PanelLeftClose,
-  PanelLeftOpen,
+  PanelLeftOpen
 } from 'lucide-vue-next'
 import GlobalSerialBar from './GlobalSerialBar.vue'
 
@@ -20,7 +20,8 @@ const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
 const { width } = useWindowSize()
-const isCompact = computed(() => collapsed.value || width.value <= 960)
+const isDebugRoute = computed(() => route.name === 'ControllerDebug')
+const isCompact = computed(() => collapsed.value || width.value <= 960 || isDebugRoute.value)
 
 function navigateTo(path: string) {
   router.push(path)
@@ -118,13 +119,23 @@ function navigateTo(path: string) {
         <nav class="nav-list">
           <button
             class="nav-item"
-            :class="{ active: route.path === '/devices/controller' }"
+            :class="{ active: route.name === 'ControllerProduct' }"
             aria-label="I/O 可视化配置工作台"
             title="I/O 可视化配置工作台"
             @click="navigateTo('/devices/controller')"
           >
             <Cpu :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">I/O 可视化配置工作台</span>
+          </button>
+          <button
+            class="nav-item commissioning-item"
+            :class="{ active: isDebugRoute }"
+            aria-label="KZ3 在线调试工作台"
+            title="KZ3 在线调试工作台"
+            @click="navigateTo('/devices/controller/debug')"
+          >
+            <Activity :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">在线调试工作台</span>
           </button>
         </nav>
       </div>
@@ -172,7 +183,7 @@ function navigateTo(path: string) {
     </div>
 
     <!-- Bottom Global Serial Connection Box -->
-    <div class="sidebar-footer">
+    <div v-if="!isDebugRoute" class="sidebar-footer">
       <GlobalSerialBar :compact="isCompact" />
     </div>
   </aside>
@@ -181,8 +192,8 @@ function navigateTo(path: string) {
 <style scoped>
 .app-sidebar {
   width: 220px;
-  background-color: var(--bg-panel, #1a1d27);
-  border-right: 1px solid var(--border, #2a2f42);
+  background-color: var(--bg-panel, #ffffff);
+  border-right: 1px solid var(--border, #b9c5cf);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -197,7 +208,7 @@ function navigateTo(path: string) {
 .sidebar-header {
   min-height: 38px;
   padding: 7px 10px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   user-select: none;
   display: flex;
   align-items: center;
@@ -205,7 +216,7 @@ function navigateTo(path: string) {
 }
 
 .workspace-label {
-  color: var(--color-text-tertiary, #718391);
+  color: var(--color-text-tertiary, #5f6f7d);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -221,15 +232,15 @@ function navigateTo(path: string) {
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-xs, 3px);
-  color: var(--text-muted, #a8b6c2);
+  color: var(--text-muted, #40515f);
   background: transparent;
   cursor: pointer;
 }
 
 .sidebar-collapse-btn:hover {
-  background: var(--bg-hover, #1d2a35);
-  border-color: var(--border, #31424f);
-  color: var(--text-main, #e6edf3);
+  background: var(--bg-hover, #eef3f7);
+  border-color: var(--border, #b9c5cf);
+  color: var(--text-main, #17212b);
 }
 
 .nav-scroll-area {
@@ -252,7 +263,7 @@ function navigateTo(path: string) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   padding: 4px 8px;
   display: flex;
   align-items: center;
@@ -260,18 +271,18 @@ function navigateTo(path: string) {
 }
 
 .tag-badge {
-  font-size: 0.6rem;
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  font-size: 0.64rem;
+  background: #e7f1fa;
+  color: #0f5f9e;
   padding: 1px 4px;
   border-radius: 4px;
   font-weight: normal;
 }
 
 .tag-badge-purple {
-  font-size: 0.6rem;
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  font-size: 0.64rem;
+  background: #f2eafb;
+  color: #6f3a96;
   padding: 1px 4px;
   border-radius: 4px;
   font-weight: normal;
@@ -291,7 +302,7 @@ function navigateTo(path: string) {
   padding: 7px 8px;
   background: transparent;
   border: 1px solid transparent;
-  color: var(--text-main, #cbd5e1);
+  color: var(--text-main, #17212b);
   border-radius: 6px;
   font-size: 0.82rem;
   font-weight: 500;
@@ -302,25 +313,25 @@ function navigateTo(path: string) {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  background: #eef3f7;
+  color: #102330;
 }
 
 .nav-item.active {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
+  background: #e7f1fa;
+  border-color: #9fc1dc;
+  color: #0f5f9e;
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent, #3b82f6);
+  box-shadow: inset 2px 0 0 var(--accent, #1769aa);
 }
 
 .nav-icon {
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #526472);
   flex-shrink: 0;
   transition: color 0.15s;
 }
 .nav-item.active .nav-icon {
-  color: #3b82f6;
+  color: #1769aa;
 }
 
 .nav-text {
@@ -332,16 +343,16 @@ function navigateTo(path: string) {
 
 .coming-soon-pill {
   font-size: 0.62rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-muted, #94a3b8);
+  background: #e8edf2;
+  color: var(--text-muted, #40515f);
   padding: 1px 5px;
   border-radius: 10px;
 }
 
 .sidebar-footer {
   padding: 8px;
-  border-top: 1px solid var(--border, #2a2f42);
-  background: var(--color-canvas, #0b1016);
+  border-top: 1px solid var(--border, #b9c5cf);
+  background: var(--color-canvas, #edf1f4);
 }
 
 .app-sidebar.collapsed .sidebar-header,

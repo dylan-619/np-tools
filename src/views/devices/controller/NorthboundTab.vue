@@ -238,8 +238,8 @@ function onBindChange(fieldIdx: number, newBind: string) {
 
 /* Protocol Spec Banner */
 .protocol-spec-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 10px;
   padding: 12px 18px;
   display: flex;
@@ -265,7 +265,7 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .spec-main-title {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .active-protocols-row {
@@ -283,7 +283,7 @@ function onBindChange(fieldIdx: number, newBind: string) {
   border-radius: 4px;
   background: rgba(16, 185, 129, 0.08);
   border: 1px solid rgba(16, 185, 129, 0.2);
-  color: #6ee7b7;
+  color: #176b45;
 }
 
 .modbus-legend-grid {
@@ -311,15 +311,15 @@ function onBindChange(fieldIdx: number, newBind: string) {
   opacity: 0.85;
 }
 
-.zone-blue { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.25); color: #93c5fd; }
-.zone-green { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; }
-.zone-amber { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.25); color: #fde68a; }
-.zone-purple { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.25); color: #d8b4fe; }
-.zone-gray { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #94a3b8; }
+.zone-blue { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.25); color: #1769aa; }
+.zone-green { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.25); color: #176b45; }
+.zone-amber { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.25); color: #7a4b00; }
+.zone-purple { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.25); color: #6f3a96; }
+.zone-gray { background: #eef3f7; border-color: #d5dde4; color: #40515f; }
 
 .panel-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -328,11 +328,11 @@ function onBindChange(fieldIdx: number, newBind: string) {
 
 .panel-header {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.015);
+  background: #f7f9fb;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -343,13 +343,13 @@ function onBindChange(fieldIdx: number, newBind: string) {
   gap: 8px;
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .count-pill {
   font-size: 0.72rem;
   background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  color: #0f5f9e;
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -374,12 +374,12 @@ function onBindChange(fieldIdx: number, newBind: string) {
 }
 
 .data-table th {
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-muted, #94a3b8);
+  background: #f7f9fb;
+  color: var(--text-muted, #40515f);
   font-weight: 600;
   font-size: 0.74rem;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
 }
 
 .data-table td {
@@ -389,16 +389,16 @@ function onBindChange(fieldIdx: number, newBind: string) {
 }
 
 .table-cell-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 0.78rem;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
   width: 100%;
   outline: none;
 }
-.table-cell-input:focus { border-color: #3b82f6; }
+.table-cell-input:focus { border-color: #1769aa; }
 
 .compact-select-wrapper {
   max-width: 110px;
@@ -422,7 +422,7 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .badge-rw {
   background: rgba(59, 130, 246, 0.15);
   border-color: rgba(59, 130, 246, 0.35);
-  color: #60a5fa;
+  color: #0f5f9e;
 }
 .badge-rw:hover {
   background: rgba(59, 130, 246, 0.25);
@@ -431,7 +431,7 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .badge-r {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.35);
-  color: #34d399;
+  color: #176b45;
 }
 .badge-r:hover {
   background: rgba(16, 185, 129, 0.25);
@@ -447,15 +447,15 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .ref-input {
   width: 65px;
   text-align: center;
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 4px;
   padding: 5px 6px;
   font-size: 0.8rem;
-  color: #fff;
+  color: #17212b;
   outline: none;
 }
-.ref-input:focus { border-color: #3b82f6; }
+.ref-input:focus { border-color: #1769aa; }
 
 .ref-zone-tag {
   font-size: 0.65rem;
@@ -468,9 +468,9 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .text-mono { font-family: monospace; }
 .font-bold { font-weight: 600; }
 .text-center { text-align: center; }
-.text-muted { color: var(--text-muted, #94a3b8); }
-.text-blue { color: #60a5fa; }
-.text-green { color: #34d399; }
+.text-muted { color: var(--text-muted, #40515f); }
+.text-blue { color: #0f5f9e; }
+.text-green { color: #176b45; }
 
 .btn-icon {
   background: transparent;
@@ -478,14 +478,14 @@ function onBindChange(fieldIdx: number, newBind: string) {
   border-radius: 4px;
   padding: 4px;
   cursor: pointer;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
-.btn-icon:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.btn-icon:hover { background: rgba(239, 68, 68, 0.15); color: #a12d34; }
 
 .empty-cell {
   text-align: center;
   padding: 36px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .btn {
@@ -500,10 +500,10 @@ function onBindChange(fieldIdx: number, newBind: string) {
   cursor: pointer;
   border: 1px solid transparent;
 }
-.btn-primary { background: #2563eb; color: #fff; }
-.btn-primary:hover { background: #1d4ed8; }
-.btn-outline { background: transparent; border-color: var(--border, #2a2f42); color: var(--text-main, #cbd5e1); }
-.btn-outline:hover { background: rgba(255, 255, 255, 0.05); color: #60a5fa; }
+.btn-primary { background: #1769aa; color: #fff; }
+.btn-primary:hover { background: #0e568e; }
+.btn-outline { background: transparent; border-color: var(--border, #b9c5cf); color: var(--text-main, #314654); }
+.btn-outline:hover { background: #eef3f7; color: #0f5f9e; }
 /* Compact engineering workspace pass */
 .northbound-tab-wrapper { gap: 10px; }
 .protocol-spec-card { padding: 9px 12px; gap: 10px; border-radius: var(--radius-sm); box-shadow: none; }

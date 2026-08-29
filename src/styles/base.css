@@ -30,7 +30,7 @@ textarea:focus-visible,
 }
 
 ::selection {
-  background: rgba(59, 130, 246, 0.36);
+  background: #cce8fb;
   color: var(--color-text-primary);
 }
 

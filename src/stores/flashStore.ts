@@ -3,6 +3,13 @@ import { ref } from 'vue'
 import { flashProbeTool, flashStart, flashCancel } from '../api/flashApi'
 import type { FlashToolInfo, FlashProgressEvent, FlashLogEntry } from '../types/flash'
 
+const CLI_PATH_STORAGE_KEY = 'np_tools_flash_cli_path'
+
+function loadPersistedCliPath(): string {
+  if (typeof localStorage === 'undefined') return ''
+  return localStorage.getItem(CLI_PATH_STORAGE_KEY) || ''
+}
+
 function parseLogType(text: string): FlashLogEntry['type'] {
   const lower = text.toLowerCase()
   if (text.startsWith('>') || text.startsWith('$') || text.startsWith('[产线流水线]')) {
@@ -57,7 +64,7 @@ export const useFlashStore = defineStore('flash', () => {
     probes: [],
   })
 
-  const customCliPath = ref('')
+  const customCliPath = ref(loadPersistedCliPath())
   const selectedHexPath = ref('')
   const selectedProbeSn = ref('')
   const isFlashing = ref(false)
@@ -168,6 +175,11 @@ export const useFlashStore = defineStore('flash', () => {
     flashLogs.value = []
   }
 
+  function persistCustomCliPath() {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(CLI_PATH_STORAGE_KEY, customCliPath.value)
+  }
+
   return {
     toolInfo,
     customCliPath,
@@ -183,5 +195,6 @@ export const useFlashStore = defineStore('flash', () => {
     startFlashing,
     cancelFlashing,
     clearLogs,
+    persistCustomCliPath,
   }
 })

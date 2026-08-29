@@ -27,6 +27,17 @@ const loopInterval = ref(1000)
 const loopTimer = ref<number | null>(null)
 const autoScroll = ref(true)
 
+const quickCommands = [
+  'DEVINFO',
+  'SLE:LIST',
+  '@WLAN=0',
+  '@WLAN=1',
+  'RS485DEV:LIST',
+  'AITEST',
+  'TESTSTOP',
+  '@RST',
+]
+
 // Filter Level
 const activeFilter = ref<'ALL' | 'INFO' | 'WARN' | 'ERROR' | 'SLE' | 'MB'>('ALL')
 
@@ -306,10 +317,12 @@ async function copyCurrentLogs() {
       <div class="quick-presets-row">
         <span class="preset-label">快捷指令:</span>
         <button
-          v-for="cmd in ['DEVINFO', 'SLE:LIST', '@WLAN=0', '@WLAN=1', 'RS485DEV:LIST', 'AITEST', 'TESTSTOP', '@RST']"
+          v-for="cmd in quickCommands"
           :key="cmd"
           class="cmd-pill"
+          :class="{ danger: cmd === '@RST' }"
           :disabled="!serial.connectedPort || loopTimer !== null"
+          :title="cmd === '@RST' ? '设备软复位命令：选中后仍需点击发送或按 Enter' : `填入 ${cmd}`"
           @click="sendText = cmd"
         >
           {{ cmd }}
@@ -346,14 +359,14 @@ async function copyCurrentLogs() {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-app, #0f111a);
+  background: var(--bg-app, #edf1f4);
 }
 
 .terminal-header {
   min-height: 40px;
   height: auto;
-  background: var(--color-surface-1, #111820);
-  border-bottom: 1px solid var(--border, #2a2f42);
+  background: var(--color-surface-1, #ffffff);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -374,10 +387,10 @@ async function copyCurrentLogs() {
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .activity-icon {
-  color: var(--accent, #3b82f6);
+  color: var(--accent, #1769aa);
 }
 
 .filter-chips {
@@ -389,7 +402,7 @@ async function copyCurrentLogs() {
 }
 .filter-label {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   display: flex;
   align-items: center;
   gap: 3px;
@@ -401,34 +414,34 @@ async function copyCurrentLogs() {
   padding: 2px 7px;
   border-radius: 4px;
   font-size: 0.7rem;
-  background: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
-  color: var(--text-muted, #94a3b8);
+  background: var(--bg-input, #f7f9fb);
+  border: 1px solid var(--border, #b9c5cf);
+  color: var(--text-muted, #40515f);
   cursor: pointer;
 }
 .chip:hover {
-  color: #fff;
+  color: #17212b;
 }
 .chip.active {
   background: rgba(59, 130, 246, 0.2);
-  border-color: #3b82f6;
-  color: #93c5fd;
+  border-color: #1769aa;
+  color: #1769aa;
   font-weight: bold;
 }
 .chip.chip-info.active {
   background: rgba(16, 185, 129, 0.2);
-  border-color: #10b981;
-  color: #34d399;
+  border-color: #176b45;
+  color: #176b45;
 }
 .chip.chip-warn.active {
   background: rgba(245, 158, 11, 0.2);
-  border-color: #f59e0b;
-  color: #fbbf24;
+  border-color: #8a5700;
+  color: #7a4b00;
 }
 .chip.chip-err.active {
   background: rgba(239, 68, 68, 0.2);
-  border-color: #ef4444;
-  color: #f87171;
+  border-color: #a12d34;
+  color: #a12d34;
 }
 
 .header-right {
@@ -439,9 +452,9 @@ async function copyCurrentLogs() {
 
 .btn-tool {
   padding: 4px 10px;
-  background: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
-  color: var(--text-muted, #94a3b8);
+  background: var(--bg-input, #f7f9fb);
+  border: 1px solid var(--border, #b9c5cf);
+  color: var(--text-muted, #40515f);
   border-radius: 4px;
   cursor: pointer;
   display: flex;
@@ -451,9 +464,9 @@ async function copyCurrentLogs() {
   transition: all 0.15s ease;
 }
 .btn-tool:hover:not(:disabled) {
-  background: #2e3448;
-  color: #fff;
-  border-color: #3b82f6;
+  background: #e5ebf0;
+  color: #17212b;
+  border-color: #1769aa;
 }
 .btn-tool:disabled {
   opacity: 0.4;
@@ -462,10 +475,10 @@ async function copyCurrentLogs() {
 .btn-tool.success {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.4);
-  color: #34d399;
+  color: #176b45;
 }
 .icon-success {
-  color: #34d399;
+  color: #176b45;
 }
 
 .checkbox-label {
@@ -473,7 +486,7 @@ async function copyCurrentLogs() {
   align-items: center;
   gap: 5px;
   font-size: 0.75rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   cursor: pointer;
 }
 
@@ -507,26 +520,26 @@ async function copyCurrentLogs() {
   flex-shrink: 0;
 }
 .log-row.rx .log-dir {
-  color: #10b981;
+  color: #176b45;
 }
 .log-row.tx .log-dir {
-  color: #3b82f6;
+  color: #1769aa;
 }
 
 .log-content {
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 .log-row.INFO .log-content {
-  color: #34d399;
+  color: #176b45;
 }
 .log-row.WARN .log-content {
-  color: #fbbf24;
+  color: #7a4b00;
 }
 .log-row.ERROR .log-content {
-  color: #f87171;
+  color: #a12d34;
 }
 .log-row.DEBUG .log-content {
-  color: #67e8f9;
+  color: #0f5f9e;
 }
 
 .empty-terminal-state {
@@ -536,8 +549,8 @@ async function copyCurrentLogs() {
 }
 
 .send-dock {
-  background: var(--bg-panel, #1a1d27);
-  border-top: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border-top: 1px solid var(--border, #b9c5cf);
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
@@ -557,7 +570,7 @@ async function copyCurrentLogs() {
 .divider-v {
   width: 1px;
   height: 14px;
-  background: var(--border, #2a2f42);
+  background: var(--border, #b9c5cf);
 }
 
 .loop-box {
@@ -565,14 +578,14 @@ async function copyCurrentLogs() {
   align-items: center;
   gap: 4px;
   font-size: 0.75rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .loop-input {
   width: 60px;
   padding: 2px 6px;
-  background: var(--bg-app, #0f111a);
-  border: 1px solid var(--border, #2a2f42);
-  color: #fff;
+  background: var(--bg-app, #edf1f4);
+  border: 1px solid var(--border, #b9c5cf);
+  color: #17212b;
   border-radius: 4px;
   font-size: 0.75rem;
 }
@@ -585,26 +598,36 @@ async function copyCurrentLogs() {
 }
 .preset-label {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .cmd-pill {
   padding: 2px 7px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border, #2a2f42);
+  background: #eef3f7;
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 4px;
-  color: #93c5fd;
+  color: #1769aa;
   font-family: var(--font-mono, monospace);
   font-size: 0.72rem;
   cursor: pointer;
 }
 .cmd-pill:hover:not(:disabled) {
   background: rgba(59, 130, 246, 0.2);
-  border-color: #3b82f6;
-  color: #fff;
+  border-color: #1769aa;
+  color: #0f5f9e;
 }
 .cmd-pill:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+.cmd-pill.danger {
+  border-color: #d3a1a5;
+  color: #8f2028;
+  background: #fff3f4;
+}
+.cmd-pill.danger:hover:not(:disabled) {
+  border-color: #a12d34;
+  color: #7d1820;
+  background: #fdebed;
 }
 
 .send-input-row {
@@ -616,21 +639,21 @@ async function copyCurrentLogs() {
   flex: 1;
   height: 40px;
   padding: 7px 10px;
-  background: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
-  color: #fff;
+  background: var(--bg-input, #f7f9fb);
+  border: 1px solid var(--border, #b9c5cf);
+  color: #17212b;
   border-radius: 6px;
   font-size: 0.85rem;
   resize: none;
   outline: none;
 }
 .send-textarea:focus {
-  border-color: var(--accent, #3b82f6);
+  border-color: var(--accent, #1769aa);
 }
 
 .btn-send-main {
   width: 82px;
-  background: var(--accent, #3b82f6);
+  background: var(--accent, #1769aa);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -659,10 +682,10 @@ async function copyCurrentLogs() {
   }
 }
 .btn-send-main:hover:not(:disabled) {
-  background: var(--accent-hover, #2563eb);
+  background: var(--accent-hover, #1769aa);
 }
 .btn-send-main.btn-loop-stop {
-  background: var(--danger, #ef4444);
+  background: var(--danger, #a12d34);
 }
 .btn-send-main:disabled {
   opacity: 0.5;

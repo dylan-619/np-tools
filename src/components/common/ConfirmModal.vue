@@ -123,7 +123,7 @@ function handleCancel() {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(27, 45, 58, 0.38);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -134,10 +134,10 @@ function handleCancel() {
 .modal-card {
   width: 440px;
   max-width: 90vw;
-  background-color: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background-color: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 8px;
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 32px rgba(27, 45, 58, 0.24);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -163,18 +163,18 @@ function handleCancel() {
   display: flex;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   gap: 10px;
 }
 
 .header-icon {
-  color: #f59e0b;
+  color: #8a5700;
   display: flex;
   align-items: center;
 }
 
 .modal-card.critical .header-icon {
-  color: #ef4444;
+  color: #a12d34;
 }
 
 .modal-header h3 {
@@ -182,66 +182,66 @@ function handleCancel() {
   font-size: 1rem;
   font-weight: 600;
   flex: 1;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .close-btn {
   background: transparent;
   border: none;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
 }
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: #eef3f7;
+  color: #17212b;
 }
 
 .modal-body {
   padding: 18px 16px;
   font-size: 0.88rem;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
   line-height: 1.5;
 }
 
 .modal-message {
   margin: 0 0 12px 0;
-  color: #cbd5e1;
+  color: #314654;
 }
 
 .typing-confirm-group {
   margin-top: 14px;
-  background: rgba(0, 0, 0, 0.2);
+  background: #f7f9fb;
   padding: 12px;
   border-radius: 6px;
-  border: 1px dashed var(--border, #2a2f42);
+  border: 1px dashed var(--border, #b9c5cf);
 }
 
 .typing-confirm-group label {
   display: block;
   font-size: 0.8rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   margin-bottom: 8px;
 }
 
 .type-hint {
-  color: #ef4444;
+  color: #a12d34;
   font-family: var(--font-mono, monospace);
 }
 
 .typing-input {
   width: 100%;
   padding: 8px 10px;
-  background: var(--bg-input, #232736);
-  border: 1px solid var(--border, #2a2f42);
-  color: #fff;
+  background: var(--bg-input, #f7f9fb);
+  border: 1px solid var(--border, #b9c5cf);
+  color: #17212b;
   border-radius: 4px;
   font-family: var(--font-mono, monospace);
   font-size: 0.9rem;
 }
 .typing-input:focus {
-  border-color: #ef4444;
+  border-color: #a12d34;
   outline: none;
 }
 
@@ -251,8 +251,8 @@ function handleCancel() {
   justify-content: flex-end;
   gap: 10px;
   padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.15);
-  border-top: 1px solid var(--border, #2a2f42);
+  background: #f7f9fb;
+  border-top: 1px solid var(--border, #b9c5cf);
 }
 
 .btn {
@@ -266,16 +266,16 @@ function handleCancel() {
 }
 
 .btn-secondary {
-  background: var(--bg-input, #232736);
-  color: var(--text-main, #e2e8f0);
-  border-color: var(--border, #2a2f42);
+  background: var(--bg-input, #f7f9fb);
+  color: var(--text-main, #17212b);
+  border-color: var(--border, #b9c5cf);
 }
 .btn-secondary:hover {
-  background: #2e3448;
+  background: #e5ebf0;
 }
 
 .btn-danger {
-  background: #ef4444;
+  background: #a12d34;
   color: #fff;
 }
 .btn-danger:hover:not(:disabled) {

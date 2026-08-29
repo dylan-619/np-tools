@@ -483,8 +483,8 @@ const directionOptions = [
 }
 
 .panel-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -493,11 +493,11 @@ const directionOptions = [
 
 .panel-header {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.015);
+  background: #f7f9fb;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -515,20 +515,20 @@ const directionOptions = [
   gap: 8px;
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .panel-icon {
-  color: #60a5fa;
+  color: #0f5f9e;
 }
 
 .sub-nav-tabs {
   display: flex;
   gap: 4px;
-  background: var(--bg-app, #12141c);
+  background: var(--bg-app, #ffffff);
   padding: 3px;
   border-radius: 6px;
-  border: 1px solid var(--border, #2a2f42);
+  border: 1px solid var(--border, #b9c5cf);
 }
 
 .sub-tab-btn {
@@ -537,7 +537,7 @@ const directionOptions = [
   gap: 5px;
   background: transparent;
   border: none;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   font-size: 0.74rem;
   padding: 4px 10px;
   border-radius: 4px;
@@ -546,7 +546,7 @@ const directionOptions = [
 }
 
 .sub-tab-btn.active {
-  background: #3b82f6;
+  background: #1769aa;
   color: #fff;
   font-weight: 600;
 }
@@ -568,12 +568,12 @@ const directionOptions = [
 }
 
 .data-table th {
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-muted, #94a3b8);
+  background: #f7f9fb;
+  color: var(--text-muted, #40515f);
   font-weight: 600;
   font-size: 0.74rem;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border, #2a2f42);
+  border-bottom: 1px solid var(--border, #b9c5cf);
 }
 
 .data-table td {
@@ -583,25 +583,25 @@ const directionOptions = [
 }
 
 .table-cell-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 0.78rem;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
   width: 100%;
   outline: none;
 }
-.table-cell-input:focus { border-color: #3b82f6; }
+.table-cell-input:focus { border-color: #1769aa; }
 
 .text-mono { font-family: monospace; }
 .font-bold { font-weight: 600; }
-.text-muted { color: var(--text-muted, #94a3b8); }
+.text-muted { color: var(--text-muted, #40515f); }
 
 .badge-cmd {
   font-size: 0.7rem;
   background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  color: #6f3a96;
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid rgba(168, 85, 247, 0.25);
@@ -613,14 +613,14 @@ const directionOptions = [
   border-radius: 4px;
   padding: 4px;
   cursor: pointer;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
-.btn-icon:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.btn-icon:hover { background: rgba(239, 68, 68, 0.15); color: #a12d34; }
 
 .empty-cell, .empty-state {
   text-align: center;
   padding: 36px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .empty-state {
   display: flex;
@@ -638,8 +638,8 @@ const directionOptions = [
 }
 
 .pid-card {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border, #2a2f42);
+  background: #f7f9fb;
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 8px;
   padding: 14px;
   display: flex;
@@ -665,17 +665,17 @@ const directionOptions = [
   font-size: 0.72rem;
   font-weight: 700;
   background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  color: #0f5f9e;
   padding: 2px 8px;
   border-radius: 4px;
 }
 
 .pid-name-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 4px;
   padding: 4px 8px;
-  color: #fff;
+  color: #17212b;
   font-size: 0.8rem;
   width: 160px;
 }
@@ -685,8 +685,8 @@ const directionOptions = [
   padding: 1px 6px;
   border-radius: 4px;
 }
-.pid-status-tag.active { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.pid-status-tag.inactive { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.pid-status-tag.active { background: rgba(16, 185, 129, 0.15); color: #176b45; }
+.pid-status-tag.inactive { background: rgba(239, 68, 68, 0.15); color: #a12d34; }
 
 .pid-form-grid {
   display: grid;
@@ -702,19 +702,19 @@ const directionOptions = [
 
 .form-group label {
   font-size: 0.76rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .form-input {
-  background: var(--bg-app, #12141c);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 0.8rem;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
   outline: none;
 }
-.form-input:focus { border-color: #3b82f6; }
+.form-input:focus { border-color: #1769aa; }
 
 .range-inputs {
   display: flex;
@@ -722,7 +722,7 @@ const directionOptions = [
   gap: 6px;
 }
 .range-inputs input { width: 50%; }
-.range-sep { color: var(--text-muted, #94a3b8); font-size: 0.8rem; }
+.range-sep { color: var(--text-muted, #40515f); font-size: 0.8rem; }
 
 .btn {
   display: inline-flex;
@@ -736,8 +736,8 @@ const directionOptions = [
   cursor: pointer;
   border: 1px solid transparent;
 }
-.btn-primary { background: #2563eb; color: #fff; }
-.btn-primary:hover { background: #1d4ed8; }
+.btn-primary { background: #1769aa; color: #fff; }
+.btn-primary:hover { background: #0e568e; }
 /* Compact engineering workspace pass */
 .tab-content { gap: 10px; }
 .panel-card { border-radius: var(--radius-sm); }

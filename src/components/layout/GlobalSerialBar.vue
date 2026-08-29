@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RefreshCw, Activity, Power, Sliders } from 'lucide-vue-next'
 import { useSerialStore } from '../../stores/serialStore'
 import CustomSelect from '../common/CustomSelect.vue'
+import { formatSerialConfig } from '../../utils/serialFormat'
 
 defineProps<{ compact?: boolean }>()
 
@@ -29,6 +30,19 @@ const parityOptions = [
   { label: '偶 (Even)', value: 'even' },
 ]
 
+const stopBitOptions = [
+  { label: '1 位', value: 'one' },
+  { label: '2 位', value: 'two' },
+]
+
+const flowControlOptions = [
+  { label: '无', value: 'none' },
+  { label: 'XON/XOFF', value: 'software' },
+  { label: 'RTS/CTS', value: 'hardware' },
+]
+
+const serialConfigSummary = computed(() => formatSerialConfig(serial.config))
+
 onMounted(() => {
   serial.refreshPorts()
 })
@@ -39,8 +53,9 @@ onMounted(() => {
     <div class="card-header">
       <div class="status-indicator">
         <span class="status-dot" :class="{ connected: !!serial.connectedPort }" />
-        <span v-if="!compact" class="status-title">
-          {{ serial.connectedPort ? '串口已连接' : '串口未连接' }}
+        <span v-if="!compact" class="status-copy">
+          <strong>{{ serial.connectedPort ? '串口已连接' : '串口未连接' }}</strong>
+          <small>{{ serialConfigSummary }}</small>
         </span>
       </div>
 
@@ -120,6 +135,24 @@ onMounted(() => {
             size="sm"
           />
         </div>
+        <div class="config-item">
+          <label>停止位</label>
+          <CustomSelect
+            v-model="serial.config.stopBits"
+            :options="stopBitOptions"
+            :disabled="!!serial.connectedPort"
+            size="sm"
+          />
+        </div>
+        <div class="config-item">
+          <label>流控</label>
+          <CustomSelect
+            v-model="serial.config.flowControl"
+            :options="flowControlOptions"
+            :disabled="!!serial.connectedPort"
+            size="sm"
+          />
+        </div>
       </div>
     </div>
 
@@ -160,8 +193,8 @@ onMounted(() => {
 
 <style scoped>
 .global-serial-card {
-  background-color: var(--color-surface-2, #17212b);
-  border: 1px solid var(--color-border-subtle, #24323d);
+  background-color: var(--color-surface-2, #f7f9fb);
+  border: 1px solid var(--color-border-subtle, #d5dde4);
   border-radius: var(--radius-sm, 5px);
   padding: 8px;
   display: flex;
@@ -195,18 +228,30 @@ onMounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--text-muted, #94a3b8);
+  background-color: var(--text-muted, #40515f);
   transition: all 0.2s ease;
 }
 .status-dot.connected {
-  background-color: var(--color-success, #38b276);
+  background-color: var(--color-success, #176b45);
   box-shadow: 0 0 0 3px rgba(56, 178, 118, 0.12);
 }
 
-.status-title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+.status-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.status-copy strong {
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: var(--text-main, #17212b);
+}
+
+.status-copy small {
+  color: var(--color-text-tertiary, #5f6f7d);
+  font: 0.62rem var(--font-mono, monospace);
 }
 
 .header-actions {
@@ -218,7 +263,7 @@ onMounted(() => {
 .icon-btn-micro {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   border-radius: 4px;
   min-width: 24px;
   min-height: 24px;
@@ -228,11 +273,11 @@ onMounted(() => {
   align-items: center;
 }
 .icon-btn-micro:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: #e5ebf0;
+  color: #17212b;
 }
 .icon-btn-micro.active {
-  color: var(--accent, #3b82f6);
+  color: var(--accent, #1769aa);
   background: rgba(59, 130, 246, 0.1);
 }
 
@@ -259,7 +304,7 @@ onMounted(() => {
 .connect-action-btn {
   min-height: var(--control-height-dense, 28px);
   padding: 4px 9px;
-  background-color: var(--accent, #3b82f6);
+  background-color: var(--accent, #1769aa);
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -273,26 +318,26 @@ onMounted(() => {
   white-space: nowrap;
 }
 .connect-action-btn:hover:not(:disabled) {
-  background-color: var(--accent-hover, #2563eb);
+  background-color: var(--accent-hover, #1769aa);
 }
 .connect-action-btn.connected {
-  background-color: var(--color-surface-3, #1d2a35);
-  border: 1px solid rgba(223, 91, 91, 0.42);
-  color: #f19a9a;
+  background-color: #fdebed;
+  border: 1px solid #d58b90;
+  color: #8f2028;
 }
 .connect-action-btn.connected:hover:not(:disabled) {
   background-color: rgba(223, 91, 91, 0.14);
 }
 .connect-action-btn:disabled {
-  background: var(--color-surface-1, #111820);
-  color: var(--color-text-disabled, #586874);
+  background: var(--color-surface-1, #ffffff);
+  color: var(--color-text-disabled, #667784);
   opacity: 1;
   cursor: not-allowed;
 }
 
 .advanced-config-box {
-  background: var(--bg-app, #0f111a);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-app, #edf1f4);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: 6px;
   padding: 8px;
   display: flex;
@@ -307,14 +352,14 @@ onMounted(() => {
 }
 .config-item label {
   font-size: 0.7rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .config-item select {
   font-size: 0.75rem;
   padding: 4px 6px;
-  background-color: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
-  color: var(--text-main, #e2e8f0);
+  background-color: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
+  color: var(--text-main, #17212b);
   border-radius: 4px;
 }
 
@@ -329,10 +374,10 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding-top: 4px;
-  border-top: 1px dashed var(--border, #2a2f42);
+  border-top: 1px dashed var(--border, #b9c5cf);
   font-size: 0.72rem;
   font-family: var(--font-mono, monospace);
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .rx-tx-metrics {
@@ -341,7 +386,7 @@ onMounted(() => {
   gap: 4px;
 }
 .activity-icon {
-  color: var(--accent, #3b82f6);
+  color: var(--accent, #1769aa);
 }
 .sep {
   opacity: 0.4;
@@ -355,22 +400,22 @@ onMounted(() => {
 .pin-btn {
   padding: 1px 5px;
   font-size: 0.68rem;
-  background: var(--bg-app, #0f111a);
-  border: 1px solid var(--border, #2a2f42);
-  color: var(--text-muted, #94a3b8);
+  background: var(--bg-app, #edf1f4);
+  border: 1px solid var(--border, #b9c5cf);
+  color: var(--text-muted, #40515f);
   border-radius: 3px;
   cursor: pointer;
 }
 .pin-btn.active {
   background: rgba(59, 130, 246, 0.2);
-  border-color: var(--accent, #3b82f6);
-  color: var(--accent, #3b82f6);
+  border-color: var(--accent, #1769aa);
+  color: var(--accent, #1769aa);
   font-weight: bold;
 }
 
 .serial-error-hint {
   font-size: 0.7rem;
-  color: #f19a9a;
+  color: #8f2028;
   word-break: break-all;
   padding: 4px;
   background: rgba(223, 91, 91, 0.1);

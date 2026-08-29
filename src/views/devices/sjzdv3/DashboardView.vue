@@ -59,9 +59,9 @@ function updateChartOption() {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#1a1d27',
-      borderColor: '#2a2f42',
-      textStyle: { color: '#e2e8f0' },
+      backgroundColor: '#ffffff',
+      borderColor: '#b9c5cf',
+      textStyle: { color: '#17212b' },
       formatter: (params: any) => {
         let res = `<div style="font-family:monospace;font-size:12px;">时间: ${params[0]?.name}<br/>`
         for (const item of params) {
@@ -73,7 +73,7 @@ function updateChartOption() {
     },
     legend: {
       data: ['AI 1 电流通道', 'AI 2 电流通道'],
-      textStyle: { color: '#94a3b8' },
+      textStyle: { color: '#40515f' },
       top: 0,
       right: 16,
     },
@@ -88,17 +88,17 @@ function updateChartOption() {
       type: 'category',
       boundaryGap: false,
       data: times,
-      axisLine: { lineStyle: { color: '#2a2f42' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10 },
+      axisLine: { lineStyle: { color: '#b9c5cf' } },
+      axisLabel: { color: '#40515f', fontSize: 10 },
     },
     yAxis: {
       type: 'value',
       name: '电流 (mA)',
       min: 0,
       max: 24,
-      nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+      nameTextStyle: { color: '#40515f', fontSize: 11 },
       splitLine: { lineStyle: { color: 'rgba(42, 47, 66, 0.5)', type: 'dashed' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10 },
+      axisLabel: { color: '#40515f', fontSize: 10 },
     },
     series: [
       {
@@ -107,7 +107,7 @@ function updateChartOption() {
         smooth: true,
         showSymbol: false,
         data: ai1Data,
-        lineStyle: { color: '#3b82f6', width: 2 },
+        lineStyle: { color: '#1769aa', width: 2 },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(59, 130, 246, 0.35)' },
@@ -121,7 +121,7 @@ function updateChartOption() {
         smooth: true,
         showSymbol: false,
         data: ai2Data,
-        lineStyle: { color: '#10b981', width: 2 },
+        lineStyle: { color: '#176b45', width: 2 },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(16, 185, 129, 0.35)' },
@@ -337,8 +337,8 @@ onUnmounted(() => {
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 12px;
-  border: 1px solid var(--color-border-subtle, #24323d);
-  background: var(--color-surface-1, #111820);
+  border: 1px solid var(--color-border-subtle, #d5dde4);
+  background: var(--color-surface-1, #ffffff);
   border-radius: var(--radius-sm, 5px);
 }
 
@@ -346,12 +346,12 @@ onUnmounted(() => {
   margin: 0 0 3px 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 .subtitle {
   margin: 0;
   font-size: 0.74rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .gauges-grid {
@@ -361,8 +361,8 @@ onUnmounted(() => {
 }
 
 .gauge-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: var(--radius-sm, 5px);
   padding: 10px 12px;
   display: flex;
@@ -370,10 +370,10 @@ onUnmounted(() => {
   gap: 10px;
 }
 .gauge-card.blue {
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #1769aa;
 }
 .gauge-card.green {
-  border-left: 4px solid #10b981;
+  border-left: 4px solid #176b45;
 }
 
 .gauge-header {
@@ -396,15 +396,15 @@ onUnmounted(() => {
 }
 .loop-status-pill.normal {
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: #176b45;
 }
 .loop-status-pill.broken {
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: #a12d34;
 }
 .loop-status-pill.overload {
   background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  color: #7a4b00;
 }
 
 .gauge-badge {
@@ -415,16 +415,16 @@ onUnmounted(() => {
 }
 .gauge-badge.blue {
   background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  color: #0f5f9e;
 }
 .gauge-badge.green {
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: #176b45;
 }
 
 .range-hint {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   font-family: var(--font-mono, monospace);
 }
 
@@ -438,18 +438,18 @@ onUnmounted(() => {
   font-size: 1.65rem;
   font-weight: 700;
   font-family: var(--font-mono, monospace);
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .gauge-unit {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 
 .gauge-bar-wrapper {
   height: 6px;
-  background: var(--bg-input, #232736);
+  background: var(--bg-input, #f7f9fb);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -459,15 +459,15 @@ onUnmounted(() => {
   transition: width 0.3s ease;
 }
 .gauge-bar-fill.blue {
-  background: #3b82f6;
+  background: #1769aa;
 }
 .gauge-bar-fill.green {
-  background: #10b981;
+  background: #176b45;
 }
 
 .section-card {
-  background: var(--bg-panel, #1a1d27);
-  border: 1px solid var(--border, #2a2f42);
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border, #b9c5cf);
   border-radius: var(--radius-sm, 5px);
   overflow: hidden;
 }
@@ -475,8 +475,8 @@ onUnmounted(() => {
 .card-header {
   min-height: 38px;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid var(--border, #2a2f42);
+  background: #eef3f7;
+  border-bottom: 1px solid var(--border, #b9c5cf);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -491,14 +491,14 @@ onUnmounted(() => {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-main, #e2e8f0);
+  color: var(--text-main, #17212b);
 }
 
 .icon-blue {
-  color: #3b82f6;
+  color: #1769aa;
 }
 .icon-amber {
-  color: #f59e0b;
+  color: #8a5700;
 }
 
 .sample-status {
@@ -506,10 +506,10 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
 }
 .sample-status.active {
-  color: #34d399;
+  color: #176b45;
 }
 .status-dot {
   width: 6px;
@@ -557,36 +557,36 @@ onUnmounted(() => {
 .btn-green-led {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.3);
-  color: #34d399;
+  color: #176b45;
 }
 .btn-green-led:hover:not(:disabled) {
   background: rgba(16, 185, 129, 0.25);
-  border-color: #10b981;
+  border-color: #176b45;
 }
 
 .btn-red-led {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  color: #a12d34;
 }
 .btn-red-led:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.25);
-  border-color: #ef4444;
+  border-color: #a12d34;
 }
 
 .btn-off-led {
-  background: var(--bg-input, #232736);
-  border-color: var(--border, #2a2f42);
-  color: var(--text-muted, #94a3b8);
+  background: var(--bg-input, #f7f9fb);
+  border-color: var(--border, #b9c5cf);
+  color: var(--text-muted, #40515f);
 }
 .btn-off-led:hover:not(:disabled) {
-  background: #2e3448;
-  color: #fff;
+  background: #e5ebf0;
+  color: #17212b;
 }
 
 .led-desc {
   font-size: 0.72rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #40515f);
   text-align: center;
 }
 
@@ -603,23 +603,23 @@ onUnmounted(() => {
   border: 1px solid transparent;
 }
 .btn-primary {
-  background: var(--accent, #3b82f6);
+  background: var(--accent, #1769aa);
   color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover, #2563eb);
+  background: var(--accent-hover, #1769aa);
 }
 .btn-danger {
-  background: #ef4444;
+  background: #a12d34;
   color: #fff;
 }
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
 }
 .btn:disabled {
-  background: var(--color-surface-1, #111820);
-  border-color: var(--color-border-subtle, #24323d);
-  color: var(--color-text-disabled, #586874);
+  background: var(--color-surface-1, #ffffff);
+  border-color: var(--color-border-subtle, #d5dde4);
+  color: var(--color-text-disabled, #667784);
   opacity: 1;
   cursor: not-allowed;
 }
