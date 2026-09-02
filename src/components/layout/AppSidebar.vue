@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -46,10 +46,37 @@ const isMonitorRoute = computed(() => route.name === 'ControllerMonitor')
 const isMaintenanceRoute = computed(() => route.name === 'ControllerMaintenance')
 const isXtqCoordinatorRoute = computed(() => route.name === 'XtqCoordinator')
 const isControllerFocusRoute = computed(() => isDebugRoute.value || isMonitorRoute.value)
-const isCompact = computed(() => collapsed.value || width.value <= 960 || isControllerFocusRoute.value)
+const isNarrowWindow = computed(() => width.value <= 960)
+const isCompact = computed(() => collapsed.value)
+let collapsedBeforeControllerFocus = false
+
+watch(
+  isControllerFocusRoute,
+  (focused, wasFocused) => {
+    if (focused && !wasFocused) {
+      collapsedBeforeControllerFocus = collapsed.value
+      collapsed.value = true
+    } else if (!focused && wasFocused) {
+      collapsed.value = collapsedBeforeControllerFocus
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  isNarrowWindow,
+  (narrow, wasNarrow) => {
+    if (narrow && !wasNarrow) collapsed.value = true
+  },
+  { immediate: true }
+)
 
 function navigateTo(path: string) {
   router.push(path)
+}
+
+function toggleSidebar() {
+  collapsed.value = !collapsed.value
 }
 
 function toggleGroup(group: ProductGroup) {
@@ -67,10 +94,11 @@ function groupIsCollapsed(group: ProductGroup) {
     <div class="sidebar-header">
       <span v-if="!isCompact" class="workspace-label">工作区</span>
       <button
+        type="button"
         class="sidebar-collapse-btn"
         :title="isCompact ? '展开导航栏' : '折叠导航栏'"
         :aria-label="isCompact ? '展开导航栏' : '折叠导航栏'"
-        @click="collapsed = !collapsed"
+        @click.stop="toggleSidebar"
       >
         <PanelLeftOpen v-if="isCompact" :size="16" />
         <PanelLeftClose v-else :size="16" />
@@ -495,24 +523,4 @@ function groupIsCollapsed(group: ProductGroup) {
   gap: 2px;
 }
 
-@media (max-width: 960px) {
-  .app-sidebar {
-    width: 52px;
-  }
-
-  .workspace-label,
-  .group-label,
-  .nav-text {
-    display: none;
-  }
-
-  .sidebar-header,
-  .nav-item {
-    justify-content: center;
-  }
-
-  .nav-item {
-    padding-inline: 0;
-  }
-}
 </style>
