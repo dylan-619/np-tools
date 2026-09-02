@@ -126,6 +126,20 @@ let diagnosticResizeStartWidth = 0
 let previousBodyCursor = ''
 let previousBodyUserSelect = ''
 
+const writePermitBlockReason = computed(() => {
+  if (!debug.isConnected) return '请先连接设备并完成预检'
+  if (!debug.operatorName.trim()) return '请先填写工程师姓名或工号'
+  if (debug.projectIdentityChanged) return '打开的工程身份已变化，请结束会话后重新连接'
+  if (debug.compatibilityState === 'mismatch') return '设备与当前工程不兼容，请核对工程和设备'
+  if (debug.compatibilityState === 'unverified') return '设备预检尚未完成'
+  if (!debug.diagnostics.device) return '缺少设备身份诊断结果'
+  if (!debug.diagnostics.health || !debug.diagnostics.io) return '健康或 IO 诊断结果尚未就绪'
+  if (debug.controllerFaultActive) return '控制器存在 active fault，请先排除故障'
+  if (!debug.allHealthHealthy) return '四项健康门禁未全部通过'
+  if (debug.consecutiveHealthErrors > 0) return '健康诊断存在连续读取错误'
+  return null
+})
+
 function diagnosticWidthLimit() {
   if (typeof window === 'undefined') return MAX_DIAGNOSTIC_WIDTH
   const viewportAllowance = window.innerWidth > 1200 ? window.innerWidth - 520 : window.innerWidth - 24
@@ -369,15 +383,8 @@ async function handleConnect() {
 }
 
 function requestWritePermit(target?: PointDescriptor) {
-  if (!debug.isConnected) {
-    controller.showMessage('请先连接设备并完成预检', false)
-    return
-  }
   if (!debug.canEnableWrites) {
-    controller.showMessage(
-      '暂不能解锁：请填写工程师，并确认工程未变化、四项健康正常且无 active fault',
-      false
-    )
+    controller.showMessage(`暂不能解锁：${writePermitBlockReason.value || '当前写入门禁不满足'}`, false)
     return
   }
   pendingWriteTarget.value = target || null
@@ -1079,7 +1086,8 @@ onUnmounted(() => {
         立即上锁
       </button><button
         v-else
-        :disabled="!debug.canEnableWrites"
+        :class="{ blocked: !debug.canEnableWrites }"
+        :title="debug.canEnableWrites ? '打开写入许可确认' : writePermitBlockReason || '查看未满足的解锁条件'"
         @click="requestWritePermit()"
       >
         解锁写入
@@ -3070,6 +3078,9 @@ onUnmounted(() => {
 .write-release-note button:not(:disabled):hover {
   border-color: #8c681f;
   background: #ffefc6;
+}
+.write-release-note button.blocked {
+  border-style: dashed;
 }
 .write-release-note button.revoke {
   border-color: #b9c5cf;
