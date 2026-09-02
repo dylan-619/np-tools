@@ -56,6 +56,12 @@ const router = createRouter({
       meta: { title: 'KZ3 在线调试工作台' }
     },
     {
+      path: '/devices/xtq-coordinator',
+      name: 'XtqCoordinator',
+      component: () => import('../views/devices/xtq/XtqCoordinatorView.vue'),
+      meta: { title: '双星闪协调器调试工作台' }
+    },
+    {
       path: '/flashing',
       name: 'FirmwareFlashing',
       component: () => import('../views/FlashView.vue'),

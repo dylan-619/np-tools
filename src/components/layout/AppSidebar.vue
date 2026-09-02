@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -11,6 +11,7 @@ import {
   Wrench,
   Flame,
   Settings,
+  ChevronDown,
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-vue-next'
@@ -19,12 +20,41 @@ import GlobalSerialBar from './GlobalSerialBar.vue'
 const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
+type ProductGroup = 'controller' | 'xtq' | 'sjzdv3' | 'common'
+const PRODUCT_GROUP_STORAGE_KEY = 'np_tools_sidebar_product_groups'
+
+function loadCollapsedGroups(): Record<ProductGroup, boolean> {
+  const defaults: Record<ProductGroup, boolean> = {
+    controller: false,
+    xtq: false,
+    sjzdv3: false,
+    common: false
+  }
+  if (typeof localStorage === 'undefined') return defaults
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem(PRODUCT_GROUP_STORAGE_KEY) || '{}') }
+  } catch {
+    return defaults
+  }
+}
+
+const collapsedGroups = reactive(loadCollapsedGroups())
 const { width } = useWindowSize()
 const isDebugRoute = computed(() => route.name === 'ControllerDebug')
+const isXtqCoordinatorRoute = computed(() => route.name === 'XtqCoordinator')
 const isCompact = computed(() => collapsed.value || width.value <= 960 || isDebugRoute.value)
 
 function navigateTo(path: string) {
   router.push(path)
+}
+
+function toggleGroup(group: ProductGroup) {
+  collapsedGroups[group] = !collapsedGroups[group]
+  localStorage.setItem(PRODUCT_GROUP_STORAGE_KEY, JSON.stringify(collapsedGroups))
+}
+
+function groupIsCollapsed(group: ProductGroup) {
+  return !isCompact.value && collapsedGroups[group]
 }
 </script>
 
@@ -45,14 +75,88 @@ function navigateTo(path: string) {
 
     <!-- Navigation Scroll Area -->
     <div class="nav-scroll-area">
-      <!-- Section 1: Smart Data Terminal -->
-      <div class="nav-group">
-        <div v-if="!isCompact" class="group-label">
-          <span>智能采集终端</span>
-          <span class="tag-badge">主线产品</span>
-        </div>
+      <!-- Section 1: Smart Controller I/O Tool -->
+      <div class="nav-group" :class="{ folded: groupIsCollapsed('controller') }">
+        <button
+          v-if="!isCompact"
+          class="group-label"
+          :aria-expanded="!groupIsCollapsed('controller')"
+          @click="toggleGroup('controller')"
+        >
+          <span>智能控制器 (KZ3)</span>
+          <span class="group-meta">
+            <span class="tag-badge">主线产品</span>
+            <ChevronDown :size="14" class="group-chevron" />
+          </span>
+        </button>
+        <nav v-show="!groupIsCollapsed('controller')" class="nav-list">
+          <button
+            class="nav-item"
+            :class="{ active: route.name === 'ControllerProduct' }"
+            aria-label="I/O 可视化配置工作台"
+            title="I/O 可视化配置工作台"
+            @click="navigateTo('/devices/controller')"
+          >
+            <Cpu :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">I/O 可视化配置工作台</span>
+          </button>
+          <button
+            class="nav-item commissioning-item"
+            :class="{ active: isDebugRoute }"
+            aria-label="KZ3 在线调试工作台"
+            title="KZ3 在线调试工作台"
+            @click="navigateTo('/devices/controller/debug')"
+          >
+            <Activity :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">在线调试工作台</span>
+          </button>
+        </nav>
+      </div>
 
-        <nav class="nav-list">
+      <!-- Section 2: Dual NearLink Coordinator -->
+      <div class="nav-group" :class="{ folded: groupIsCollapsed('xtq') }">
+        <button
+          v-if="!isCompact"
+          class="group-label"
+          :aria-expanded="!groupIsCollapsed('xtq')"
+          @click="toggleGroup('xtq')"
+        >
+          <span>双星闪协调器</span>
+          <span class="group-meta">
+            <span class="tag-badge">F407 / F427</span>
+            <ChevronDown :size="14" class="group-chevron" />
+          </span>
+        </button>
+        <nav v-show="!groupIsCollapsed('xtq')" class="nav-list">
+          <button
+            class="nav-item"
+            :class="{ active: isXtqCoordinatorRoute }"
+            aria-label="双星闪协调器调试工作台"
+            title="双星闪协调器调试工作台"
+            @click="navigateTo('/devices/xtq-coordinator')"
+          >
+            <Radio :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">协调器调试工作台</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Section 3: Smart Data Terminal -->
+      <div class="nav-group" :class="{ folded: groupIsCollapsed('sjzdv3') }">
+        <button
+          v-if="!isCompact"
+          class="group-label"
+          :aria-expanded="!groupIsCollapsed('sjzdv3')"
+          @click="toggleGroup('sjzdv3')"
+        >
+          <span>智能采集终端</span>
+          <span class="group-meta">
+            <span class="tag-badge">主线产品</span>
+            <ChevronDown :size="14" class="group-chevron" />
+          </span>
+        </button>
+
+        <nav v-show="!groupIsCollapsed('sjzdv3')" class="nav-list">
           <button
             class="nav-item"
             :class="{ active: route.path === '/devices/sjzdv3' }"
@@ -110,42 +214,18 @@ function navigateTo(path: string) {
         </nav>
       </div>
 
-      <!-- Section 2: Smart Controller I/O Tool -->
-      <div class="nav-group">
-        <div v-if="!isCompact" class="group-label">
-          <span>智能控制器 (KZ3)</span>
-          <span class="tag-badge-purple">工艺组态</span>
-        </div>
-        <nav class="nav-list">
-          <button
-            class="nav-item"
-            :class="{ active: route.name === 'ControllerProduct' }"
-            aria-label="I/O 可视化配置工作台"
-            title="I/O 可视化配置工作台"
-            @click="navigateTo('/devices/controller')"
-          >
-            <Cpu :size="16" class="nav-icon" />
-            <span v-if="!isCompact" class="nav-text">I/O 可视化配置工作台</span>
-          </button>
-          <button
-            class="nav-item commissioning-item"
-            :class="{ active: isDebugRoute }"
-            aria-label="KZ3 在线调试工作台"
-            title="KZ3 在线调试工作台"
-            @click="navigateTo('/devices/controller/debug')"
-          >
-            <Activity :size="16" class="nav-icon" />
-            <span v-if="!isCompact" class="nav-text">在线调试工作台</span>
-          </button>
-        </nav>
-      </div>
-
-      <!-- Section 3: Universal Tools -->
-      <div class="nav-group">
-        <div v-if="!isCompact" class="group-label">
+      <!-- Section 4: Universal Tools -->
+      <div class="nav-group" :class="{ folded: groupIsCollapsed('common') }">
+        <button
+          v-if="!isCompact"
+          class="group-label"
+          :aria-expanded="!groupIsCollapsed('common')"
+          @click="toggleGroup('common')"
+        >
           <span>公共工具</span>
-        </div>
-        <nav class="nav-list">
+          <ChevronDown :size="14" class="group-chevron" />
+        </button>
+        <nav v-show="!groupIsCollapsed('common')" class="nav-list">
           <button
             class="nav-item"
             :class="{ active: route.path === '/serial' }"
@@ -259,6 +339,7 @@ function navigateTo(path: string) {
 }
 
 .group-label {
+  width: 100%;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -268,21 +349,38 @@ function navigateTo(path: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs, 3px);
+  cursor: pointer;
+  text-align: left;
+}
+
+.group-label:hover {
+  color: var(--color-text-primary, #17212b);
+  background: var(--color-surface-3, #eef3f7);
+  border-color: var(--color-border-subtle, #d5dde4);
+}
+
+.group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.group-chevron {
+  flex-shrink: 0;
+  transition: transform 0.16s ease;
+}
+
+.nav-group.folded .group-chevron {
+  transform: rotate(-90deg);
 }
 
 .tag-badge {
   font-size: 0.64rem;
   background: #e7f1fa;
   color: #0f5f9e;
-  padding: 1px 4px;
-  border-radius: 4px;
-  font-weight: normal;
-}
-
-.tag-badge-purple {
-  font-size: 0.64rem;
-  background: #f2eafb;
-  color: #6f3a96;
   padding: 1px 4px;
   border-radius: 4px;
   font-weight: normal;
