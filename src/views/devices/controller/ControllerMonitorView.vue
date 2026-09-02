@@ -545,6 +545,10 @@ onUnmounted(() => debug.suspend())
 .signal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--color-border-subtle, #d5dde4); }.signal-grid.analog { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .signal-cell { min-width: 0; min-height: 42px; padding: 5px 6px; display: grid; grid-template-columns: 10px minmax(0,1fr) auto; align-items: center; gap: 4px; background: #ffffff; }
 .signal-copy { min-width: 0; display: grid; }.signal-copy strong { color: var(--ink); font: 700 10px var(--font-mono); }.signal-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-tertiary, #5f6f7d); font-size: 8px; }.signal-cell b { color: var(--muted); font: 700 10px var(--font-mono); white-space: nowrap; }.signal-cell.on b { color: var(--green); }
+.signal-group.ai .signal-cell,
+.signal-group.ao .signal-cell { grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }
+.signal-group.ai .signal-cell b,
+.signal-group.ao .signal-cell b { justify-self: end; }
 .signal-lamp, .mini-lamp { width: 7px; height: 7px; border-radius: 50%; background: #d7e0e6; border: 1px solid #8fa2b0; box-shadow: inset 0 0 2px rgba(23,33,43,.2); }.signal-cell.on .signal-lamp, .module-signal.on .mini-lamp { border-color: #128148; background: #22b866; box-shadow: 0 0 7px rgba(34,184,102,.58); }.signal-cell.stale { opacity: .58; }
 
 .bus-stack { min-width: 0; display: flex; flex-direction: column; gap: 9px; }
