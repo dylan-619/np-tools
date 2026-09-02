@@ -32,7 +32,7 @@ import type {
 } from '../../../types/kz3Maintenance'
 import {
   buildDebugCommand,
-  buildEthernetInitCommand,
+  buildEthernetCommands,
   buildIdentityCommand,
   buildRoleCommand,
   buildSleInitCommand,
@@ -65,7 +65,7 @@ const sle = ref<Kz3SleCandidate>({
 })
 const role = ref<Kz3SystemRole>('CONTROLLER')
 const roleAddress = ref('1')
-const confirmAction = ref<{ title: string; message: string; command: string } | null>(null)
+const confirmAction = ref<{ title: string; message: string; commands: string[] } | null>(null)
 
 const sections: Array<{
   id: Section
@@ -157,10 +157,16 @@ async function queryAll() {
   }
 }
 
-function requestWrite(title: string, message: string, builder: () => string) {
+function requestWrite(title: string, message: string, builder: () => string | string[]) {
   try {
-    const command = builder()
-    confirmAction.value = { title, message: `${message}\n\n即将发送：${command}`, command }
+    const built = builder()
+    const commands = Array.isArray(built) ? built : [built]
+    const commandPreview = commands.map((command, index) => `${index + 1}. ${command}`).join('\n')
+    confirmAction.value = {
+      title,
+      message: `${message}\n\n即将按顺序发送 ${commands.length} 条配置指令：\n${commandPreview}`,
+      commands,
+    }
   } catch (error) {
     showMessage(String(error), true)
   }
@@ -171,12 +177,22 @@ async function confirmWrite() {
   confirmAction.value = null
   if (!action) return
   try {
-    const result = await maintenance.runWrite(action.command)
-    if (result.status === 'ok') {
-      showMessage('设备已接受写入，并已执行对应 SHOW 复核；请继续检查生效层级')
-    } else {
-      showMessage(result.error || result.protocolLine || '写入失败', true)
+    for (let index = 0; index < action.commands.length; index++) {
+      const command = action.commands[index]
+      const result = await maintenance.runWrite(command)
+      if (result.status !== 'ok') {
+        showMessage(
+          `第 ${index + 1}/${action.commands.length} 条指令失败（${command}）：${result.error || result.protocolLine || '设备拒绝写入'}`,
+          true
+        )
+        return
+      }
     }
+    showMessage(
+      action.commands.length > 1
+        ? `${action.commands.length} 项配置已逐条写入，每条均完成回包与 SHOW 复核；请继续检查生效层级`
+        : '设备已接受写入，并已执行对应 SHOW 复核；请继续检查生效层级'
+    )
   } catch (error) {
     showMessage(String(error), true)
   }
@@ -377,8 +393,8 @@ onMounted(() => {
               <label class="form-field"><span>网关</span><input v-model="ethernet.gateway" class="mono"></label>
               <label class="form-field"><span>HTTP 端口</span><input v-model="ethernet.port" class="mono" inputmode="numeric"></label>
             </div>
-            <p class="info-box">批量初始化固定生成完整四参数命令。写入后 LwIP 不在线切换，必须重启并再次查询。</p>
-            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认写入 Ethernet 配置', '四个字段将作为一个完整候选提交；成功后仍需物理重启。', () => buildEthernetInitCommand(ethernet))"><Save :size="14" /> 写入完整网络配置</button>
+            <p class="info-box">按 IP → MASK → GW → PORT 逐条发送；每条等待回包并完成 SHOW 复核后再发送下一条。写入后 LwIP 不在线切换，必须重启并再次查询。</p>
+            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认逐项写入 Ethernet 配置', '四个参数将拆为独立指令顺序写入；任意一条失败会立即停止。成功后仍需物理重启。', () => buildEthernetCommands(ethernet))"><Save :size="14" /> 逐项写入网络配置</button>
           </div>
           <div class="snapshot-card">
             <h3>RUN / SAVED 对照</h3>

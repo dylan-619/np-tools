@@ -66,7 +66,6 @@ function isAllowedCommand(command: string): boolean {
     Object.values(KZ3_QUERY_COMMANDS).includes(command) ||
     /^@CFG,SYS,SN,\d{12}$/.test(command) ||
     /^@CFG,ETH,(IP|MASK|GW|PORT),[^,]+$/.test(command) ||
-    /^@CFG,ETH,INIT,[^,]+,[^,]+,[^,]+,\d+$/.test(command) ||
     command === `@CFG,SLE,ADDR,${KZ3_SLE_FIXED_ADDRESS}` ||
     command === `@CFG,SLE,APID,${KZ3_SLE_FIXED_APID}` ||
     /^@CFG,SLE,(PWR|MAXPWR|MODE),[^,]+$/.test(command) ||
@@ -135,12 +134,17 @@ export function buildIdentityCommand(serialNumber: string): string {
   return validateKz3Command(`@CFG,SYS,SN,${value}`)
 }
 
-export function buildEthernetInitCommand(candidate: Kz3EthernetCandidate): string {
+export function buildEthernetCommands(candidate: Kz3EthernetCandidate): string[] {
   const ip = normalizeIpv4(candidate.ip, 'IP')
   const mask = normalizeNetmask(candidate.mask)
   const gateway = normalizeIpv4(candidate.gateway, '网关')
   const port = normalizeUint(candidate.port, 1, 65535, 'HTTP 端口')
-  return validateKz3Command(`@CFG,ETH,INIT,${ip},${mask},${gateway},${port}`)
+  return [
+    validateKz3Command(`@CFG,ETH,IP,${ip}`),
+    validateKz3Command(`@CFG,ETH,MASK,${mask}`),
+    validateKz3Command(`@CFG,ETH,GW,${gateway}`),
+    validateKz3Command(`@CFG,ETH,PORT,${port}`),
+  ]
 }
 
 function normalizeSleName(value: string): string {
