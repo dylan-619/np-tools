@@ -109,6 +109,7 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
           c_type: f.c_type,
           access: f.access,
           reference: String(f.reference).padStart(5, '0'),
+          ...(f.description ? { description: f.description } : {}),
         })),
       },
     },
@@ -216,6 +217,7 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
     c_type: f.c_type || 'bool',
     access: f.access === 'read_write' ? ('read_write' as const) : ('read' as const),
     reference: String(f.reference || '00001').padStart(5, '0'),
+    description: f.description || '',
   }))
 
   return {

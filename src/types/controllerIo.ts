@@ -134,6 +134,7 @@ export interface NorthboundField {
   c_type: 'bool' | 'u16' | 'u32' | 'float' | 'i16' | 'i32'
   access: 'read' | 'read_write'
   reference: string     // 5 位 Modicon 地址，如 '00001', '10001', '30001', '40001'
+  description?: string  // 面向第三方的点位用途说明
 }
 
 export interface ProjectIoDocument {

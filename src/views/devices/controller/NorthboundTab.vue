@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import {
   Plus,
   Trash2,
@@ -7,11 +8,15 @@ import {
   Zap,
   CheckCircle2,
   ArrowRightLeft,
+  Download,
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
+import { appSaveFile } from '../../../api/sjzdApi'
+import { buildNorthboundCsv, buildNorthboundCsvFileName } from '../../../utils/northboundCsv'
 
 const controller = useControllerStore()
+const exportingCsv = ref(false)
 
 // 紧凑数据类型选项
 const cTypeCompactOptions = [
@@ -54,6 +59,47 @@ function onBindChange(fieldIdx: number, newBind: string) {
     f.c_type = target.type as any
   }
 }
+
+async function exportNorthboundCsv() {
+  const project = controller.doc.project
+  if (project.northbound.fields.length === 0) {
+    controller.showMessage('当前北向点位表为空，无需导出', false)
+    return
+  }
+
+  exportingCsv.value = true
+  const now = new Date()
+  const content = buildNorthboundCsv(project, now)
+  const defaultName = buildNorthboundCsvFileName(project, now)
+
+  try {
+    const savedPath = await appSaveFile(
+      defaultName,
+      content,
+      '北向 Modbus 点位表 (*.csv)',
+      'csv'
+    )
+    if (savedPath) {
+      controller.showMessage(`已导出 Base 1 北向 Modbus 点位表：${savedPath}`)
+      return
+    }
+
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = defaultName
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+    controller.showMessage('已导出 Base 1 北向 Modbus 点位表（Excel 兼容 CSV）')
+  } catch (error) {
+    controller.showMessage(`北向点位表导出失败：${String(error)}`, false)
+  } finally {
+    exportingCsv.value = false
+  }
+}
 </script>
 
 <template>
@@ -76,7 +122,7 @@ function onBindChange(fieldIdx: number, newBind: string) {
           </span>
           <span class="proto-badge">
             <CheckCircle2 :size="13" class="text-green" />
-            <span>Modbus TCP 从站 (5位地址 / 大端 ABCD)</span>
+            <span>Modbus TCP 从站 (5位地址 / Base 1 / 大端 ABCD)</span>
           </span>
         </div>
       </div>
@@ -113,6 +159,16 @@ function onBindChange(fieldIdx: number, newBind: string) {
         </div>
 
         <div class="header-actions">
+          <button
+            class="btn btn-export"
+            :disabled="exportingCsv || controller.doc.project.northbound.fields.length === 0"
+            title="导出供第三方调试使用的 Base 1 Modbus 点位表"
+            @click="exportNorthboundCsv"
+          >
+            <Download :size="14" />
+            <span>{{ exportingCsv ? '正在导出…' : '导出 CSV 点表' }}</span>
+          </button>
+
           <button
             class="btn btn-outline"
             title="一键将点表、参数、命令与状态生成对应的北向字段"
@@ -504,6 +560,9 @@ function onBindChange(fieldIdx: number, newBind: string) {
 .btn-primary:hover { background: #0e568e; }
 .btn-outline { background: transparent; border-color: var(--border, #b9c5cf); color: var(--text-main, #314654); }
 .btn-outline:hover { background: #eef3f7; color: #0f5f9e; }
+.btn-export { background: #176b45; border-color: #176b45; color: #fff; }
+.btn-export:hover:not(:disabled) { background: #115c3a; }
+.btn:disabled { cursor: not-allowed; opacity: 0.5; }
 /* Compact engineering workspace pass */
 .northbound-tab-wrapper { gap: 10px; }
 .protocol-spec-card { padding: 9px 12px; gap: 10px; border-radius: var(--radius-sm); box-shadow: none; }
