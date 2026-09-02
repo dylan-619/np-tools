@@ -56,6 +56,18 @@ const router = createRouter({
       meta: { title: 'KZ3 在线调试工作台' }
     },
     {
+      path: '/devices/controller/maintenance',
+      name: 'ControllerMaintenance',
+      component: () => import('../views/devices/controller/Kz3MaintenanceView.vue'),
+      meta: { title: 'KZ3 UART1 设备维护' }
+    },
+    {
+      path: '/devices/controller/monitor',
+      name: 'ControllerMonitor',
+      component: () => import('../views/devices/controller/ControllerMonitorView.vue'),
+      meta: { title: 'KZ3 I/O 拓扑监测' }
+    },
+    {
       path: '/devices/xtq-coordinator',
       name: 'XtqCoordinator',
       component: () => import('../views/devices/xtq/XtqCoordinatorView.vue'),

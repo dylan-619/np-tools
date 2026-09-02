@@ -11,6 +11,7 @@ import {
   Wrench,
   Flame,
   Settings,
+  LayoutDashboard,
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen
@@ -41,8 +42,11 @@ function loadCollapsedGroups(): Record<ProductGroup, boolean> {
 const collapsedGroups = reactive(loadCollapsedGroups())
 const { width } = useWindowSize()
 const isDebugRoute = computed(() => route.name === 'ControllerDebug')
+const isMonitorRoute = computed(() => route.name === 'ControllerMonitor')
+const isMaintenanceRoute = computed(() => route.name === 'ControllerMaintenance')
 const isXtqCoordinatorRoute = computed(() => route.name === 'XtqCoordinator')
-const isCompact = computed(() => collapsed.value || width.value <= 960 || isDebugRoute.value)
+const isControllerFocusRoute = computed(() => isDebugRoute.value || isMonitorRoute.value)
+const isCompact = computed(() => collapsed.value || width.value <= 960 || isControllerFocusRoute.value)
 
 function navigateTo(path: string) {
   router.push(path)
@@ -99,6 +103,26 @@ function groupIsCollapsed(group: ProductGroup) {
           >
             <Cpu :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">I/O 可视化配置工作台</span>
+          </button>
+          <button
+            class="nav-item"
+            :class="{ active: isMonitorRoute }"
+            aria-label="KZ3 I/O 拓扑监测"
+            title="KZ3 I/O 拓扑监测"
+            @click="navigateTo('/devices/controller/monitor')"
+          >
+            <LayoutDashboard :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">I/O 拓扑监测</span>
+          </button>
+          <button
+            class="nav-item"
+            :class="{ active: isMaintenanceRoute }"
+            aria-label="KZ3 UART1 设备维护"
+            title="KZ3 UART1 设备维护"
+            @click="navigateTo('/devices/controller/maintenance')"
+          >
+            <Wrench :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">UART1 设备维护</span>
           </button>
           <button
             class="nav-item commissioning-item"
@@ -263,7 +287,7 @@ function groupIsCollapsed(group: ProductGroup) {
     </div>
 
     <!-- Bottom Global Serial Connection Box -->
-    <div v-if="!isDebugRoute" class="sidebar-footer">
+    <div v-if="!isControllerFocusRoute" class="sidebar-footer">
       <GlobalSerialBar :compact="isCompact" />
     </div>
   </aside>

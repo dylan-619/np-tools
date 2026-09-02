@@ -1,10 +1,13 @@
 # KZ3 工艺项目 I/O 可视化配置工具设计
 
-> 状态：目标设计；NP-Tools 已实现配置器原型和可交付的只读在线调试工作台，HIL 写入待实板验证后开放
+> 状态：目标设计；NP-Tools 已实现配置器原型、HTTP 在线调试工作台和 UART1 结构化设备维护工作台；
+> 串口协议已按固件代码对齐，真实 UART/EEPROM/Ethernet/SLE/双角色 HIL 仍待实板验证
 >
-> 配置模型基线核对日期：2026-08-25；HTTP API 核对日期：2026-08-28
+> 配置模型基线核对日期：2026-09-01；HTTP API 核对日期：2026-08-28
 >
 > HTTP 固件实现基线：`e70e100`
+>
+> 控制器/IO 扩展双模式固件基线：`e075fce`
 >
 > 适用范围：KZ3 F427 工艺项目的板型与扩展模块组态、业务点配置、应用变量、逻辑资源、南向实例、北向映射、需求与验收描述、校验及 OpenCode 工作空间导出
 >
@@ -89,6 +92,7 @@ application/io_definitions/rtu_profile_*.yaml ─┘
 | RTU | `sp4055_703` | 8DO；DO 写目标与寄存器回读同地址 | 软件协议有基线，端子实际输出待确认 |
 | RTU | `sp4055_704` | 8AI，4–20 mA 转换为 4000..20000 µA | 量程已有部分实测依据 |
 | RTU | `sp4024_705` | 4DI + 4AO，AO 原始码 0..4095 | 地址和原始范围有依据，电气映射/安全含义待 HIL |
+| RTU | `kz3_f427_io` | KZ3 F427 作为 12DI、4AI、8DO、2AO IO 扩展模块 | 协议和角色切换已有软件/启动冒烟证据；RS485-2 真实帧、端子和输出 watchdog 待 HIL |
 | 示例 | `generic_level_f32_example` | F32、CDAB 字节序示例 | `example_only`，不能作为可交付真实设备 |
 
 工具必须把 `software_qualified`、`pending`、`range_confirmed`、`example_only` 等状态直接展示给工程师。
@@ -136,7 +140,27 @@ Profile 内仍保留 `doXX_feedback`/`aoXX_feedback` 信号，供南向写后确
 模块页必须同时显示 `qualification` 和 `evidence.hardware_hil`。`software_qualified` 只证明请求/响应和
 软件解析有基线，不证明接线、端子极性、实际电压/电流或负载已经动作。
 
-#### 2.2.3 跨工程交付时的事实优先级
+#### 2.2.3 KZ3 F427 IO 扩展 Profile
+
+`kz3_f427_io` 是上层 Controller 项目使用的只读伴生 Profile，不是目标设备的在线角色配置。它固定
+描述 KZ3 F427 在 `RTU_SLAVE` 角色下对外暴露的协议能力：
+
+| 能力 | 固定协议 |
+| --- | --- |
+| DO 回读 | FC01，PDU 0，8 coils |
+| DI | FC02，PDU 0，12 discrete inputs |
+| AI | FC04，PDU 0，4 registers，U16 AB，单位 µA，0..20000 |
+| 诊断 | FC04，PDU 4，19 registers；包含质量、故障、map version/hash、从站地址、watchdog、运行时间和持久化状态 |
+| AO 回读 | FC03，PDU 0，2 registers，U16 AB，单位 µA，0..20000 |
+| DO 写入 | FC15，PDU 0，完整 8-coil 组，默认安全值 false |
+| AO 写入 | FC16，PDU 0，完整 2-register 组，U16 AB，0..20000，默认安全值 0 |
+
+基础 Profile 的 `io_map_hash` 当前为 `706267284`。工具必须同时读取设备诊断中的 map hash 并与项目
+绑定的 Profile 比较；不一致时不得把 DI/AI 标为 GOOD，也不得开放 DO/AO 写入。基础 Profile 和每个
+项目生成的 `rtu_slave_profile.yaml` 都属于固件产品契约：前者供上层项目实例化，后者由当前项目的
+`io_extension.exports` 确定性生成，普通工程师不得直接编辑功能码、PDU、通道或 hash。
+
+#### 2.2.4 跨工程交付时的事实优先级
 
 另一工程实现工具时按以下顺序处理冲突：
 
@@ -157,6 +181,7 @@ project_io.yaml
 ├── feature 开关：pid/counter/retained
 ├── 南向端口：rs485_1/rs485_2 及串口、超时、重试、退避参数
 ├── 南向设备：Profile、端口、站号、轮询、失效时间、启用通道、安全值
+├── IO 扩展导出：io_extension.exports 聚合 rs485_1 下挂设备的只读输入/反馈
 ├── 业务点：points.inputs/outputs 的 name/source/description
 ├── 应用变量：parameters/commands/states
 ├── PID：measurement/setpoint/output/周期/方向/整定值/限幅
@@ -192,6 +217,58 @@ project_io.yaml
 
 可视化工具不能掩盖这些缺口。首版应通过禁用、状态标记或权威后端校验保持现有安全边界。
 
+### 2.5 三类配置域与唯一 owner
+
+工具必须把三类配置域在页面、保存位置和审计记录中分开，不能做成一张可任意互填的“设备配置表”：
+
+| 配置域 | 权威入口与 owner | 持久化/生效 | 工具动作 |
+| --- | --- | --- | --- |
+| 工程配置 | `project_io.yaml` → 生成器 → 固件 Flash | 重新生成、构建、烧录后生效 | 离线编辑、校验、冻结、导出；不得在线偷改 EEPROM |
+| 设备本机配置 | UART1 `@CFG/*` / `@DEBUG` → 各 EEPROM owner | 按命令独立提交；部分立即请求应用，部分必须重启 | 结构化表单、预校验、确认、单次发送、SHOW 回读和会话记录 |
+| 运行时业务值 | HTTP/Modbus TCP/SLE → `Network/DataManager` | parameter 可能仅 RAM；command 为 one-shot | 按生成字段权限受控读写；不写 GPIO、AO 或 RTU 寄存器 |
+
+系统角色与上层设备实例尤其不能合并：远端 KZ3 的从站地址由本机
+`@CFG,IO,INIT,RTU_SLAVE,<address>` 保存；上层 Controller 的 `devices[].slave_address` 只是工程拓扑声明。
+工具可以做一致性核对，但不得从上层 YAML 自动跨设备写远端 EEPROM。
+
+### 2.6 UART1 设备初始化与维护契约
+
+UART1 固定为 USART1（PA9/TX、PA10/RX）、`115200 8N1`、无硬件流控。固件以 10 ms 无新字节判断
+帧结束，接收缓冲 256 B，单条有效命令最多 255 B。工具统一发送 ASCII + CRLF，同一时刻只允许一条命令
+在途；写命令超时不自动重试。调试日志可能与回包交错，客户端提取最后一条 `OK/ERR`，同时保留原始行。
+
+结构化页面覆盖的现行白名单如下：
+
+| 配置组 | 查询 | 写入 | 关键边界 |
+| --- | --- | --- | --- |
+| 生产身份 | `@CFG,SYS,SHOW` | `@CFG,SYS,SN,<12位SN>` | 前缀 `0203`，末四位 `0001..2047`；`OK,SN_UPDATED` 后写后查询 |
+| Ethernet | `@CFG,ETH,SHOW` | 单字段或完整四参数 `INIT` | IP/GW 非全 0/255，连续非零掩码，端口 1..65535；比较 RUN/SAVED 与重启标记 |
+| SLE | `@CFG,SLE,SHOW` | 单字段或严格六字段 `INIT` | KZ3 控制器固定下发 `CFG_ADDR=0`、`APID=1`；名称最多 16 B 可打印 ASCII、PWR -127..20 或 127、MAXPWR 1..8、MODE=0 |
+| 系统角色 | `@CFG,IO,SHOW` | `CONTROLLER` 或 `RTU_SLAVE,1..247` | 同时展示 ACTIVE/SAVED、两份记录状态和 `REBOOT_REQUIRED` |
+| 调试日志 | `@DEBUG` | `@DEBUG=0/1` | 持久化开关；关闭普通 DBG 后协议 OK/ERR 仍保留 |
+
+SLE 的 `OK,SLE_RECONFIGURE` 只表示本地记录已保存并请求模组重新配置。工具继续查询并分别展示
+`VALID`、`READY`、`MAC_VALID`、`CFG_APPLIED` 和 `AT_ADDR/AT_NAME/AT_PWR`；任一单层成功都不能升级为
+“无线链路通过”。`SHOW` 中 NAME 的 `%25/%2C` 解码后显示，原始协议行仍进入会话记录。
+KZ3 控制器工具不开放 `CFG_ADDR` 和 `APID` 编辑：表单只读显示产品固定值，SLE `INIT` 命令构造层也
+始终使用 `0` 和 `1`，不能通过修改页面状态绕过。`SHOW` 返回的实际值仍单独展示，用于诊断旧设备或异常配置。
+
+Ethernet 批量初始化必须生成完整 `IP,MASK,GW,PORT` 四参数，不发送历史文档中的空参数 `INIT`。
+普通流程不提供任意文本输入；整片 EEPROM 擦除、Lua、文本复位、旧 SN/IP/端口、统计清零、RTC 写入、
+裸 AO、旧 Zigbee 等退役入口在真正串口写入前拦截。
+
+### 2.7 系统角色与双 RS485 固定职责
+
+| 活动角色 | UART3 / RS485-1 | UART4 / RS485-2 | application 与输出行为 |
+| --- | --- | --- | --- |
+| `CONTROLLER` | RTU 主站 A | RTU 主站 B | 正常运行 `logic.c`、PID、顺控和南向读写 |
+| `RTU_SLAVE` | 只读采集主站 | 本机 Modbus RTU 从站 | 不初始化/扫描 application，不执行下行写入 |
+| 维护安全态 | 不启动业务 | 不启动业务 | DO/AO 保持安全，只接受 UART1 IO 角色查询和重配 |
+
+两口产品参数固定为 `9600/N/1`。角色保存不能在线切换任务或 UART owner；必须物理复位、重新连接并再次
+SHOW，只有 ACTIVE/SAVED 一致、两份记录为 `VALID`、`REBOOT_REQUIRED=0` 才能显示“角色已生效”。
+`INVALID/IO_ERROR` 不能仅因角色文本相同而视为成功，`IO_ERROR` 不得自动写入或回退。
+
 ## 3. 产品目标与非目标
 
 ### 3.1 目标
@@ -205,7 +282,9 @@ project_io.yaml
 7. 为 OpenCode 生成最小、稳定、无物理实现噪声的业务上下文；
 8. 配置冻结后形成哈希、版本、自动绑定的产品契约锁和校验报告，可追溯到同一次生成任务；
 9. 支持导入现有 `project_io.yaml`，编辑后先显示语义 diff，再明确保存；
-10. 明确区分主机生成/编译验证、HIL 和现场验证状态。
+10. 明确区分主机生成/编译验证、HIL 和现场验证状态；
+11. 通过 UART1 结构化向导完成 SN、Ethernet、SLE、调试日志和系统角色配置，写前校验、写后回读；
+12. 将 RUN/SAVED、ACTIVE/SAVED、重启待生效和 SLE 模组确认层级明确展示并导出独立维护记录。
 
 ### 3.2 非目标
 
@@ -218,6 +297,9 @@ project_io.yaml
 - 不把编译通过显示成“设备验证通过”或“可以投产”；
 - 不提供板型/Profile 可视化维护入口；硬件定义变更必须随固件产品版本开发和发布；
 - 不在没有证据时自动推断端子极性、工程单位、反馈真实性或安全值。
+- 不从上层 Controller 项目自动写远端 IO 设备的系统角色 EEPROM；
+- 不恢复整片 EEPROM 擦除、文本复位、裸 AO 写入等退役入口；
+- 不把 UART1 写入成功、SLE 本地重配置请求或 `REBOOT_REQUIRED=1` 显示成配置已经运行。
 
 ## 4. 使用对象与权限模型
 
@@ -327,12 +409,15 @@ OpenCode 生成 logic_definition.json / logic.c / 测试
 “南向通信”不单独再造一张寄存器表。标准模块的功能码、PDU 地址和字节序来自 Profile；工程项目只在
 硬件组态中配置端口、站号、轮询周期、失效时间和实际启用通道。
 
+系统角色不属于工程 YAML，应放在独立的“设备维护/系统角色”页面。项目编辑器可以提示某个工程具备
+IO 扩展导出能力，但不得在保存 `project_io.yaml` 时自动改写已连接设备的 EEPROM 角色。
+
 ### 6.3 工具安装包应包含的内容
 
 | 内容 | 用途 | 是否由普通项目人员修改 |
 | --- | --- | --- |
 | 可视化工程编辑器 | 菜单、表格、拓扑、检查器、诊断和 Diff | 使用但不改程序本身 |
-| 固化板型/Profile 目录 | 标准板载 I/O 和 701/702/703/704/705 定义，随工具产品发布 | 否，只能查看和实例化 |
+| 固化板型/Profile 目录 | 标准板载 I/O、701/702/703/704/705 和 `kz3_f427_io` 定义，随工具产品发布 | 否，只能查看和实例化 |
 | schema/固件契约包 | 字段类型、容量、允许 API 和兼容版本 | 否 |
 | 案例/模板索引 | 电机启停、多泵、输送线等起始结构 | 复制后必须重新确认现场参数 |
 | 权威校验与点位生成 SDK | 复用 `point_config_gen.py` 能力，输出结构化诊断 | 否 |
@@ -415,9 +500,9 @@ OpenCode 生成 logic_definition.json / logic.c / 测试
 
 端口只允许 `rs485_1`、`rs485_2`。每个端口使用表单加预算条：
 
-- baud：1200..1000000；
-- parity：none/even/odd；
-- stop bits：1/2；
+- baud：当前产品固定 9600，只读展示；
+- parity：当前产品固定 none，只读展示；
+- stop bits：当前产品固定 1，只读展示；
 - response timeout；
 - retry count；
 - offline backoff；
@@ -425,6 +510,115 @@ OpenCode 生成 logic_definition.json / logic.c / 测试
 
 预算颜色建议：低于门禁只用中性色；接近门禁显示黄色；超过权威门禁显示红色并阻止冻结。不要把低占用
 显示成“通信已验证”。
+
+#### 7.3.2.1 设备系统角色与固定端口职责
+
+工具新增“设备维护/系统角色”卡片，通过 UART1 `115200 8N1` 使用以下原子指令：
+
+```text
+@CFG,IO,SHOW
+@CFG,IO,INIT,CONTROLLER
+@CFG,IO,INIT,RTU_SLAVE,7
+```
+
+`RTU_SLAVE` 地址只允许 `1..247`。首版不提供端口、baud、parity 或 stop bits 编辑；两种角色的物理
+职责固定如下：
+
+| EEPROM 角色 | UART3 / RS485-1 | UART4 / RS485-2 | application 逻辑 |
+| --- | --- | --- | --- |
+| `CONTROLLER` | RTU 主站 A | RTU 主站 B | 正常初始化和扫描 |
+| `RTU_SLAVE` | 只读采集主站，可继续下挂扩展模块 | 本机 Modbus RTU 从站 | 不初始化、不扫描 |
+
+角色记录位于 AT24C16 `528..543` 的单个 16 B 页，使用 magic、version、保留零和 CRC-8，一次整页写入
+并回读；不使用 A/B 双槽。工具不能提供裸 EEPROM 地址编辑，也不能把角色记录并入项目参数、网络配置或
+运行时间区域。成功保存只改变下次启动配置，不在线切换 UART owner；界面必须明确显示“需要重启”，
+不能在收到保存成功后直接把 ACTIVE 状态改成目标角色。
+
+`SHOW` 响应应解析并分别展示：
+
+- `ACTIVE_ROLE/ACTIVE_ADDR/ACTIVE_RECORD`：本次启动实际使用的角色、地址和记录状态；
+- `SAVED_ROLE/SAVED_ADDR/RECORD`：EEPROM 保存的下次启动配置；
+- `REBOOT_REQUIRED`：活动配置与保存配置不同，或记录处于错误状态。
+
+记录状态固定为 `VALID/BLANK/INVALID/IO_ERROR`。空白页兼容旧设备并以 `CONTROLLER` 启动，但不自动
+写 EEPROM；非空损坏或读取失败会进入维护安全态，只接受 `@CFG,IO,*` 恢复。IO 角色下其他配置命令
+可能返回 `ERR,MAINTENANCE_ROLE_ONLY`，工具应解释为角色权限限制，不得提示成串口断线。
+
+推荐交互流程：连接设备后先 `SHOW`；用户选择角色并输入地址；展示端口职责、应用逻辑停用和输出风险；
+二次确认后发送单条 `INIT`；收到 `OK,IO,SAVED_ROLE=...,SAVED_ADDR=...,REBOOT_REQUIRED=1` 后提示人工或
+受控复位；复位后再次 `SHOW`，只有 ACTIVE/SAVED 一致、记录 `VALID` 且 `REBOOT_REQUIRED=0` 才显示
+“角色已生效”。
+
+两台控制器联动时必须区分“设备角色”和“项目拓扑”：第二台通过上述 UART 指令保存 `RTU_SLAVE,7`；
+第一台仍在自己的项目 YAML 中把第二台声明为普通南向设备。只读联调的最小示例如下：
+
+```yaml
+project:
+  required_profiles: [kz3_f427_io]
+
+  rs485_ports:
+    rs485_1:
+      baud: 9600
+      parity: none
+      stop_bits: 1
+      response_timeout_ms: 100
+      retry_count: 1
+      offline_backoff_ms: 5000
+
+  devices:
+    - name: remote_io_1
+      profile: kz3_f427_io
+      port: rs485_1
+      slave_address: 7
+      poll_period_ms: 500
+      stale_after_ms: 1500
+      use:
+        inputs: [di01, ai01]
+```
+
+需要写 DO/AO 时，工具应按 Profile 写组让用户一次确认完整 8 路 DO 和完整 2 路 AO 的安全值，不能只
+生成部分 FC15/FC16 组。上层 YAML 的 `slave_address: 7` 是主站拓扑配置；它不会替第二台写 EEPROM，
+也不能与第二台 `SHOW` 返回的 `ACTIVE_ADDR` 不一致。
+
+如果第二台在 IO 角色下还通过 RS485-1 下挂 701/704 等模块，可在第二台项目中选择已声明的只读输入或
+反馈加入聚合导出：
+
+```yaml
+project:
+  rs485_ports:
+    rs485_1:
+      baud: 9600
+      parity: none
+      stop_bits: 1
+      response_timeout_ms: 100
+      retry_count: 1
+      offline_backoff_ms: 5000
+
+  devices:
+    - name: downstream_di
+      profile: sp4055_701
+      port: rs485_1
+      slave_address: 8
+      poll_period_ms: 500
+      stale_after_ms: 1500
+      use:
+        inputs: [di01]
+
+  points:
+    inputs:
+      - {name: downstream_allow, source: rtu.downstream_di.di01,
+         description: IO 扩展控制器下挂 701 DI1}
+
+  io_extension:
+    exports:
+      - {name: downstream_allow, bind: point.downstream_allow,
+         c_type: bool, reference: "10101"}
+```
+
+`io_extension.exports` 每项必须且只能包含 `name/bind/c_type/reference`，最多 64 项；只接受 `bool/u16`，
+且源必须最终解析为 `rs485_1` 已声明的只读输入或反馈。BOOL 从 `10101` 连续分配，U16 从 `30101`
+连续分配，每项质量寄存器由生成器从 `30201` 起派生。板载 I/O 和固定诊断区已经由基础 Profile 暴露，
+不得再通过该列表重复导出。
 
 #### 7.3.3 扩展设备拓扑
 
@@ -462,9 +656,10 @@ Profile: software_qualified；HIL: pending
 | `use.outputs.<signal>.safe_value` | STOP/FAULT/初始化安全目标 | 必填；BOOL 或 Profile raw 范围内整数 |
 | `use.outputs.<signal>.confirm_timeout_ms` | 写 ACK 后等待寄存器回读一致的超时 | 可选正整数 U32；不填时生成器使用 `poll_period_ms * 3` |
 
-RS485 端口字段必须原样落入 `rs485_ports.<port>`：`baud` 1200..1000000、`parity` 为
-`none/even/odd`、`stop_bits` 为 1/2、`response_timeout_ms` 和 `offline_backoff_ms` 为 1..65535、
-`retry_count` 为 0..255。
+RS485 端口字段必须原样落入 `rs485_ports.<port>`。schema 仍保留 baud/parity/stop bits 字段，但当前
+产品生成器只接受 `9600/N/1`；工具应只读展示并固定序列化这三个值，不得利用 schema 的宽范围制造尚未
+接入 UART 重配置的能力。`response_timeout_ms` 和 `offline_backoff_ms` 为 1..65535，`retry_count`
+为 0..255。
 
 即时校验：
 
@@ -869,6 +1064,34 @@ NP-Tools 通过独立路由提供“在线调试”工作模式，消费控制�
 写入类弹窗禁止使用“点击遮罩关闭”。输入框拖选文本时，指针可能在弹窗外释放，不能因此丢弃写入草稿；
 仅允许通过右上角关闭按钮、底部取消按钮或流程完成明确退出。
 
+### 7.12 UART1 设备初始化与维护工作台
+
+NP-Tools 使用独立路由 `/devices/controller/maintenance` 提供设备维护页，与工程组态、HTTP 在线调试和
+通用自由文本终端分离，但串口物理连接统一复用应用侧边栏底部的 `GlobalSerialBar/serialStore`；维护页
+不得再枚举端口或提供第二套连接/断开控件。当前实现由以下区域组成：
+
+1. 公共串口状态：只读显示全局连接和参数匹配状态；端口选择、参数和连接操作均在左下角公共串口完成；
+2. 设备总览：展示 SYS、ETH、SLE、IO、DEBUG 的最后查询快照和配置域生效矩阵；
+3. 单项维护：类型化表单构造白名单命令，前端先按固件范围、ASCII 和长度约束校验；
+4. 生效复核：写入成功后自动发送所属配置组的 SHOW；写入与复核是两条独立会话记录；
+5. 实时事务：显示当前在途命令、RX/TX 字节、最近 UART 行和错误；
+6. 会话记录：保留命令、时间、串口、最终协议回包、完整原始行、结果和验证边界，可导出 JSON。
+
+连接状态区分 `disconnected/connected/querying/writing/waiting_reboot/error`。串口断开会终止在途事务；
+换端口后旧快照标为来自其他串口，不能继续当作当前设备状态。所有写操作弹出明确确认，不提供循环发送；
+超时结果记为 `timeout`，只允许用户重新查询或再次明确发送。公共串口不是 `115200 8N1`、无流控时，
+维护页只提示参数不匹配并禁用所有 KZ3 查询/写入，不擅自断开或改写其他公共工具正在使用的连接。
+
+Ethernet 页面用三列表对照 RUN/SAVED；只有二者一致且 `REBOOT_REQUIRED=0` 才显示一致。系统角色页面同屏
+展示 ACTIVE 与 SAVED、地址、`ACTIVE_RECORD/RECORD`；保存后进入等待重启状态，物理复位后的再次 SHOW
+仍由用户执行。SLE 页面使用四层阶梯显示 EEPROM `VALID`、模组 `READY`、`MAC_VALID` 和本轮 AT 参数
+`CFG_APPLIED/AT_*`，不使用单一绿色“成功”覆盖不同证据层。配置表单中的 `CFG_ADDR`、`APID` 分别固定
+为 `0`、`1` 且不可编辑；命令构造层再次强制使用固定值，设备回读值只用于诊断展示。
+
+当前实现边界：已经通过 TypeScript 静态检查/构建的主机 UI 与协议逻辑不等于串口实机通过；真实 UART
+收发、EEPROM 掉电恢复、Ethernet 重启切换、SLE 模组 AT/无线互通、双角色 RS485 owner 与维护安全态仍需
+按目标固件和实板记录 HIL 证据。
+
 ## 8. 配置模型与 YAML 映射
 
 ### 8.1 工具内部领域模型
@@ -882,6 +1105,7 @@ ProjectDocument
 ├── boardInstance
 ├── rs485Ports[]
 ├── deviceInstances[]
+├── ioExtensionExports[]     生成 io_extension.exports 和伴生 RTU Profile
 ├── physicalChannels[]       从固化硬件目录和设备 use 派生
 ├── businessPoints[]         uid + logicName + sourceRef + description
 ├── externalVariables[]      uid + category + contract
@@ -908,6 +1132,7 @@ binding 作为固件交换契约。
 | `features.retained` | 禁用/固定 false | 当前运行时边界 | 否 |
 | `rs485_ports` | 是 | 预算派生 | 否 |
 | `devices` | 是 | 通道类型/Profile 细节派生 | 否 |
+| `io_extension.exports` | 是，从受限候选点中选择 | reference、类型、Profile 和 `io_map_hash` 派生 | 否 |
 | `points` | 是 | direction/type/quality 派生 | 否 |
 | parameters/commands | 是 | 系统命令自动加入运行时，不重复写 YAML | 否 |
 | 外部 observable states | 是 | 无 | 否 |
@@ -1156,7 +1381,7 @@ project:
 #### 端口和设备
 
 - 只支持 `rs485_1/rs485_2`；
-- baud/parity/stop bits、timeout/retry/backoff 落在生成器范围；
+- baud/parity/stop bits 固定为 `9600/N/1`，timeout/retry/backoff 落在生成器范围；
 - 同一端口站号唯一，站号 1..247；
 - poll/stale 为合法正整数；
 - use 通道存在且不重复；
@@ -1165,6 +1390,19 @@ project:
 - 702/703/705 的输出—回读关联必须与固定 Profile 一致，项目不能覆盖 PDU、通道、类型或缩放；
 - 同地址输出默认不把 `*_feedback` 加入业务输入；若高级模式显式启用，必须标记为寄存器回读；
 - 同一物理输出不能被两个设备实例重复声明。
+
+#### 系统角色与 IO 扩展导出
+
+- 系统角色和本机从站地址不得写入 `project_io.yaml`，只通过 `@CFG,IO,*` 管理 EEPROM；
+- `CONTROLLER` 地址固定为 0，`RTU_SLAVE` 地址必须为 1..247；
+- 工具不得开放 RS485 从站端口、9600/N/1 或 1500 ms watchdog 的项目级覆盖；
+- IO 模式聚合导出只允许 `rs485_1` 已声明的只读输入/反馈，不允许重复导出板载点，也不允许引用
+  `rs485_2` 下行点；
+- IO 模式不得下发 UART3 输出，导出表不能把下挂输出命令声明为可写 owner；
+- 导出类型只允许与源一致的 `bool/u16`，最多 64 项；BOOL reference 从 `10101`、U16 reference 从
+  `30101` 按类型连续分配，且不得覆盖固定诊断区；
+- 生成的 `rtu_slave_profile.yaml` 必须与 `io_extension.exports` 和 `io_map_hash` 确定性一致；
+- 上层 Controller 使用 `kz3_f427_io` 实例时，同一端口站号唯一，且 Profile hash 不匹配必须禁止输出。
 
 #### 业务点
 
@@ -1457,6 +1695,10 @@ Local Application Service
 | --- | --- |
 | `domain` | Project、Device、Point、Variable、NorthField 等类型和引用关系 |
 | `hardware_catalog` | 只读加载随产品固化的 board/Profile，并提供展示和派生查询 |
+| `device_role_protocol` | 组装/解析 `@CFG,IO,SHOW/INIT`，区分 ACTIVE、SAVED、记录状态和重启要求 |
+| `device_role_service` | 串行执行查询、保存、受控复位后的复查；不修改项目 YAML |
+| `kz3_uart_protocol` | UART1 固定参数、命令白名单、SYS/ETH/SLE/IO/DEBUG 构造与解析、范围/ASCII/255 B/退役入口门禁 |
+| `kz3_maintenance_store` | 单命令事务、超时但不重试、日志与协议回包聚合、写后 SHOW、快照陈旧判断和会话导出 |
 | `importer` | YAML/schema 检测、迁移、未知字段和注释保留 |
 | `validator` | 即时/完整/权威校验编排，统一诊断格式 |
 | `serializer` | 规范 YAML、generation request 和人读表生成 |
@@ -1597,6 +1839,8 @@ POST   /api/projects/{id}/import-opencode-result
 - 案例中心项目可以导入、导出并通过生成器；
 - 256 binding、128 北向字段、4 KiB context 和功能块边界 fixture；
 - 两个 RS485 端口预算和超载拒绝；
+- `io_extension.exports` 生成稳定伴生 Profile 和 `io_map_hash`，非法方向、`rs485_2` 引用、地址冲突被拒绝；
+- 上层项目实例化 `kz3_f427_io` 后生成完整 DI/AI 读取块和 DO/AO 写组；
 - 产品硬件契约 hash 不一致时拒绝重现；
 - 临时目录生成不修改仓库活动 `application/`；
 - Windows 路径、中文目录和长路径测试。
@@ -1614,6 +1858,22 @@ POST   /api/projects/{id}/import-opencode-result
 - 模块寄存器回读始终标为寄存器值，不得显示为端子/接触器/真实电流反馈；
 - SLE 对外契约只比较字段 name/type/access，内部路由 ID 变化不报外部协议破坏；
 - 编译成功只显示 host/compile 范围。
+- 角色保存成功但未重启时必须显示 SAVED 与 ACTIVE 不一致，禁止提前显示“已生效”；
+- `INVALID/IO_ERROR` 必须显示维护安全态和恢复入口，不得自动回退后静默继续；
+- IO 角色返回 `ERR,MAINTENANCE_ROLE_ONLY` 时不得自动改用旧指令或绕过角色限制；
+- 从站地址改变必须二次确认，且不得通过 Modbus RTU 远程修改本机地址。
+
+### 16.5 UART1 维护适配器测试
+
+- 固定 `115200 8N1`；若全局串口以其他参数连接，维护命令在发送前拒绝；
+- SYS、ETH、SLE、IO、DEBUG 命令构造覆盖正常值、上下界和非法 ASCII；
+- Ethernet `INIT` 只能是完整四参数，SLE `INIT` 只能是严格六字段；
+- SLE `INIT` 无论候选状态为何都固定生成 `CFG_ADDR=0`、`APID=1`，其他单字段值在白名单层拒绝；
+- 255 B、非 ASCII、退役命令和非白名单文本在真正写入前拒绝；
+- 调试日志与协议回包交错时保留所有原始行，最终事务使用最后一条 `OK/ERR`；
+- 写超时不自动 retry；写成功后产生独立的 follow-up query 记录；
+- ETH RUN/SAVED、IO ACTIVE/SAVED/RECORD、SLE VALID/READY/MAC_VALID/CFG_APPLIED/AT_* 稳定解析；
+- 断开、换端口、`INVALID/IO_ERROR` 时不把缓存显示成当前已生效配置。
 
 ## 17. 分阶段实现
 
@@ -1627,6 +1887,7 @@ POST   /api/projects/{id}/import-opencode-result
 6. 明确外部 state 与 AI 内部 state 的合并规则；
 7. 修复并测试冻结 `i32` 北向宽度和 `u8` 生成契约，收敛 SLE 472 B 保守门禁与 690 B 运行时预算；
    SLE 对外身份固定使用字段 name，内部路由 ID 不进入产品兼容契约。
+8. 冻结 UART1 维护命令白名单、字段 schema、响应解析、退役命令列表和固件能力版本。
 
 阶段出口：无 UI 也能把现有 YAML 导入领域模型、规范导出、调用生成器并得到结构化诊断；同一输入的
 YAML 和 hash 稳定。
@@ -1640,10 +1901,12 @@ YAML 和 hash 稳定。
 5. parameter/command/state；
 6. 北向字段和地址冲突检查；
 7. 权威生成器检查、YAML 预览和单文件导出；
-8. 在硬件组态页面直接展示固定模块资料和 qualification，不建设独立维护页面。
+8. 在硬件组态页面直接展示固定模块资料和 qualification，不建设独立模块库维护页面；
+9. 提供 UART1 设备维护页，覆盖五组只读总览、结构化写入、写后查询和会话导出。
 
 阶段出口：PLC 工程师不手写 YAML，可以配置一个板载 + 701/702/704/705 的项目并生成通过当前校验器的
-`project_io.yaml`。
+`project_io.yaml`；调试工程师不手写串口命令即可完成受校验的设备本机配置，并得到区分保存值、活动值、
+重启待生效和待实板状态的维护记录。
 
 ### 17.3 P2：OpenCode 工作空间闭环
 
@@ -1692,6 +1955,19 @@ YAML 和 hash 稳定。
 21. 北向页面完整说明 name/bind/c_type/access/reference/width、四个地址区及项目地址与设备 PDU 的区别；
 22. 当前活动工程作为 golden fixture 导入后显示 48 输入、20 输出、69 北向字段，地址和运行时读绑定
     与第 8.6 节一致。
+23. 系统角色页面能查询、保存并在重启后复查 `CONTROLLER` 与 `RTU_SLAVE,1..247`，ACTIVE/SAVED/
+    RECORD/REBOOT_REQUIRED 状态展示无混淆；
+24. 系统角色不进入项目 YAML，角色写入不覆盖 SN、网络、SLE、SystemLifetime、runtime 或持久化参数；
+25. `kz3_f427_io` 以只读产品 Profile 展示 12DI/4AI/8DO/2AO、质量、map hash、固定写组及待 HIL 边界；
+26. 可生成并审查项目伴生 `rtu_slave_profile.yaml`，但在真实 RS485 帧、双口并发和 1500 ms watchdog
+    HIL 完成前不显示“IO 扩展模块已通过现场验证”。
+27. UART1 页面固定 `115200 8N1`，结构化覆盖 SYS/ETH/SLE/IO/DEBUG，字段范围、ASCII、255 B 和退役命令
+    均在发送前校验；
+28. 写命令超时不自动重试；写成功后执行所属配置组的 SHOW，并分别记录写入与复核结果；
+29. Ethernet 同屏比较 RUN/SAVED，系统角色同屏比较 ACTIVE/SAVED/两份记录，未重启复核不显示已生效；
+30. SLE 的 `CFG_ADDR/APID` 固定为 `0/1`，前端不可编辑且命令层不可绕过；同时区分本地保存、配置有效、
+    模组 ready/MAC 与 AT 参数确认，不把任何单层成功显示为无线链路通过；
+31. 维护会话与工程 YAML 分离，可导出包含原始回包和验证边界的 JSON 记录。
 
 ## 19. 实施前需要确认的产品决策
 

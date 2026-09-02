@@ -13,7 +13,8 @@ import {
   FolderOpen,
   Save,
   Activity,
-  ArrowLeft
+  ArrowLeft,
+  LayoutDashboard
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import ProjectOverviewTab from './ProjectOverviewTab.vue'
@@ -40,6 +41,10 @@ watch(
 
 function enterDebugMode() {
   router.push({ name: 'ControllerDebug' })
+}
+
+function enterMonitorMode() {
+  router.push({ name: 'ControllerMonitor' })
 }
 
 function leaveDebugMode() {
@@ -106,6 +111,11 @@ function leaveDebugMode() {
           <button class="btn btn-primary" @click="controller.exportYamlFile()">
             <Save :size="15" />
             <span>导出 YAML</span>
+          </button>
+
+          <button class="btn btn-monitor" @click="enterMonitorMode">
+            <LayoutDashboard :size="15" />
+            <span>可视化监测</span>
           </button>
 
           <button class="btn btn-commissioning" @click="enterDebugMode">
@@ -561,6 +571,18 @@ function leaveDebugMode() {
   border-color: #176b63;
   color: #ffffff;
   font-weight: 650;
+}
+
+.btn-monitor {
+  background: #e7f1fa;
+  border-color: #9fc1dc;
+  color: #0f5f9e;
+  font-weight: 650;
+}
+
+.btn-monitor:hover {
+  background: #d8eaf7;
+  border-color: #79aacf;
 }
 
 .btn-commissioning:hover {
