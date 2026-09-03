@@ -1026,8 +1026,8 @@ NP-Tools 通过独立路由提供“在线调试”工作模式，消费控制�
 | 固定诊断 | 串行读取 device/hardware/network/sle/io/config/services/health | 保留设备 tick、HTTP status、错误码和原始 body |
 | 点位监视 | 从当前北向映射生成本地 descriptor，最多同时轮询 12 点；监视组按工程保存在本机 | 设备不枚举点位；设备质量与工具本地陈旧分别显示 |
 | 板级 I/O | DI/AI 标为采样，DO/AO 标为软件目标 | 软件目标、寄存器回读影子和物理反馈不得混称“当前值” |
-| Parameter 写入 | 仅支持 BOOL/FLOAT `read_write`，写前 GET、单次 POST、写后 GET | 受控测试入口已开放；只修改 RAM；整数 owner 尚未实现时禁用 |
-| Command 写入 | 仅支持 BOOL `true` 单次触发 | 受控测试入口已开放；不保持、不连发、不自动重试，成功后保留当前许可 |
+| Parameter 写入 | 支持 BOOL/FLOAT/U32 `read_write`，写前 GET、单次 POST、写后 GET | U32 按完整 JSON 整数下发，按类型范围与工程 min/max 的交集校验；U16/I16/I32 写入链路仍未开放；成功不证明持久化 |
+| Command 写入 | 支持 `command.*` 和 `runtime.<name>.clear` 的 BOOL `true` 单次触发 | 受控测试入口已开放；不保持、不连发、不自动重试，成功后保留当前许可；其他 runtime 字段不开放写入 |
 | 写入门禁 | 默认锁定；工程师填写本组测试依据并显式确认后开放 10 分钟 | 成功写入后续期；要求连接预检、工程未变化、四项健康正常、无 active fault；离页、断线或异常自动上锁 |
 | 审计证据 | 分开记录 transport、owner accepted、readback、logic、physical | 后两层由工程师结合 HIL/现场证据标注，默认 `unknown` |
 
@@ -1035,6 +1035,18 @@ NP-Tools 通过独立路由提供“在线调试”工作模式，消费控制�
 细分错误码，因此兼容性最多标为 `partial`。受控写入只定位为待验证的隔离实验/HIL 能力，不能包装为
 生产在线控制或在线强制。`/api/v1/io.remote_write_allowed` 是兼容板级
 投影，不能作为生成点位 POST 权限门禁。
+
+2026-09-03 按固件 `User/Src/network.c`、`network_protocol.c` 和 `data_manager.c` 核对：
+`Network.WriteItem` 已接入 `DataManager_WriteParameterU32`，旧设计中“U16/U32 均缺少写 owner”的
+结论不再适用于 U32。接口路径使用北向字段 `name`，不是内部 `bind`；请求仅包含 `value`，例如
+`POST /api/v1/point/G1_RUN_T` 配合 `{"value":1800}`。U32 不使用字符串、小数或科学计数形式的
+报文，不拆成两个 Modbus 寄存器；BOOL 参数使用 JSON boolean，FLOAT 参数使用有限 JSON number。
+累计运行时间清零别名经生成器映射为 BOOL command，只发送一次 `{"value":true}`。
+
+数值输入、最终提交共用类型和范围校验：U32 为 0..4294967295 的整数，并收窄到工程 min/max，
+输入步进为 1；FLOAT 保留小数输入。整数监视变化、写前快照检查和写后读回均精确比较，只有 FLOAT
+使用舍入容差。设备返回 U32 小数、负数或越界值时标记类型不匹配并解除写入许可。工具不会向旧固件
+降级为其他格式或自动重试；设备烧录版本及真实写入效果仍需工程师验证。
 
 轮询采用单会话串行调度，同一时刻最多一个在途设备请求。每个周期读取 `/io`、`/health`、一个慢速
 诊断资源和用户选择的少量点位，不对全部北向字段进行高频扫描。页面关闭后停止轮询。断开或重连后，

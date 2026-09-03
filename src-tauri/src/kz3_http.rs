@@ -153,13 +153,22 @@ fn validate_write_target(binding: &str, value: &Value) -> Result<(), String> {
         }
         return Err("parameter 写入值只能是 JSON boolean 或 number".to_string());
     }
-    if binding.starts_with("command.") {
+    let runtime_clear = binding
+        .strip_prefix("runtime.")
+        .and_then(|name| name.strip_suffix(".clear"))
+        .is_some_and(|name| {
+            !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        });
+    if binding.starts_with("command.") || runtime_clear {
         if value.as_bool() == Some(true) {
             return Ok(());
         }
         return Err("command 只允许单次写入 JSON true，不允许复位、保持或数值写入".to_string());
     }
-    Err("工具只允许写入 parameter.* 或 command.* 北向字段，禁止直接写 point/state".to_string())
+    Err("工具只允许写入 parameter.*、command.* 或 runtime.<name>.clear 北向字段，禁止直接写 point/state".to_string())
 }
 
 #[tauri::command]
@@ -249,5 +258,41 @@ mod tests {
         assert!(validate_write_target("state.running", &serde_json::json!(true)).is_err());
         assert!(validate_write_target("parameter.note", &serde_json::json!("x")).is_err());
         assert!(validate_write_target("../parameter.x", &serde_json::json!(true)).is_err());
+    }
+
+    #[test]
+    fn u32参数保持完整的十进制整数报文() {
+        for value in [0u32, 65536, 180000, 2147483648, u32::MAX] {
+            let json_value = serde_json::json!(value);
+            assert!(validate_write_target("parameter.run_time", &json_value).is_ok());
+            assert_eq!(
+                serde_json::json!({ "value": json_value }).to_string(),
+                format!("{{\"value\":{value}}}")
+            );
+        }
+        assert!(validate_write_target("parameter.run_time", &serde_json::json!("1800")).is_err());
+    }
+
+    #[test]
+    fn 运行时间清零仅开放明确的单次布尔命令() {
+        for binding in ["command.start", "runtime.grating_01.clear"] {
+            assert!(validate_write_target(binding, &serde_json::json!(true)).is_ok());
+            for value in [
+                serde_json::json!(false),
+                serde_json::json!(1),
+                serde_json::json!("true"),
+            ] {
+                assert!(validate_write_target(binding, &value).is_err());
+            }
+        }
+        for binding in [
+            "runtime.grating_01.seconds",
+            "runtime.grating_01.clear_pending",
+            "runtime..clear",
+            "runtime.grating_01.extra.clear",
+            "runtime.grating_01.clear.extra",
+        ] {
+            assert!(validate_write_target(binding, &serde_json::json!(true)).is_err());
+        }
     }
 }

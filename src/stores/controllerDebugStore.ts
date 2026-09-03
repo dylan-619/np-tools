@@ -8,6 +8,12 @@ import {
 } from '../api/controllerDebugApi'
 import { useControllerStore } from './controllerStore'
 import { PROFILE_CATALOG } from '../utils/controllerIoCatalog'
+import {
+  isRuntimeClearBinding,
+  pointValueMatchesType,
+  pointValuesEqual,
+  writeValueError
+} from '../utils/controllerDebugValues'
 import type {
   CompatibilityState,
   DebugLogEntry,
@@ -81,13 +87,6 @@ function errorDetail(error: unknown): string {
     return `HTTP ${error.status}${error.code ? ` / ${error.code}` : ''} / ${error.body}`
   }
   return error instanceof Error ? error.message : String(error)
-}
-
-function valuesEqual(a: Kz3Scalar, b: Kz3Scalar): boolean {
-  if (typeof a === 'number' && typeof b === 'number') {
-    return Math.abs(a - b) <= Math.max(1e-6, Math.abs(a) * 1e-6)
-  }
-  return a === b
 }
 
 export const useControllerDebugStore = defineStore('controllerDebug', () => {
@@ -176,6 +175,10 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         min = parameter?.min
         max = parameter?.max
         valueSemantic = 'RAM 参数当前值（非持久化配置）'
+      } else if (isRuntimeClearBinding(field.bind)) {
+        category = 'command'
+        description = field.description || '累计运行时间清零；单次触发后需核对秒数与清零状态'
+        valueSemantic = '运行时间清零 one-shot 命令，不代表累计值已完成清零'
       } else if (field.bind.startsWith('command.')) {
         category = 'command'
         const name = field.bind.slice('command.'.length)
@@ -218,15 +221,15 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         writeDisabledReason = '工程北向契约为只读'
       } else if (
         category === 'parameter' &&
-        (field.c_type === 'bool' || field.c_type === 'float')
+        (field.c_type === 'bool' || field.c_type === 'float' || field.c_type === 'u32')
       ) {
         writeSupported = true
       } else if (category === 'command' && field.c_type === 'bool') {
         writeSupported = true
-      } else if (category === 'parameter' && ['u16', 'u32', 'i16', 'i32'].includes(field.c_type)) {
-        writeDisabledReason = '当前固件 Network.WriteItem 尚无整数 parameter 写 owner'
+      } else if (category === 'parameter' && ['u16', 'i16', 'i32'].includes(field.c_type)) {
+        writeDisabledReason = `当前固件尚未实现 ${field.c_type.toUpperCase()} parameter 写入链路`
       } else {
-        writeDisabledReason = '当前固件仅允许 BOOL/FLOAT parameter 或 BOOL command 写入'
+        writeDisabledReason = '当前固件仅允许 BOOL/FLOAT/U32 parameter 或 BOOL command 写入'
       }
 
       return {
@@ -420,11 +423,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         throw new Error(`点位 ${name} 返回未知质量码 ${data.quality}`)
       }
       const descriptor = pointDescriptors.value.find((item) => item.name === name)
-      const typeMatches =
-        descriptor?.c_type === 'bool'
-          ? typeof data.value === 'boolean'
-          : typeof data.value === 'number'
-      if (descriptor && !typeMatches) {
+      if (descriptor && !pointValueMatchesType(descriptor.c_type, data.value)) {
         compatibilityState.value = 'mismatch'
         const currentSession = session.value
         if (currentSession && currentSession.sessionId === expectedSessionId) {
@@ -434,7 +433,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         throw new Error(`点位 ${name} 设备值类型与工程 ${descriptor.c_type} 不一致`)
       }
       const previous = samples.value[name]
-      const changed = previous !== undefined && !valuesEqual(previous.value, data.value)
+      const changed =
+        previous !== undefined &&
+        !pointValuesEqual(previous.value, data.value, descriptor?.c_type)
       const sample: PointSample = {
         name,
         value: data.value,
@@ -699,23 +700,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     writePermitReason.value = ''
   }
 
-  function validateWriteValue(descriptor: PointDescriptor, value: Kz3Scalar) {
-    if (descriptor.category === 'command' && value !== true) {
-      throw new Error('BOOL command 只允许触发一次 true 脉冲')
-    }
-    if (descriptor.c_type === 'bool' && typeof value !== 'boolean') {
-      throw new Error('BOOL parameter 必须写入 true 或 false')
-    }
-    if (descriptor.c_type === 'float') {
-      if (typeof value !== 'number' || !Number.isFinite(value))
-        throw new Error('FLOAT parameter 必须写入有限数值')
-      if (descriptor.min !== undefined && value < descriptor.min)
-        throw new Error(`写入值不得小于 ${descriptor.min}`)
-      if (descriptor.max !== undefined && value > descriptor.max)
-        throw new Error(`写入值不得大于 ${descriptor.max}`)
-    }
-  }
-
   async function writePoint(
     name: string,
     value: Kz3Scalar,
@@ -733,7 +717,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     if (writeInFlight.value) throw new Error('已有写入请求在途，请等待完成')
     if (Date.now() - lastWriteAt < MIN_WRITE_INTERVAL_MS)
       throw new Error('写入操作过快，请稍后再试')
-    validateWriteValue(descriptor, value)
+    const validationError = writeValueError(descriptor, value)
+    if (validationError) throw new Error(validationError)
 
     const event: WriteEvent = {
       id: createId('write'),
@@ -763,7 +748,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       event.beforeValue = before.value
       if (
         expectedBeforeValue !== undefined &&
-        !valuesEqual(before.value, expectedBeforeValue)
+        !pointValuesEqual(before.value, expectedBeforeValue, descriptor.c_type)
       ) {
         throw new Error(
           `点位 ${name} 已从弹窗打开时的 ${String(expectedBeforeValue)} 变化为 ${String(before.value)}，已取消写入；请重新核对`
@@ -787,7 +772,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         event.afterValue = after.value
         event.readbackObserved =
           descriptor.category === 'parameter'
-            ? valuesEqual(after.value, value)
+            ? pointValuesEqual(after.value, value, descriptor.c_type)
               ? 'passed'
               : 'failed'
             : 'unknown'

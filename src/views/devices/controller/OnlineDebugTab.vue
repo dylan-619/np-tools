@@ -29,6 +29,7 @@ import {
 import { appSaveFile } from '../../../api/sjzdApi'
 import { useControllerStore } from '../../../stores/controllerStore'
 import { useControllerDebugStore } from '../../../stores/controllerDebugStore'
+import { numericWriteConstraints, writeValueError } from '../../../utils/controllerDebugValues'
 import type {
   Kz3Scalar,
   ObservationState,
@@ -290,13 +291,16 @@ const preparedWriteValue = computed<Kz3Scalar | null>(() => {
   return Number.isFinite(value) ? value : null
 })
 function isWriteValueValid(descriptor: PointDescriptor | null, value: Kz3Scalar | null) {
-  if (!descriptor || value === null) return false
-  if (typeof value === 'number') {
-    if (descriptor.min !== undefined && value < descriptor.min) return false
-    if (descriptor.max !== undefined && value > descriptor.max) return false
-  }
-  return true
+  return descriptor !== null && value !== null && writeValueError(descriptor, value) === null
 }
+const writeNumberConstraints = computed(() =>
+  writeTarget.value ? numericWriteConstraints(writeTarget.value) : undefined
+)
+const writeValidationMessage = computed(() => {
+  if (!writeTarget.value || writeTarget.value.c_type === 'bool' || !writeNumberValue.value.trim())
+    return null
+  return writeValueError(writeTarget.value, preparedWriteValue.value)
+})
 const writeValueValid = computed(() =>
   isWriteValueValid(writeTarget.value, preparedWriteValue.value)
 )
@@ -465,7 +469,7 @@ async function submitWrite() {
   if (!descriptor || !canSubmitWrite.value) return
   const value = readVisibleWriteDraft(descriptor)
   if (value === null || !isWriteValueValid(descriptor, value)) {
-    controller.showMessage('待写入值为空、不是有效数值或超出允许范围', false)
+    controller.showMessage(writeValueError(descriptor, value) || '待写入值无效', false)
     return
   }
   try {
@@ -1076,7 +1080,7 @@ onUnmounted(() => {
         debug.writesEnabled ? '北向写入许可已启用' : '北向写入默认锁定'
       }}</strong><span>{{
         debug.writesEnabled
-          ? '剩余 ' + writePermitLabel + '；仅允许 BOOL/FLOAT parameter 与 BOOL command，写后自动读回。'
+          ? '剩余 ' + writePermitLabel + '；允许 BOOL/FLOAT/U32 parameter 与 BOOL 单次命令（含运行时间清零），写后自动读回。'
           : '连接预检后由工程师显式解锁；离页、断线、工程变化、健康异常或 active fault 会自动上锁。'
       }}</span><button
         v-if="debug.writesEnabled"
@@ -1183,11 +1187,12 @@ onUnmounted(() => {
             ref="writeNumberInput"
             :value="writeNumberValue"
             type="number"
-            :min="writeTarget.min"
-            :max="writeTarget.max"
-            step="any"
+            :min="writeNumberConstraints?.min"
+            :max="writeNumberConstraints?.max"
+            :step="writeNumberConstraints?.step"
+            :aria-invalid="!!writeValidationMessage"
             @input="updateNumberDraft"
-          ><small>允许范围 {{ writeTarget.min ?? '—' }} ～ {{ writeTarget.max ?? '—' }}</small></label>
+          ><small>允许范围 {{ writeNumberConstraints?.min ?? '—' }} ～ {{ writeNumberConstraints?.max ?? '—' }}{{ writeTarget.c_type === 'u32' ? '（U32 整数）' : '' }}</small><small v-if="writeValidationMessage" role="alert">{{ writeValidationMessage }}</small></label>
           <div class="write-draft-row"><span>本次请求值</span><strong>{{ formatValue(preparedWriteValue ?? undefined, writeTarget) }}</strong><small>提交时以输入框可见值为准</small></div>
           <label class="write-reason"><span>测试依据（已从本次解锁许可带入，可按点补充）</span><textarea
             v-model="writeReason"

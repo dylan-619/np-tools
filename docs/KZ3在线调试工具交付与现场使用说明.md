@@ -2,7 +2,7 @@
 
 > 交付状态：在线诊断与受控北向写入测试可交付；HIL、端子电气和现场负载结论待工程师执行并记录。
 >
-> 软件版本：NP-Tools 2.0.0；HTTP API：KZ3 v1；文档日期：2026-08-28。
+> 软件版本：NP-Tools 2.0.0；HTTP API：KZ3 v1；文档日期：2026-09-03。
 
 ## 1. 交付范围
 
@@ -14,13 +14,14 @@
 - 点位设备质量、本机陈旧状态、采样时效和请求耗时；
 - 暂停、继续、立即采样、单点读取、监视组本机记忆；
 - 设备身份、健康、网络、服务和板级 I/O 诊断侧栏；
-- BOOL/FLOAT parameter 修改和 BOOL command 单次触发；
+- BOOL/FLOAT/U32 parameter 修改和 BOOL command 单次触发（包括 `runtime.<name>.clear` 累计运行时间清零）；
 - 写前读取、单次写入、写后读回、逻辑/物理效果人工标注；
 - 会话日志、历史写入证据查看以及 JSON 会话报告导出。
 
-当前版本开放的是受控测试写入，不是生产在线控制或在线强制。工具和 Rust/Tauri 后端只允许当前工程中
-标记为 `read_write` 的 BOOL/FLOAT parameter 或 BOOL command，禁止直接写 point/state、整数
-parameter、任意 URL 和任意路径。设备端权限、类型、范围和 owner 拒绝仍然有效。
+当前版本开放的是受控测试写入，不是生产在线控制或在线强制。工具根据当前工程中的 `read_write`
+标记开放 BOOL/FLOAT/U32 parameter 或 BOOL command；Rust/Tauri 后端按 parameter、command 和明确的
+runtime 清零别名限制写入目标。禁止直接写 point/state、其他 runtime 字段、任意 URL 和任意路径。
+U16/I16/I32 parameter 与数值型 command 尚未开放；设备端权限、类型、范围和 owner 拒绝仍然有效。
 
 ## 2. 使用前条件
 
@@ -89,7 +90,7 @@ parameter、任意 URL 和任意路径。设备端权限、类型、范围和 ow
 3. 点击底部“解锁写入”，核对设备 SN 和工程版本，一次填写本组测试编号/依据，勾选安全确认并输入“启用写入”；
 4. 许可按最后一次成功写入续期 10 分钟。离开页面、断开连接、工程变化、连续健康失败或 active fault 会立即上锁；
 5. 切换“全部点”，对带 RW 且有写入图标的 parameter/command 点击写入；
-6. parameter 选择 BOOL 值或输入范围内 FLOAT；command 固定单次触发 TRUE，但不会解除当前 10 分钟许可；
+6. parameter 选择 BOOL 值，或输入范围内 FLOAT/U32；U32 只接受整数，范围为 0..4294967295 与工程 min/max 的交集；command（含运行时间清零）固定单次触发 TRUE，但不会解除当前 10 分钟许可；
 7. 单点弹窗自动带入解锁时填写的测试依据，只需确认点名和目标值；弹窗显示的是打开瞬间的读值快照，
    用户草稿与后台实时样本完全分离，轮询不会改写正在输入的目标值。弹窗单独显示“本次请求值”，修改
    目标值后会自动取消原安全确认，必须针对最终值重新勾选。正式提交前工具仍会重新读取写前值；若设备
@@ -105,6 +106,12 @@ HTTP 成功响应只证明请求通过设备变量服务并被当前 RAM owner �
 设备拒绝会自动上锁，工具不会自动重试；成功的 command 保持当前许可，但仍应先确认关联状态再继续操作。
 写入证据中的 `requestedValue` 和结果提示必须使用提交瞬间输入框中的可见值，不能从实时样本或打开时快照
 反向覆盖。
+
+U32 通过单点 HTTP 报文 `{"value":1800}` 下发，接口使用北向字段名，例如 `/api/v1/point/G1_RUN_T`，
+不是内部 `parameter.d1_run_time_s`。报文不加引号、不拆寄存器、不附加其他属性。U32 写前快照和写后
+读回采用精确比较，大整数即使相差 1 也会取消写入或判为读回失败；FLOAT 仍保留舍入容差。
+累计运行时间清零属于单次命令，成功响应仅表示接受请求；需要另外读取累计秒数、清零处理中状态，
+确认业务效果。设备若仍运行未实现 U32 owner 的旧固件，工具不会自动重试或改用其他写入方式。
 
 ### 3.5 诊断和留档
 
@@ -133,7 +140,7 @@ HTTP 成功响应只证明请求通过设备变量服务并被当前 RAM owner �
 | LOCAL STALE | 链路延迟、轮询点过多、设备 HTTP client 忙或会话降级 |
 | 诊断值为“—” | 当前没有证据，不得按 0、OFF 或正常处理 |
 | “解锁写入”不可用 | 补充工程师；检查四项健康、active fault、工程变化和连接状态 |
-| 没有写入图标 | 字段不是受支持的 RW BOOL/FLOAT parameter 或 BOOL command |
+| 没有写入图标 | 字段不是受支持的 RW BOOL/FLOAT/U32 parameter 或 BOOL command（含 runtime 清零）；U16/I16/I32 尚未开放 |
 | HTTP 403 `point_write_failed` | 可能是只读、类型/范围、owner、写忙或工程不匹配；固件当前不能细分 |
 | Owner 接受但读回失败 | 立即停止连续操作，读取点位与诊断，保留原始响应并核对工程/固件 |
 
@@ -145,8 +152,9 @@ HTTP 成功响应只证明请求通过设备变量服务并被当前 RAM owner �
 成品发布前最低软件门禁：
 
 ```sh
+pnpm test:kz3-debug
 pnpm build
-pnpm exec eslint src/types/controllerDebug.ts src/stores/controllerDebugStore.ts \
+pnpm exec eslint src/types/controllerDebug.ts src/stores/controllerDebugStore.ts src/utils/controllerDebugValues.ts \
   src/router/index.ts src/App.vue src/components/layout/AppSidebar.vue \
   src/views/devices/controller/ControllerView.vue \
   src/views/devices/controller/OnlineDebugTab.vue

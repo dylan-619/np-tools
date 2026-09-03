@@ -11,7 +11,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:macos-local": "APPLE_SIGNING_IDENTITY=- tauri build",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:kz3-debug": "node --test tests/controllerDebug.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.2.0",
