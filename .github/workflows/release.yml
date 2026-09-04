@@ -2,8 +2,6 @@ name: 'Release and Build Installers'
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -12,7 +10,55 @@ permissions:
   contents: write
 
 jobs:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create-release.outputs.result }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create or Get Release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = context.ref.replace('refs/tags/', '').replace('refs/heads/', '');
+            const version = require('./package.json').version;
+            const tagName = context.ref.startsWith('refs/tags/') ? tag : `v${version}`;
+
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: tagName,
+              });
+              console.log(`Found existing release ID: ${existing.data.id}`);
+              return existing.data.id;
+            } catch (err) {
+              const release = await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tagName,
+                name: `NP-Tools ${tagName}`,
+                body: `## NP-Tools ${tagName} 发布包\n\n基于 Tauri v2 + Rust 构建的跨平台工业硬件调试与产线配置平台。\n\n### 包含安装包：\n- **Windows**: \`.exe\` (NSIS 安装包) / \`.msi\` (Windows Installer)\n- **macOS (Apple Silicon M系列)**: \`aarch64\` \`.dmg\`\n- **macOS (Intel 系列)**: \`x86_64\` \`.dmg\``,
+                draft: false,
+                prerelease: false,
+              });
+              console.log(`Created release ID: ${release.data.id}`);
+              return release.data.id;
+            }
+
   build-tauri:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -66,17 +112,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: '-'
         with:
-          tagName: v__VERSION__
-          releaseName: 'NP-Tools v__VERSION__'
-          releaseBody: |
-            ## NP-Tools v__VERSION__ 发布包
-
-            基于 Tauri v2 + Rust 构建的跨平台工业硬件调试与产线配置平台。
-
-            ### 包含安装包：
-            - **Windows**: `.exe` (NSIS 安装包) / `.msi` (Windows Installer)
-            - **macOS (Apple Silicon M系列)**: `aarch64` `.dmg`
-            - **macOS (Intel 系列)**: `x86_64` `.dmg`
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
