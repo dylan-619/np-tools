@@ -1,4 +1,4 @@
-# NP-Tools 工业硬件产品调试与配置平台 (v2.0)
+# NP-Tools 工业硬件产品调试与配置平台 (v1.0)
 
 > 基于 **Tauri v2 + Rust + Vue 3 (Vite + TypeScript) + Pinia + ECharts** 构建的高性能、跨平台（Windows / macOS）现代化工业硬件调试与产线生产配置工具。
 
