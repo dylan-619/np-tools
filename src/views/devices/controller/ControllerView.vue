@@ -14,7 +14,8 @@ import {
   Save,
   Activity,
   ArrowLeft,
-  LayoutDashboard
+  LayoutDashboard,
+  Wrench
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import ProjectOverviewTab from './ProjectOverviewTab.vue'
@@ -45,6 +46,10 @@ function enterDebugMode() {
 
 function enterMonitorMode() {
   router.push({ name: 'ControllerMonitor' })
+}
+
+function enterMaintenanceMode() {
+  router.push({ name: 'ControllerMaintenance' })
 }
 
 function leaveDebugMode() {
@@ -116,6 +121,11 @@ function leaveDebugMode() {
           <button class="btn btn-monitor" @click="enterMonitorMode">
             <LayoutDashboard :size="15" />
             <span>可视化监测</span>
+          </button>
+
+          <button class="btn btn-maintenance" @click="enterMaintenanceMode" title="直达 UART1 串口底层设备初始化与维护工作台">
+            <Wrench :size="15" />
+            <span>UART1 维护</span>
           </button>
 
           <button class="btn btn-commissioning" @click="enterDebugMode">
@@ -583,6 +593,19 @@ function leaveDebugMode() {
 .btn-monitor:hover {
   background: #d8eaf7;
   border-color: #79aacf;
+}
+
+.btn-maintenance {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+  font-weight: 650;
+}
+
+.btn-maintenance:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-commissioning:hover {

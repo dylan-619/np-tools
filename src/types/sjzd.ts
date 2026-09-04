@@ -96,3 +96,65 @@ export const LOG_LEVEL_OPTIONS = [
   { value: 4, label: '4: WARN (警告信息)' },
   { value: 5, label: '5: ERROR (仅错误)' },
 ]
+
+export type WirelessMode = 'SLE' | '4G'
+
+export interface WlanTypeInfo {
+  mode: WirelessMode
+  modeCode: number
+  uart2Baud: number
+  lastSyncTime?: string
+}
+
+export interface FourGConfigDto {
+  apn: string
+  host: string
+  port: number
+  clientId: string
+  username: string
+  password: string
+  publishTopic: string
+  subscribeTopic: string
+  keepAliveSec: number
+  qos: number
+}
+
+export interface FourGStatusInfo {
+  eepromVersion?: number
+  state?: string
+  configOperational?: boolean
+  isOnline?: boolean
+  passwordIsSet?: boolean
+  lastSyncTime?: string
+  lastOnlineLogTime?: string
+  lastQmtstat?: { client: string; result: string; state: string; time: string }
+  retryReason?: string
+  hasReadback?: boolean
+  configErrors?: string[]
+}
+
+export const FOUR_G_EMPTY_CONFIG: FourGConfigDto = {
+  apn: '',
+  host: '',
+  port: 0,
+  clientId: '',
+  username: '',
+  password: '',
+  publishTopic: '',
+  subscribeTopic: '',
+  keepAliveSec: 0,
+  qos: 0,
+}
+
+export const FOUR_G_DEFAULT_CONFIG: FourGConfigDto = {
+  apn: 'cmiot',
+  host: '',
+  port: 1883,
+  clientId: '',
+  username: '',
+  password: '',
+  publishTopic: '',
+  subscribeTopic: '',
+  keepAliveSec: 60,
+  qos: 1,
+}

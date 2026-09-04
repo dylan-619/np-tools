@@ -14,11 +14,14 @@ import {
   Fingerprint,
   Radio,
   RefreshCw,
+  RotateCcw,
   Save,
+  Send,
   Settings2,
   ShieldAlert,
   TerminalSquare,
   Trash2,
+  Lightbulb,
 } from 'lucide-vue-next'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 import { appSaveFile } from '../../../api/sjzdApi'
@@ -48,6 +51,7 @@ const serial = useSerialStore()
 const maintenance = useKz3MaintenanceStore()
 const activeSection = ref<Section>('overview')
 const pageMessage = ref<{ text: string; error: boolean } | null>(null)
+const customCommandInput = ref('')
 const snCandidate = ref('020300000001')
 const ethernet = ref<Kz3EthernetCandidate>({
   ip: '192.168.30.66',
@@ -154,6 +158,43 @@ async function queryAll() {
     showMessage('五组配置查询完成；请按各层状态判断是否真正生效')
   } catch (error) {
     showMessage(String(error), true)
+  }
+}
+
+function handleReboot() {
+  requestWrite(
+    '确认安全软重启设备 (@RST)',
+    '向控制器发送软重启指令 @RST。控制器输出将在安全状态下复位，CPU 重启并重新加载 EEPROM 存储的全部配置。',
+    () => '@RST'
+  )
+}
+
+async function sendIndicatorTest(kind: 'GRN' | 'RED' | 'OFF') {
+  try {
+    const res = await maintenance.runWrite(kind)
+    if (res.status === 'ok') {
+      showMessage(`指示灯自检指令 ${kind} 已执行：${res.protocolLine}`)
+    } else {
+      showMessage(`指示灯指令失败：${res.error || res.protocolLine}`, true)
+    }
+  } catch (err) {
+    showMessage(String(err), true)
+  }
+}
+
+async function sendDirectCommand(rawCmd?: string) {
+  const cmd = (rawCmd !== undefined ? rawCmd : customCommandInput.value).trim()
+  if (!cmd) return
+  try {
+    const res = await maintenance.runWrite(cmd)
+    if (res.status === 'ok') {
+      showMessage(`指令 ${cmd} 执行成功：${res.protocolLine}`)
+      if (rawCmd === undefined) customCommandInput.value = ''
+    } else {
+      showMessage(`指令失败：${res.error || res.protocolLine}`, true)
+    }
+  } catch (err) {
+    showMessage(String(err), true)
   }
 }
 
@@ -277,6 +318,9 @@ onMounted(() => {
             <small>{{ serial.connectedPort || '请使用左下角公共串口连接' }}</small>
           </div>
         </div>
+        <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" title="向控制器发送 @RST 软重启命令" @click="handleReboot">
+          <RotateCcw :size="14" /> 安全重启 (@RST)
+        </button>
         <button class="button secondary" :disabled="maintenance.isBusy" @click="exportSession">
           <Download :size="14" /> 导出记录
         </button>
@@ -325,6 +369,95 @@ onMounted(() => {
               <p>最近快照 {{ formatTime(latestSnapshotAt) }}；断开或换端口后缓存不再代表当前设备。</p>
             </div>
             <span v-if="!maintenance.snapshotPortMatches" class="stale-badge">缓存来自其他串口</span>
+          </div>
+
+          <!-- Field Quick Actions & Hardware Test Toolbar -->
+          <div class="field-toolbar-card">
+            <div class="field-toolbar-row">
+              <div class="toolbar-group">
+                <span class="toolbar-title"><Lightbulb :size="14" /> 指示灯寻机自检：</span>
+                <button
+                  class="toolbar-btn led-grn"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  title="发送 GRN 指令，绿灯常亮测试"
+                  @click="sendIndicatorTest('GRN')"
+                >
+                  绿灯 (GRN)
+                </button>
+                <button
+                  class="toolbar-btn led-red"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  title="发送 RED 指令，红灯常亮测试"
+                  @click="sendIndicatorTest('RED')"
+                >
+                  红灯 (RED)
+                </button>
+                <button
+                  class="toolbar-btn led-off"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  title="发送 OFF 指令，关闭指示灯"
+                  @click="sendIndicatorTest('OFF')"
+                >
+                  关灯 (OFF)
+                </button>
+              </div>
+
+              <div class="toolbar-group command-runner-group">
+                <span class="toolbar-title"><TerminalSquare :size="14" /> 常用指令速测：</span>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@CFG,SYS,SHOW')"
+                >
+                  @SYS
+                </button>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@CFG,ETH,SHOW')"
+                >
+                  @ETH
+                </button>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@CFG,SLE,SHOW')"
+                >
+                  @SLE
+                </button>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@CFG,IO,SHOW')"
+                >
+                  @IO
+                </button>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@DEBUG')"
+                >
+                  @DEBUG
+                </button>
+              </div>
+            </div>
+
+            <div class="custom-cmd-row">
+              <input
+                v-model="customCommandInput"
+                type="text"
+                class="custom-cmd-input mono"
+                placeholder="输入原始 UART1 指令 (如 @DEBUG=1, @CFG,SYS,SHOW, DEVINFO)..."
+                @keydown.enter="sendDirectCommand()"
+              />
+              <button
+                class="button small primary"
+                :disabled="!maintenanceReady || maintenance.isBusy || !customCommandInput.trim()"
+                @click="sendDirectCommand()"
+              >
+                <Send :size="12" /> 发送指令
+              </button>
+            </div>
           </div>
 
           <div class="summary-grid">
@@ -625,4 +758,132 @@ dd { margin: 0; font-size: 11px; font-weight: 700; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1250px) { .workspace { grid-template-columns: 164px minmax(0,1fr); } .live-rail { display: none; } .summary-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 900px) { .shared-serial-status { min-width: 0; } .shared-serial-status small { display: none; } .workspace { grid-template-columns: 52px minmax(0,1fr); } .section-item { grid-template-columns: 24px; justify-content: center; } .section-item span, .section-item > :last-child, .boundary-card { display: none; } .two-column { grid-template-columns: 1fr; } }
+
+/* Field Quick Toolbar & LED Self-Check */
+.field-toolbar-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.field-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.toolbar-btn {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn.led-grn {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+.toolbar-btn.led-grn:hover:not(:disabled) {
+  background: #bbf7d0;
+}
+
+.toolbar-btn.led-red {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+.toolbar-btn.led-red:hover:not(:disabled) {
+  background: #fecaca;
+}
+
+.toolbar-btn.led-off {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+.toolbar-btn.led-off:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.toolbar-chip {
+  font-family: monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: #ffffff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.toolbar-chip:hover:not(:disabled) {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+.toolbar-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.custom-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-cmd-input {
+  flex: 1;
+  font-size: 0.74rem;
+  padding: 4px 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  outline: none;
+}
+.custom-cmd-input:focus {
+  border-color: #0284c7;
+}
+
+.button.danger-outline {
+  color: #b91c1c;
+  background: #fff;
+  border: 1px solid #f87171;
+}
+.button.danger-outline:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
 </style>

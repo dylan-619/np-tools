@@ -253,15 +253,22 @@ export const useSerialStore = defineStore('serial', () => {
 
   async function disconnect() {
     if (!connectedPort.value) return
+    const target = connectedPort.value
     errorMsg.value = ''
+    let recordingError = ''
     try {
       if (isRecording.value) {
-        await stopRecording(connectedPort.value)
+        try {
+          await stopRecording(target)
+        } catch (err: any) {
+          recordingError = `停止录制失败: ${String(err)}`
+        }
         isRecording.value = false
       }
-      await closePort(connectedPort.value)
-      appendLog('rx', `=== 已关闭串口 ${connectedPort.value} ===`)
+      await closePort(target)
+      appendLog('rx', `=== 已关闭串口 ${target} ===`)
       connectedPort.value = null
+      if (recordingError) errorMsg.value = `${recordingError}；串口已继续关闭`
     } catch (err: any) {
       errorMsg.value = `关闭串口失败: ${String(err)}`
     }
@@ -305,7 +312,13 @@ export const useSerialStore = defineStore('serial', () => {
       txBytes.value += payload.length
       appendLog('tx', echoText)
     } catch (err: any) {
-      errorMsg.value = `发送失败: ${String(err)}`
+      const detail = String(err)
+      errorMsg.value = `发送失败: ${detail}`
+      if (/已断开|未连接|后台任务已退出|串口(?:读取|写入)失败|设备可能已断开|channel closed/i.test(detail)) {
+        appendLog('rx', `=== 串口连接已失效：${detail} ===`)
+        connectedPort.value = null
+        isRecording.value = false
+      }
       throw err
     }
   }

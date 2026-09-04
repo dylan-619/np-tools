@@ -26,6 +26,12 @@ const router = createRouter({
       meta: { title: 'SJZDV3 星闪 (SLE) 无线配置' }
     },
     {
+      path: '/devices/sjzdv3/4g',
+      name: 'SjzdFourG',
+      component: () => import('../views/devices/sjzdv3/FourGConfigView.vue'),
+      meta: { title: 'SJZDV3 4G Cat.1 / MQTT 配置' }
+    },
+    {
       path: '/devices/sjzdv3/modbus',
       name: 'SjzdModbus',
       component: () => import('../views/devices/sjzdv3/ModbusView.vue'),

@@ -12,10 +12,14 @@ import {
   Edit3,
   Eye,
   RefreshCw,
+  FileCheck,
+  Plus,
+  Trash2,
 } from 'lucide-vue-next'
 import hljs from 'highlight.js/lib/core'
 import yamlLang from 'highlight.js/lib/languages/yaml'
 import { useControllerStore } from '../../../stores/controllerStore'
+import { appSaveFile } from '../../../api/sjzdApi'
 
 // Register YAML language in highlight.js
 hljs.registerLanguage('yaml', yamlLang)
@@ -24,6 +28,31 @@ const controller = useControllerStore()
 const rawYamlText = ref(controller.getYamlString())
 const isEditing = ref(false)
 const copied = ref(false)
+const fingerprintCopied = ref(false)
+const yamlFingerprint = ref('')
+
+async function calculateFingerprint(text: string): Promise<string> {
+  try {
+    if (window.crypto?.subtle) {
+      const data = new TextEncoder().encode(text)
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+    }
+  } catch {
+    // fallback
+  }
+  let hash = 0
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash).toString(16).padStart(16, '0')
+}
+
+async function updateFingerprint() {
+  yamlFingerprint.value = await calculateFingerprint(rawYamlText.value)
+}
 
 // Sync from store when not actively in raw text editing
 watch(
@@ -31,10 +60,15 @@ watch(
   () => {
     if (!isEditing.value) {
       rawYamlText.value = controller.getYamlString()
+      updateFingerprint()
     }
   },
-  { deep: true }
+  { deep: true, immediate: true }
 )
+
+watch(rawYamlText, () => {
+  updateFingerprint()
+})
 
 // Highlighted HTML with line numbers
 const highlightedLines = computed(() => {
@@ -50,6 +84,19 @@ async function copyYaml() {
     controller.showMessage('已复制 YAML 配置代码到剪贴板！')
     setTimeout(() => {
       copied.value = false
+    }, 2000)
+  } catch (err) {
+    controller.showMessage(`复制失败: ${err}`, false)
+  }
+}
+
+async function copyFingerprint() {
+  try {
+    await navigator.clipboard.writeText(yamlFingerprint.value)
+    fingerprintCopied.value = true
+    controller.showMessage('已复制 SHA-256 配置指纹')
+    setTimeout(() => {
+      fingerprintCopied.value = false
     }, 2000)
   } catch (err) {
     controller.showMessage(`复制失败: ${err}`, false)
@@ -74,6 +121,95 @@ function handleResetFromModel() {
 function jumpToTab(tabName: any) {
   controller.activeTab = tabName
 }
+
+function ensureRequirements() {
+  if (!controller.doc.project.requirements) {
+    controller.doc.project.requirements = {
+      description: '',
+      acceptance_scenarios: [],
+      open_items: [],
+    }
+  }
+  if (!controller.doc.project.requirements.acceptance_scenarios) {
+    controller.doc.project.requirements.acceptance_scenarios = []
+  }
+}
+
+function addScenario() {
+  ensureRequirements()
+  controller.doc.project.requirements!.acceptance_scenarios!.push({
+    title: `验收场景 #${controller.doc.project.requirements!.acceptance_scenarios!.length + 1}`,
+    given: '',
+    when: '',
+    then: '',
+    status: 'pending',
+  })
+}
+
+function removeScenario(idx: number) {
+  controller.doc.project.requirements?.acceptance_scenarios?.splice(idx, 1)
+}
+
+async function exportAcceptanceMarkdown() {
+  const proj = controller.doc.project
+  const req = proj.requirements
+  const md = `# 工程验收与冻结归档报告: ${proj.name || 'KZ3工程'} (ID: ${proj.id})
+
+- **工程版本**: v${proj.version}
+- **规范标准**: kz3-project-io/v3
+- **导出时间**: ${new Date().toLocaleString()}
+- **SHA-256 配置校验指纹**: \`${yamlFingerprint.value}\`
+
+## 1. 工艺工程需求概述
+${req?.description || '暂无工艺需求描述。'}
+
+## 2. 现场验收测试用例 (Given-When-Then)
+${
+  (req?.acceptance_scenarios && req.acceptance_scenarios.length > 0)
+    ? req.acceptance_scenarios.map((s, i) => `### 用例 ${i + 1}: ${s.title} [状态: ${s.status?.toUpperCase() || 'PENDING'}]
+- **Given (初始条件)**: ${s.given || '无'}
+- **When (触发动作)**: ${s.when || '无'}
+- **Then (预期响应)**: ${s.then || '无'}
+`).join('\n')
+    : '暂无验收场景记录。'
+}
+
+## 3. 硬件与北向通信契约摘要
+- 内部物理输入点: ${proj.points.inputs.length}
+- 内部物理输出点: ${proj.points.outputs.length}
+- 应用参数数量: ${proj.application_variables.parameters.length}
+- 运行累计器数量: ${proj.runtime_counters?.length || 0}
+- 北向映射通信字段: ${proj.northbound.fields.length}
+- PID 回路数量: ${proj.pids.length}
+
+---
+*由 KZ3 工艺项目 I/O 可视化配置桌面工具自动生成 (FR-07 追溯与冻结)*
+`
+  try {
+    const savedPath = await appSaveFile(
+      `${proj.id}_验收与冻结归档报告.md`,
+      md,
+      'Markdown 报告 (*.md)',
+      'md'
+    )
+    if (savedPath) {
+      controller.showMessage(`已导出工程验收与冻结报告：${savedPath}`)
+    } else {
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${proj.id}_验收与冻结归档报告.md`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      controller.showMessage('已导出工程验收与冻结报告')
+    }
+  } catch (err) {
+    controller.showMessage(`导出报告失败: ${err}`, false)
+  }
+}
 </script>
 
 <template>
@@ -95,7 +231,7 @@ function jumpToTab(tabName: any) {
             {{ controller.warningCount }} 项优化告警
           </span>
           <span v-if="controller.errorCount === 0 && controller.warningCount === 0" class="badge-ok">
-            ✅ 全部规则校验通过 (符合 kz3-project-io/v2 规范)
+            ✅ 全部规则校验通过 (符合 kz3-project-io/v3 规范)
           </span>
         </div>
       </div>
@@ -142,6 +278,147 @@ function jumpToTab(tabName: any) {
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Requirements, Acceptance Scenarios & Freeze Panel (FR-07) -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <div class="header-left">
+          <div class="panel-title">
+            <FileCheck :size="17" class="panel-icon text-blue" />
+            <span>需求追溯、验收场景与工程冻结归档 (Requirements & Acceptance)</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button
+            class="btn btn-export"
+            title="导出包含需求、Given-When-Then 用例与 SHA-256 指纹的验收归档报告"
+            @click="exportAcceptanceMarkdown"
+          >
+            <Download :size="14" />
+            <span>导出验收与冻结报告</span>
+          </button>
+
+          <button
+            class="btn btn-primary"
+            @click="addScenario"
+          >
+            <Plus :size="14" />
+            <span>添加验收场景</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <!-- Freeze fingerprint strip -->
+        <div class="fingerprint-bar">
+          <div class="fp-left">
+            <span class="fp-badge">SHA-256 配置校验指纹</span>
+            <code class="fp-code">{{ yamlFingerprint || '正在计算…' }}</code>
+            <button class="btn-copy-fp" :title="fingerprintCopied ? '已复制' : '复制指纹'" @click="copyFingerprint">
+              <Check v-if="fingerprintCopied" :size="13" class="text-green" />
+              <Copy v-else :size="13" />
+              <span>{{ fingerprintCopied ? '已复制' : '复制' }}</span>
+            </button>
+          </div>
+          <div class="fp-right">
+            <span class="fp-meta">规范：kz3-project-io/v3</span>
+            <span class="fp-meta">版本：v{{ controller.doc.project.version }}</span>
+          </div>
+        </div>
+
+        <!-- Project Requirements Description -->
+        <div class="requirements-section">
+          <label class="section-subheading">工艺需求总体概述 (Process Requirements Overview)</label>
+          <textarea
+            v-if="controller.doc.project.requirements"
+            v-model="controller.doc.project.requirements.description"
+            class="requirements-textarea"
+            rows="2"
+            placeholder="简要描述本工程的工艺流程、控制目标、设备联锁关系及安全门禁要求..."
+          ></textarea>
+        </div>
+
+        <!-- Acceptance Scenarios Grid -->
+        <div class="scenarios-section">
+          <div class="scenarios-header-row">
+            <span class="section-subheading">现场验收测试场景 (Given-When-Then Scenarios)</span>
+            <span class="text-muted font-mono" style="font-size: 0.72rem;">
+              共 {{ controller.doc.project.requirements?.acceptance_scenarios?.length || 0 }} 个验收场景
+            </span>
+          </div>
+
+          <div
+            v-if="controller.doc.project.requirements?.acceptance_scenarios && controller.doc.project.requirements.acceptance_scenarios.length > 0"
+            class="scenarios-stack"
+          >
+            <div
+              v-for="(sc, idx) in controller.doc.project.requirements.acceptance_scenarios"
+              :key="idx"
+              class="scenario-card"
+            >
+              <div class="scenario-card-header">
+                <div class="sc-title-row">
+                  <span class="sc-idx">#{{ idx + 1 }}</span>
+                  <input
+                    v-model="sc.title"
+                    type="text"
+                    class="sc-title-input font-bold"
+                    placeholder="如 循环泵联动自启动测试"
+                  />
+                  <select v-model="sc.status" class="sc-status-select" :class="`status-${sc.status || 'pending'}`">
+                    <option value="pending">待验证 (PENDING)</option>
+                    <option value="passed">已通过 (PASSED)</option>
+                    <option value="failed">未通过 (FAILED)</option>
+                  </select>
+                </div>
+                <button
+                  class="btn-icon btn-danger"
+                  title="删除此验收场景"
+                  @click="removeScenario(idx)"
+                >
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+
+              <div class="gwt-grid">
+                <div class="gwt-col">
+                  <span class="gwt-label gwt-given">GIVEN (前提)</span>
+                  <input
+                    v-model="sc.given"
+                    type="text"
+                    class="gwt-input"
+                    placeholder="如 系统处于待机态且水位高于安全限"
+                  />
+                </div>
+                <div class="gwt-col">
+                  <span class="gwt-label gwt-when">WHEN (触发)</span>
+                  <input
+                    v-model="sc.when"
+                    type="text"
+                    class="gwt-input"
+                    placeholder="如 下发启动命令或温差超过阈值"
+                  />
+                </div>
+                <div class="gwt-col">
+                  <span class="gwt-label gwt-then">THEN (预期)</span>
+                  <input
+                    v-model="sc.then"
+                    type="text"
+                    class="gwt-input"
+                    placeholder="如 水泵 DO 接通且启动运行计时器"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-scenarios">
+            <span>暂未添加现场验收测试场景。点击右上角“添加验收场景”以 Given-When-Then 标准规范沉淀验收测试用例。</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -573,4 +850,213 @@ function jumpToTab(tabName: any) {
 .yaml-raw-textarea { min-height: 260px; }
 .empty-cell { padding: 20px; }
 .btn { min-height: var(--control-height-dense); padding: 4px 9px; border-radius: var(--radius-xs); }
+
+/* Requirements, Acceptance Scenarios & Freeze */
+.btn-export {
+  background: #176b45;
+  border-color: #176b45;
+  color: #fff;
+}
+.btn-export:hover {
+  background: #115c3a;
+}
+
+.fingerprint-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+}
+
+.fp-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fp-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.fp-code {
+  font-family: monospace;
+  font-size: 0.74rem;
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.btn-copy-fp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.68rem;
+  cursor: pointer;
+  color: #475569;
+}
+.btn-copy-fp:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.fp-right {
+  display: flex;
+  gap: 10px;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.section-subheading {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.requirements-section {
+  margin-bottom: 14px;
+}
+
+.requirements-textarea {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  color: #1e293b;
+  outline: none;
+  resize: vertical;
+}
+.requirements-textarea:focus {
+  border-color: #0284c7;
+}
+
+.scenarios-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.scenarios-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scenario-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scenario-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.sc-idx {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.sc-title-input {
+  flex: 1;
+  max-width: 320px;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.sc-status-select {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  outline: none;
+  cursor: pointer;
+}
+.sc-status-select.status-pending { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+.sc-status-select.status-passed { background: #dcfce7; color: #166534; border-color: #86efac; }
+.sc-status-select.status-failed { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+.gwt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.gwt-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gwt-label {
+  font-size: 0.65rem;
+  font-family: monospace;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  width: fit-content;
+}
+.gwt-given { background: #e0f2fe; color: #0369a1; }
+.gwt-when { background: #fef3c7; color: #92400e; }
+.gwt-then { background: #dcfce7; color: #15803d; }
+
+.gwt-input {
+  font-size: 0.76rem;
+  padding: 4px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1e293b;
+  outline: none;
+}
+.gwt-input:focus {
+  border-color: #0284c7;
+}
+
+.empty-scenarios {
+  padding: 16px;
+  text-align: center;
+  font-size: 0.76rem;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+}
 </style>

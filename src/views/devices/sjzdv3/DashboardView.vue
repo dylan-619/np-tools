@@ -7,6 +7,7 @@ import {
   Lightbulb,
   Zap,
   Download,
+  RotateCcw,
 } from 'lucide-vue-next'
 import * as echarts from 'echarts'
 import { useSjzdStore } from '../../../stores/sjzdStore'
@@ -40,6 +41,12 @@ function exportAiCsv() {
   a.click()
   a.remove()
   sjzd.showMessage(`已导出 ${sjzd.aiHistory.length} 条模拟量采样记录！`)
+}
+
+function clearAiHistory() {
+  sjzd.aiHistory.length = 0
+  updateChartOption()
+  sjzd.showMessage('已清空曲线采样历史')
 }
 
 function initChart() {
@@ -166,13 +173,32 @@ onUnmounted(() => {
     <!-- Header -->
     <header class="view-header">
       <div class="title-col">
-        <h2>实时数据看板与硬件诊断</h2>
+        <div class="title-with-badge">
+          <h2>实时数据看板与硬件诊断</h2>
+          <span
+            class="sampling-badge"
+            :class="sjzd.isSamplingAi ? 'badge-running' : 'badge-idle'"
+          >
+            <span class="badge-dot" :class="{ pulse: sjzd.isSamplingAi }" />
+            {{ sjzd.isSamplingAi ? '连续采样中 (1Hz)' : '采样就绪' }}
+          </span>
+        </div>
         <p class="subtitle">
           实时监测 2 路 4~20mA 模拟量电流输入，绘制动态平滑趋势曲线，并支持硬件双色 LED 状态灯检测。
         </p>
       </div>
 
       <div class="actions-col">
+        <button
+          class="btn btn-outline"
+          :disabled="sjzd.aiHistory.length === 0"
+          title="清空当前图表采样历史数据"
+          @click="clearAiHistory"
+        >
+          <RotateCcw :size="14" />
+          <span>清空曲线</span>
+        </button>
+
         <button
           class="btn btn-secondary"
           :disabled="sjzd.aiHistory.length === 0"
@@ -187,19 +213,21 @@ onUnmounted(() => {
           v-if="!sjzd.isSamplingAi"
           class="btn btn-primary"
           :disabled="!serial.connectedPort || sjzd.isBusy"
+          title="启动模拟量持续采样 (AITEST 1Hz)"
           @click="sjzd.startAiSampling"
         >
           <Play :size="14" />
-          <span>启动持续采样 (AITEST 1Hz)</span>
+          <span>启动持续采样</span>
         </button>
 
         <button
           v-else
           class="btn btn-danger"
+          title="停止采样测试 (TESTSTOP)"
           @click="sjzd.stopAiSampling"
         >
           <Square :size="14" />
-          <span>停止采样 (TESTSTOP)</span>
+          <span>停止采样</span>
         </button>
       </div>
     </header>
@@ -332,22 +360,79 @@ onUnmounted(() => {
 
 .view-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
   flex-wrap: wrap;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--color-border-subtle, #d5dde4);
   background: var(--color-surface-1, #ffffff);
   border-radius: var(--radius-sm, 5px);
 }
 
-.title-col h2 {
-  margin: 0 0 3px 0;
+.title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title-with-badge h2 {
+  margin: 0;
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-main, #17212b);
 }
+
+.sampling-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.badge-running {
+  background: rgba(16, 185, 129, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+.badge-idle {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badge-dot.pulse {
+  background: #16a34a;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+  animation: badge-pulse 1.8s infinite;
+}
+@keyframes badge-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+.actions-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .subtitle {
   margin: 0;
   font-size: 0.74rem;
@@ -592,35 +677,63 @@ onUnmounted(() => {
 
 .btn {
   min-height: var(--control-height, 32px);
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius-xs, 3px);
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   border: 1px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s ease;
 }
+
 .btn-primary {
   background: var(--accent, #1769aa);
-  color: #fff;
+  color: #ffffff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover, #1769aa);
+  background: var(--accent-hover, #0d5289);
 }
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--color-border-subtle, #cbd5e1);
+  color: var(--text-main, #17212b);
+}
+.btn-outline:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
 .btn-danger {
-  background: #a12d34;
-  color: #fff;
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.25);
 }
 .btn-danger:hover:not(:disabled) {
-  background: #dc2626;
+  background: #ef4444;
+  color: #ffffff;
 }
+
 .btn:disabled {
   background: var(--color-surface-1, #ffffff);
   border-color: var(--color-border-subtle, #d5dde4);
   color: var(--color-text-disabled, #667784);
-  opacity: 1;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 </style>

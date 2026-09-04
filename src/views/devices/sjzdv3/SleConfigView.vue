@@ -66,6 +66,7 @@ async function sendAtCommand(customCmd?: string) {
 
 onMounted(() => {
   if (serial.connectedPort) {
+    sjzd.queryWlanType()
     sjzd.querySleConfig()
   }
 })
@@ -93,6 +94,18 @@ onMounted(() => {
         </button>
       </div>
     </header>
+
+    <!-- 4G Mode Active Alert Banner -->
+    <div v-if="sjzd.wlanTypeInfo.mode === '4G'" class="mode-alert-banner">
+      <AlertCircle :size="18" class="banner-icon-amber" />
+      <div class="banner-content">
+        <strong>提示：当前设备处于【4G Cat.1 模式】(UART2 115200bps)。</strong>
+        <span>星闪无线模组未激活。如需使用星闪通信，请在 4G 配置页切换模式。</span>
+      </div>
+      <router-link to="/devices/sjzdv3/4g" class="btn btn-sm btn-outline">
+        前往 4G 配置
+      </router-link>
+    </div>
 
     <!-- Top SLE Metrics Grid -->
     <div class="metrics-grid">
@@ -995,6 +1008,30 @@ onMounted(() => {
   color: var(--color-text-disabled, #667784);
   opacity: 1;
   cursor: not-allowed;
+}
+
+.mode-alert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm, 5px);
+  color: #92400e;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+.banner-icon-amber {
+  color: #d97706;
+  flex-shrink: 0;
+}
+.banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
 }
 
 .spin {

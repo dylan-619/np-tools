@@ -29,7 +29,6 @@ const BLOCKED_PREFIXES = [
   '@EEP=0',
   '@CLR_E2P',
   '@CLR_LUA',
-  '@RST',
   'SN:',
   '@REPORTFREQSEC:',
   '@POC=0',
@@ -64,8 +63,13 @@ function assertAsciiCommand(command: string): string {
 function isAllowedCommand(command: string): boolean {
   return (
     Object.values(KZ3_QUERY_COMMANDS).includes(command) ||
+    command === '@RST' ||
+    command === 'GRN' ||
+    command === 'RED' ||
+    command === 'OFF' ||
     /^@CFG,SYS,SN,\d{12}$/.test(command) ||
     /^@CFG,ETH,(IP|MASK|GW|PORT),[^,]+$/.test(command) ||
+    /^@CFG,ETH,INIT,[^,]+,[^,]+,[^,]+,\d+$/.test(command) ||
     command === `@CFG,SLE,ADDR,${KZ3_SLE_FIXED_ADDRESS}` ||
     command === `@CFG,SLE,APID,${KZ3_SLE_FIXED_APID}` ||
     /^@CFG,SLE,(PWR|MAXPWR|MODE),[^,]+$/.test(command) ||
@@ -128,9 +132,8 @@ function normalizeUint(value: string, minimum: number, maximum: number, name: st
 export function buildIdentityCommand(serialNumber: string): string {
   const value = serialNumber.trim()
   if (!/^\d{12}$/.test(value)) throw new Error('SN 必须是 12 位十进制数字')
-  if (!value.startsWith('0203')) throw new Error('当前 KZ3 F427 固件只接受 0203 开头的 SN')
   const address = Number(value.slice(8))
-  if (address < 1 || address > 2047) throw new Error('SN 最后四位地址必须在 0001~2047')
+  if (address < 1 || address > 2047) throw new Error('SN 最后四位设备地址必须在 0001~2047')
   return validateKz3Command(`@CFG,SYS,SN,${value}`)
 }
 
@@ -189,6 +192,106 @@ export function buildRoleCommand(role: Kz3SystemRole, address: string): string {
 export function buildDebugCommand(enabled: boolean): string {
   return enabled ? '@DEBUG=1' : '@DEBUG=0'
 }
+
+export function buildRebootCommand(): string {
+  return validateKz3Command('@RST')
+}
+
+export function buildIndicatorCommand(kind: 'GRN' | 'RED' | 'OFF'): string {
+  return validateKz3Command(kind)
+}
+
+export interface PresetCommandItem {
+  name: string
+  cmd: string
+  description: string
+  category: 'query' | 'config' | 'action' | 'led'
+  danger?: 'none' | 'low' | 'high'
+  confirmPrompt?: string
+}
+
+export const KZ3_PRESET_COMMANDS: PresetCommandItem[] = [
+  {
+    name: '查询生产身份',
+    cmd: '@CFG,SYS,SHOW',
+    description: '查询 EEPROM 生产身份记录 (12位 SN、产品类型、设备地址、有效性标志)',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '查询以太网状态',
+    cmd: '@CFG,ETH,SHOW',
+    description: '查询 Ethernet 运行值 (RUN) 与保存值 (SAVED)、重启需求及物理网线 Link 状态',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '查询星闪无线状态',
+    cmd: '@CFG,SLE,SHOW',
+    description: '查询 SLE 地址、网络名、发射功率、模组 READY、MAC 及本轮 AT 参数确认状态',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '查询系统角色',
+    cmd: '@CFG,IO,SHOW',
+    description: '查询本次活动角色 (CONTROLLER / RTU_SLAVE) 与 EEPROM 下次启动保存角色',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '查询调试日志状态',
+    cmd: '@DEBUG',
+    description: '查询 UART1 调试日志持久化开关 (@DEBUG=0/1)',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '开启调试日志',
+    cmd: '@DEBUG=1',
+    description: '开启详细调试日志输出并写入 EEPROM',
+    category: 'config',
+    danger: 'low',
+    confirmPrompt: '确定开启 UART1 详细调试日志输出？',
+  },
+  {
+    name: '关闭调试日志',
+    cmd: '@DEBUG=0',
+    description: '关闭调试日志以保持终端整洁 (OK/ERR 维护回包仍保留)',
+    category: 'config',
+    danger: 'low',
+    confirmPrompt: '确定关闭 UART1 调试日志输出？',
+  },
+  {
+    name: '点亮绿灯 (GRN)',
+    cmd: 'GRN',
+    description: '点亮控制器面板绿色运行指示灯 (测试硬件通道，不修改持久化配置)',
+    category: 'led',
+    danger: 'none',
+  },
+  {
+    name: '点亮红灯 (RED)',
+    cmd: 'RED',
+    description: '点亮控制器面板红色告警指示灯 (测试硬件通道，不修改持久化配置)',
+    category: 'led',
+    danger: 'none',
+  },
+  {
+    name: '关闭指示灯 (OFF)',
+    cmd: 'OFF',
+    description: '关闭控制器面板状态指示灯',
+    category: 'led',
+    danger: 'none',
+  },
+  {
+    name: '安全软件重启 (@RST)',
+    cmd: '@RST',
+    description: '通知核心任务确认安全输出后执行软件复位；使保存的以太网和系统角色生效',
+    category: 'action',
+    danger: 'high',
+    confirmPrompt: '危险操作：控制器即将安全关断输出并执行软件复位！现场设备将短暂离线，是否继续？',
+  },
+]
 
 export function getCommandGroup(command: string): Kz3ConfigGroup {
   if (command.startsWith('@CFG,SYS,')) return 'system'

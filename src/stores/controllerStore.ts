@@ -11,7 +11,7 @@ import { KZ3_BOARD_DEF, PROFILE_CATALOG } from '../utils/controllerIoCatalog'
 import { serializeProjectIoYaml, deserializeProjectIoYaml } from '../utils/yamlHelper'
 import { appSaveFile, appOpenFile } from '../api/sjzdApi'
 
-const DEFAULT_MARQUEE_YAML = `schema: kz3-project-io/v2
+const DEFAULT_MARQUEE_YAML = `schema: kz3-project-io/v3
 
 project:
   name: 扩展DO北向启停跑马灯
@@ -85,7 +85,8 @@ project:
     debounces: []
     filters: []
     rate_limits: []
-    runtimes: []
+
+  runtime_counters: []
 
   northbound:
     protocols: [sle, http, modbus_tcp]
@@ -264,6 +265,27 @@ export const useControllerStore = defineStore('controller', () => {
         value: `state.${st.name}`,
         type: st.c_type,
         category: 'state',
+      })
+    }
+    // 6. Runtime Counters (FR-04/FR-05)
+    for (const rc of doc.value.project.runtime_counters || []) {
+      list.push({
+        label: `[运行时间清零] runtime.${rc.name}.clear (BOOL, 可写脉冲)`,
+        value: `runtime.${rc.name}.clear`,
+        type: 'bool',
+        category: 'runtime',
+      })
+      list.push({
+        label: `[清零处理中] runtime.${rc.name}.clear_pending (BOOL, 只读)`,
+        value: `runtime.${rc.name}.clear_pending`,
+        type: 'bool',
+        category: 'runtime',
+      })
+      list.push({
+        label: `[累计运行秒数] runtime.${rc.name}.seconds (U32, 只读)`,
+        value: `runtime.${rc.name}.seconds`,
+        type: 'u32',
+        category: 'runtime',
       })
     }
     return list
@@ -487,6 +509,15 @@ export const useControllerStore = defineStore('controller', () => {
             message: `系统状态 '${f.bind}' 必须为只读 (read)`,
           })
         }
+        if (f.bind.startsWith('runtime.') && !f.bind.endsWith('.clear') && f.access === 'read_write') {
+          issues.push({
+            code: 'RUNTIME_SECONDS_CANNOT_BE_WRITTEN',
+            severity: 'error',
+            tab: 'northbound',
+            entity: `north:${f.name}`,
+            message: `运行时间字段 '${f.bind}' 必须为只读，仅 runtime.<name>.clear 允许配置为 read_write (单次清零脉冲)`,
+          })
+        }
         if ((f.bind.startsWith('parameter.') || f.bind.startsWith('command.')) && f.access === 'read') {
           issues.push({
             code: 'PARAM_CMD_SHOULD_BE_RW',
@@ -498,8 +529,14 @@ export const useControllerStore = defineStore('controller', () => {
         }
       }
 
-      // Modbus Reference 格式与地址区检查
+      // Modbus Reference 格式与地址区检查 (含 32 位连续双寄存器冲突检查)
       const refStr = String(f.reference).padStart(5, '0')
+      const refNum = parseInt(refStr, 10)
+      const is32Bit = f.c_type === 'u32' || f.c_type === 'i32' || f.c_type === 'float'
+      const registersOccupied = is32Bit && !isNaN(refNum)
+        ? [refStr, String(refNum + 1).padStart(5, '0')]
+        : [refStr]
+
       if (!/^\d{5}$/.test(refStr)) {
         issues.push({
           code: 'INVALID_MODBUS_REF',
@@ -509,18 +546,66 @@ export const useControllerStore = defineStore('controller', () => {
           message: `Modbus 地址 '${f.reference}' 格式错误，必须为 5 位数字 (如 00001, 10001, 30001, 40001)`,
         })
       } else {
-        if (usedModbusRefs.has(refStr)) {
-          issues.push({
-            code: 'DUPLICATE_MODBUS_REF',
-            severity: 'error',
-            tab: 'northbound',
-            entity: `north:${f.name}`,
-            message: `Modbus 地址 '${refStr}' 与其他字段冲突`,
-          })
-        } else {
-          usedModbusRefs.add(refStr)
+        for (const reg of registersOccupied) {
+          if (usedModbusRefs.has(reg)) {
+            issues.push({
+              code: 'DUPLICATE_MODBUS_REF',
+              severity: 'error',
+              tab: 'northbound',
+              entity: `north:${f.name}`,
+              message: `Modbus 寄存器地址 '${reg}' 发生重叠冲突 (32位字段 ${f.name} 占用连续 2 个寄存器)`,
+            })
+          } else {
+            usedModbusRefs.add(reg)
+          }
         }
       }
+    }
+
+    // 5. 运行时间累计器检查 (FR-04)
+    const rcNames = new Set<string>()
+    for (const rc of p.runtime_counters || []) {
+      if (!rc.name || !/^[a-zA-Z0-9_.-]{1,48}$/.test(rc.name)) {
+        issues.push({
+          code: 'INVALID_RUNTIME_COUNTER_NAME',
+          severity: 'error',
+          tab: 'variables',
+          entity: `runtime:${rc.name}`,
+          message: `运行时间累计器名称 '${rc.name}' 格式不合法：必须由字母/数字/下划线组成 (最长48字符)`,
+        })
+      } else if (rcNames.has(rc.name)) {
+        issues.push({
+          code: 'DUPLICATE_RUNTIME_COUNTER_NAME',
+          severity: 'error',
+          tab: 'variables',
+          entity: `runtime:${rc.name}`,
+          message: `运行时间累计器名称 '${rc.name}' 重复`,
+        })
+      } else {
+        rcNames.add(rc.name)
+      }
+
+      if (!rc.trigger?.bind) {
+        issues.push({
+          code: 'EMPTY_RUNTIME_TRIGGER_BIND',
+          severity: 'error',
+          tab: 'variables',
+          entity: `runtime:${rc.name}`,
+          message: `运行时间累计器 '${rc.name}' 未指定触发绑定点 (trigger.bind)`,
+        })
+      }
+    }
+
+    // 6. 持久化参数容量检查 (FR-04)
+    const persistentParams = p.application_variables.parameters.filter((param) => param.persistent)
+    if (persistentParams.length > 32) {
+      issues.push({
+        code: 'PERSISTENT_PARAMS_CAPACITY_EXCEEDED',
+        severity: 'warning',
+        tab: 'variables',
+        entity: 'parameters',
+        message: `持久化参数数量为 ${persistentParams.length}，超过固件推荐的 EEPROM 32 个持久化参数容量上限`,
+      })
     }
 
     return issues
@@ -673,6 +758,32 @@ export const useControllerStore = defineStore('controller', () => {
 
   function removePid(index: number) {
     doc.value.project.pids.splice(index, 1)
+  }
+
+  function addRuntimeCounter(bind?: string) {
+    if (!doc.value.project.runtime_counters) {
+      doc.value.project.runtime_counters = []
+    }
+    const count = doc.value.project.runtime_counters.length + 1
+    const defaultBind = bind || (doc.value.project.points.inputs[0]?.name
+      ? `point.${doc.value.project.points.inputs[0]?.name}`
+      : 'point.device_running_feedback')
+    doc.value.project.runtime_counters.push({
+      id: `rc_${Date.now()}`,
+      name: `device_${count.toString().padStart(2, '0')}`,
+      description: `设备运行反馈累计秒数`,
+      trigger: {
+        bind: defaultBind,
+        active_value: true,
+        quality: 'good',
+      },
+    })
+  }
+
+  function removeRuntimeCounter(index: number) {
+    if (doc.value.project.runtime_counters) {
+      doc.value.project.runtime_counters.splice(index, 1)
+    }
   }
 
   function addNorthboundField(f?: Partial<NorthboundField>) {
@@ -872,8 +983,44 @@ export const useControllerStore = defineStore('controller', () => {
       }
     }
 
+    // 6. Runtime Counters -> Coil 0xxxx (clear, RW one-shot), DI 1xxxx (clear_pending, RO), IR 3xxxx (seconds, U32 2 Reg)
+    for (const rc of doc.value.project.runtime_counters || []) {
+      fields.push({
+        id: `nb_${Date.now()}_${rc.name}_clear`,
+        name: `runtime.${rc.name}.clear`,
+        bind: `runtime.${rc.name}.clear`,
+        c_type: 'bool',
+        access: 'read_write',
+        reference: coilRef.toString().padStart(5, '0'),
+        description: `${rc.description || rc.name} 运行时间清零 (one-shot)`,
+      })
+      coilRef++
+
+      fields.push({
+        id: `nb_${Date.now()}_${rc.name}_pending`,
+        name: `runtime.${rc.name}.clear_pending`,
+        bind: `runtime.${rc.name}.clear_pending`,
+        c_type: 'bool',
+        access: 'read',
+        reference: diRef.toString().padStart(5, '0'),
+        description: `${rc.description || rc.name} 清零操作持久化中`,
+      })
+      diRef++
+
+      fields.push({
+        id: `nb_${Date.now()}_${rc.name}_sec`,
+        name: `runtime.${rc.name}.seconds`,
+        bind: `runtime.${rc.name}.seconds`,
+        c_type: 'u32',
+        access: 'read',
+        reference: irRef.toString().padStart(5, '0'),
+        description: `${rc.description || rc.name} 累计运行秒数 (U32, 2 Reg)`,
+      })
+      irRef += 2
+    }
+
     doc.value.project.northbound.fields = fields
-    showMessage(`已自动生成 ${fields.length} 个北向通信映射字段 (含 DI/DO/AI/AO 准确数据类型与 Modbus 地址)！`)
+    showMessage(`已自动生成 ${fields.length} 个北向通信映射字段 (含 DI/DO/AI/AO/参数/命令/运行时间)！`)
   }
 
   // ==============================================================================
@@ -886,7 +1033,7 @@ export const useControllerStore = defineStore('controller', () => {
       showMessage('已载入《扩展 DO 北向跑马灯》工程配置模板')
     } else if (presetKey === 'blank') {
       doc.value = {
-        schema: 'kz3-project-io/v2',
+        schema: 'kz3-project-io/v3',
         project: {
           name: '新工艺控制器工程',
           id: 'new_kz3_project',
@@ -917,8 +1064,8 @@ export const useControllerStore = defineStore('controller', () => {
             debounces: [],
             filters: [],
             rate_limits: [],
-            runtimes: [],
           },
+          runtime_counters: [],
           northbound: {
             protocols: ['sle', 'http', 'modbus_tcp'],
             modbus_tcp: { address_style: 'modicon_5_digit', word_order_32: 'abcd' },
@@ -1001,6 +1148,8 @@ export const useControllerStore = defineStore('controller', () => {
     removeState,
     addPid,
     removePid,
+    addRuntimeCounter,
+    removeRuntimeCounter,
     addNorthboundField,
     removeNorthboundField,
     getSourceType,

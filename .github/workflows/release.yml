@@ -2,6 +2,8 @@ name: 'Release and Build Installers'
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -54,6 +56,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install
+
+      - name: Run unit tests
+        run: pnpm run test:kz3-debug
 
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v1

@@ -12,8 +12,8 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
   const hasPid = doc.project.pids.length > 0
   const hasCounter = (doc.project.logic_blocks?.counters?.length || 0) > 0
 
-  const cleanDoc = {
-    schema: doc.schema || 'kz3-project-io/v2',
+  const cleanDoc: any = {
+    schema: doc.schema || 'kz3-project-io/v3',
     project: {
       name: doc.project.name || '未命名控制器工程',
       id: doc.project.id || 'unnamed_project',
@@ -58,19 +58,23 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
           name: p.name,
           c_type: p.c_type,
           default: p.default,
+          ...(p.persistent ? { persistent: true } : {}),
           ...(p.min !== undefined ? { min: p.min } : {}),
           ...(p.max !== undefined ? { max: p.max } : {}),
           ...(p.unit ? { unit: p.unit } : {}),
           ...(p.apply ? { apply: p.apply } : {}),
+          ...(p.description ? { description: p.description } : {}),
         })),
         commands: (doc.project.application_variables?.commands || []).map((c) => ({
           name: c.name,
           c_type: c.c_type || 'bool',
+          ...(c.description ? { description: c.description } : {}),
         })),
         states: (doc.project.application_variables?.states || []).map((s) => ({
           name: s.name,
           c_type: s.c_type,
           default: s.default,
+          ...(s.description ? { description: s.description } : {}),
         })),
       },
       pids: (doc.project.pids || []).map((pid) => ({
@@ -95,8 +99,16 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
         debounces: doc.project.logic_blocks?.debounces || [],
         filters: doc.project.logic_blocks?.filters || [],
         rate_limits: doc.project.logic_blocks?.rate_limits || [],
-        runtimes: doc.project.logic_blocks?.runtimes || [],
       },
+      runtime_counters: (doc.project.runtime_counters || []).map((rc) => ({
+        name: rc.name,
+        ...(rc.description ? { description: rc.description } : {}),
+        trigger: {
+          bind: rc.trigger.bind,
+          active_value: rc.trigger.active_value ?? true,
+          quality: rc.trigger.quality || 'good',
+        },
+      })),
       northbound: {
         protocols: doc.project.northbound?.protocols || ['sle', 'http', 'modbus_tcp'],
         modbus_tcp: {
@@ -170,6 +182,7 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
     name: param.name || `param_${idx + 1}`,
     c_type: param.c_type || 'bool',
     default: param.default !== undefined ? param.default : false,
+    persistent: Boolean(param.persistent),
     min: param.min,
     max: param.max,
     unit: param.unit,
@@ -190,6 +203,18 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
     c_type: st.c_type || 'bool',
     default: st.default !== undefined ? st.default : false,
     description: st.description,
+  }))
+
+  // 映射 runtime_counters
+  const runtime_counters = (p.runtime_counters || []).map((rc: any, idx: number) => ({
+    id: `rc_${Date.now()}_${idx}`,
+    name: rc.name || `counter_${idx + 1}`,
+    description: rc.description || '',
+    trigger: {
+      bind: rc.trigger?.bind || '',
+      active_value: rc.trigger?.active_value !== undefined ? Boolean(rc.trigger.active_value) : true,
+      quality: rc.trigger?.quality || 'good',
+    },
   }))
 
   // 映射 pids
@@ -221,7 +246,7 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
   }))
 
   return {
-    schema: raw.schema || 'kz3-project-io/v2',
+    schema: raw.schema || 'kz3-project-io/v3',
     project: {
       name: p.name || '未命名工程',
       id: p.id || 'unnamed_project',
@@ -265,6 +290,7 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
         rate_limits: p.logic_blocks?.rate_limits || [],
         runtimes: p.logic_blocks?.runtimes || [],
       },
+      runtime_counters,
       northbound: {
         protocols: p.northbound?.protocols || ['sle', 'http', 'modbus_tcp'],
         modbus_tcp: {

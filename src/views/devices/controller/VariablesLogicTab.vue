@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   Plus,
   Trash2,
@@ -8,13 +8,15 @@ import {
   Activity,
   Gauge,
   Info,
+  Clock,
+  HardDrive,
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const controller = useControllerStore()
 
-const subTab = ref<'parameters' | 'commands' | 'states' | 'pids'>('parameters')
+const subTab = ref<'parameters' | 'commands' | 'states' | 'pids' | 'runtimes'>('parameters')
 
 const cTypeOptions = [
   { label: '布尔值 (bool)', value: 'bool' },
@@ -29,6 +31,20 @@ const directionOptions = [
   { label: '正动作 (Direct)', value: 'direct' },
   { label: '反动作 (Reverse)', value: 'reverse' },
 ]
+
+const activeValueOptions = [
+  { label: '高电平/真 (true)', value: true },
+  { label: '低电平/假 (false)', value: false },
+]
+
+const qualityOptions = [
+  { label: '必须有效 (good)', value: 'good' },
+  { label: '任意质量 (any)', value: 'any' },
+]
+
+const persistentCount = computed(() => {
+  return controller.doc.project.application_variables.parameters.filter((p) => p.persistent).length
+})
 </script>
 
 <template>
@@ -77,6 +93,15 @@ const directionOptions = [
               <Gauge :size="14" />
               <span>PID 回路 ({{ controller.doc.project.pids.length }})</span>
             </button>
+
+            <button
+              class="sub-tab-btn"
+              :class="{ active: subTab === 'runtimes' }"
+              @click="subTab = 'runtimes'"
+            >
+              <Clock :size="14" />
+              <span>运行累计 ({{ controller.doc.project.runtime_counters?.length || 0 }})</span>
+            </button>
           </div>
         </div>
 
@@ -116,23 +141,41 @@ const directionOptions = [
             <Plus :size="14" />
             <span>添加 PID 回路</span>
           </button>
+
+          <button
+            v-if="subTab === 'runtimes'"
+            class="btn btn-primary"
+            @click="controller.addRuntimeCounter()"
+          >
+            <Plus :size="14" />
+            <span>添加运行累计器</span>
+          </button>
         </div>
       </div>
 
       <div class="panel-body">
         <!-- 1. Parameters Table -->
         <div v-if="subTab === 'parameters'" class="table-responsive">
+          <div class="param-persistent-banner" :class="{ warn: persistentCount > 32 }">
+            <div class="banner-left">
+              <HardDrive :size="15" />
+              <span>掉电保持参数：<strong>{{ persistentCount }}</strong> / 32</span>
+              <span v-if="persistentCount > 32" class="persistent-warn-text">⚠️ 保持参数超过 32 项推荐上限，写入下发可能受 EEPROM 扇区容量限制</span>
+              <span v-else class="persistent-tip-text">勾选“保持”的参数在掉电后自动存入内部 EEPROM，重启时不丢失；写入后下个扫描周期生效</span>
+            </div>
+          </div>
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 50px;">#</th>
-                <th style="width: 220px;">参数名称 (name)</th>
-                <th style="width: 180px;">类型 (c_type)</th>
-                <th style="width: 140px;">默认值 (default)</th>
-                <th style="width: 100px;">最小值 (min)</th>
-                <th style="width: 100px;">最大值 (max)</th>
-                <th style="width: 100px;">工程单位</th>
-                <th style="width: 70px; text-align: center;">操作</th>
+                <th style="width: 45px;">#</th>
+                <th style="width: 200px;">参数名称 (name)</th>
+                <th style="width: 170px;">类型 (c_type)</th>
+                <th style="width: 120px;">默认值 (default)</th>
+                <th style="width: 90px;">最小值 (min)</th>
+                <th style="width: 90px;">最大值 (max)</th>
+                <th style="width: 90px;">工程单位</th>
+                <th style="width: 100px; text-align: center;">掉电保持</th>
+                <th style="width: 60px; text-align: center;">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -195,6 +238,17 @@ const directionOptions = [
                   />
                 </td>
                 <td style="text-align: center;">
+                  <label class="persistent-toggle-label" :title="param.persistent ? '掉电保持：写入控制器内部 EEPROM' : '非保持：重启后恢复默认值'">
+                    <input
+                      v-model="param.persistent"
+                      type="checkbox"
+                    />
+                    <span class="persistent-pill" :class="{ active: param.persistent }">
+                      {{ param.persistent ? '保持' : '非保持' }}
+                    </span>
+                  </label>
+                </td>
+                <td style="text-align: center;">
                   <button
                     class="btn-icon btn-danger"
                     title="删除参数"
@@ -206,7 +260,7 @@ const directionOptions = [
               </tr>
 
               <tr v-if="controller.doc.project.application_variables.parameters.length === 0">
-                <td colspan="8" class="empty-cell">
+                <td colspan="9" class="empty-cell">
                   暂无参数定义，点击右上角“添加参数”。
                 </td>
               </tr>
@@ -469,6 +523,90 @@ const directionOptions = [
             <Info :size="32" class="empty-icon" />
             <p>当前项目未配置任何 PID 闭环控制回路，点击右上角“添加 PID 回路”。</p>
           </div>
+        </div>
+
+        <!-- 5. Runtime Counters Table -->
+        <div v-if="subTab === 'runtimes'" class="table-responsive">
+          <div class="runtime-intro-banner">
+            <Clock :size="16" class="text-blue banner-icon" />
+            <div class="intro-text">
+              <div class="intro-title">设备运行时间累计器 (Runtime Hour Counters)</div>
+              <div class="intro-desc">
+                根据绑定的布尔信号自动按秒累计持续运行时间。自动在北向生成 <code>runtime.&lt;name&gt;.seconds</code> (只读 U32 累计秒数)、<code>runtime.&lt;name&gt;.clear</code> (读写 BOOL 复位触发) 与 <code>runtime.&lt;name&gt;.clear_pending</code> (只读 BOOL 正在复位)。
+              </div>
+            </div>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 45px; text-align: center;">#</th>
+                <th style="width: 180px;">累计器名称 (name)</th>
+                <th style="min-width: 200px;">触发信号绑定 (trigger.bind)</th>
+                <th style="width: 150px;">有效电平 (active_value)</th>
+                <th style="width: 150px;">质量门禁 (quality)</th>
+                <th>功能描述 (description)</th>
+                <th style="width: 60px; text-align: center;">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(rc, idx) in (controller.doc.project.runtime_counters || [])"
+                :key="rc.id"
+              >
+                <td class="text-center text-muted font-mono">{{ idx + 1 }}</td>
+                <td>
+                  <input
+                    v-model="rc.name"
+                    type="text"
+                    class="table-cell-input text-mono font-bold"
+                    placeholder="如 pump1_run"
+                  />
+                </td>
+                <td>
+                  <CustomSelect
+                    v-model="rc.trigger.bind"
+                    :options="controller.availableBindTargets.filter((t) => t.type === 'bool' || !t.type)"
+                  />
+                </td>
+                <td>
+                  <CustomSelect
+                    v-model="rc.trigger.active_value"
+                    :options="activeValueOptions"
+                  />
+                </td>
+                <td>
+                  <CustomSelect
+                    v-model="rc.trigger.quality"
+                    :options="qualityOptions"
+                  />
+                </td>
+                <td>
+                  <input
+                    v-model="rc.description"
+                    type="text"
+                    class="table-cell-input"
+                    placeholder="如 1# 循环泵累计运行时间"
+                  />
+                </td>
+                <td style="text-align: center;">
+                  <button
+                    class="btn-icon btn-danger"
+                    title="删除累计器"
+                    @click="controller.removeRuntimeCounter(idx)"
+                  >
+                    <Trash2 :size="14" />
+                  </button>
+                </td>
+              </tr>
+
+              <tr v-if="!controller.doc.project.runtime_counters || controller.doc.project.runtime_counters.length === 0">
+                <td colspan="7" class="empty-cell">
+                  暂无运行时间累计器，点击右上角“添加运行累计器”为泵/阀等设备建立工时与维护监控。
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -747,4 +885,107 @@ const directionOptions = [
 .table-cell-input { min-height: var(--control-height-dense); padding: 4px 7px; }
 .empty-cell { padding: 20px; }
 .btn { min-height: var(--control-height-dense); padding: 4px 9px; border-radius: var(--radius-xs); }
+
+/* Persistent Parameter Banner & Pills */
+.param-persistent-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  font-size: 0.76rem;
+  color: #166534;
+}
+
+.param-persistent-banner.warn {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.persistent-warn-text {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.persistent-tip-text {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.persistent-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.persistent-toggle-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.persistent-pill {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.persistent-pill.active {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+/* Runtime Counters Intro Banner */
+.runtime-intro-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.runtime-intro-banner .banner-icon {
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: #2563eb;
+}
+
+.intro-text .intro-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1e40af;
+  margin-bottom: 2px;
+}
+
+.intro-text .intro-desc {
+  font-size: 0.73rem;
+  color: #3b82f6;
+  line-height: 1.4;
+}
+
+.intro-desc code {
+  background: rgba(37, 99, 235, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.7rem;
+}
 </style>

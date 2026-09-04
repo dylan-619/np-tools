@@ -6,6 +6,7 @@ import {
   TerminalSquare,
   Cpu,
   Radio,
+  Wifi,
   TableProperties,
   Activity,
   Wrench,
@@ -44,24 +45,9 @@ const { width } = useWindowSize()
 const isDebugRoute = computed(() => route.name === 'ControllerDebug')
 const isMonitorRoute = computed(() => route.name === 'ControllerMonitor')
 const isMaintenanceRoute = computed(() => route.name === 'ControllerMaintenance')
-const isXtqCoordinatorRoute = computed(() => route.name === 'XtqCoordinator')
-const isControllerFocusRoute = computed(() => isDebugRoute.value || isMonitorRoute.value)
+const isXtqCoordinatorRoute = computed(() => route.name === 'XtqCoordinator' || route.path.includes('/devices/xtq-coordinator'))
 const isNarrowWindow = computed(() => width.value <= 960)
 const isCompact = computed(() => collapsed.value)
-let collapsedBeforeControllerFocus = false
-
-watch(
-  isControllerFocusRoute,
-  (focused, wasFocused) => {
-    if (focused && !wasFocused) {
-      collapsedBeforeControllerFocus = collapsed.value
-      collapsed.value = true
-    } else if (!focused && wasFocused) {
-      collapsed.value = collapsedBeforeControllerFocus
-    }
-  },
-  { immediate: true }
-)
 
 watch(
   isNarrowWindow,
@@ -126,41 +112,41 @@ function groupIsCollapsed(group: ProductGroup) {
             class="nav-item"
             :class="{ active: route.name === 'ControllerProduct' }"
             aria-label="I/O 可视化配置工作台"
-            title="I/O 可视化配置工作台"
+            title="I/O 可视化配置工作台 (工程组态/点表/变量/北向)"
             @click="navigateTo('/devices/controller')"
           >
             <Cpu :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">I/O 可视化配置工作台</span>
           </button>
           <button
-            class="nav-item"
-            :class="{ active: isMonitorRoute }"
-            aria-label="KZ3 I/O 拓扑监测"
-            title="KZ3 I/O 拓扑监测"
-            @click="navigateTo('/devices/controller/monitor')"
+            class="nav-item commissioning-item"
+            :class="{ active: isDebugRoute }"
+            aria-label="KZ3 在线调试工作台"
+            title="KZ3 在线调试工作台 (HTTP点位监视与受控写入)"
+            @click="navigateTo('/devices/controller/debug')"
           >
-            <LayoutDashboard :size="16" class="nav-icon" />
-            <span v-if="!isCompact" class="nav-text">I/O 拓扑监测</span>
+            <Activity :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">在线调试工作台</span>
           </button>
           <button
             class="nav-item"
             :class="{ active: isMaintenanceRoute }"
             aria-label="KZ3 UART1 设备维护"
-            title="KZ3 UART1 设备维护"
+            title="KZ3 UART1 设备维护 (生产SN/以太网/SLE/角色)"
             @click="navigateTo('/devices/controller/maintenance')"
           >
             <Wrench :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">UART1 设备维护</span>
           </button>
           <button
-            class="nav-item commissioning-item"
-            :class="{ active: isDebugRoute }"
-            aria-label="KZ3 在线调试工作台"
-            title="KZ3 在线调试工作台"
-            @click="navigateTo('/devices/controller/debug')"
+            class="nav-item"
+            :class="{ active: isMonitorRoute }"
+            aria-label="KZ3 I/O 拓扑监测"
+            title="KZ3 I/O 拓扑监测 (硬件机架与通道状态)"
+            @click="navigateTo('/devices/controller/monitor')"
           >
-            <Activity :size="16" class="nav-icon" />
-            <span v-if="!isCompact" class="nav-text">在线调试工作台</span>
+            <LayoutDashboard :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">I/O 拓扑监测</span>
           </button>
         </nav>
       </div>
@@ -229,6 +215,17 @@ function groupIsCollapsed(group: ProductGroup) {
           >
             <Radio :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">星闪 (SLE) 无线配置</span>
+          </button>
+
+          <button
+            class="nav-item"
+            :class="{ active: route.path === '/devices/sjzdv3/4g' }"
+            aria-label="4G Cat.1 / MQTT 配置"
+            title="4G Cat.1 / MQTT 配置"
+            @click="navigateTo('/devices/sjzdv3/4g')"
+          >
+            <Wifi :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">4G Cat.1 / MQTT 配置</span>
           </button>
 
           <button
@@ -315,7 +312,7 @@ function groupIsCollapsed(group: ProductGroup) {
     </div>
 
     <!-- Bottom Global Serial Connection Box -->
-    <div v-if="!isControllerFocusRoute" class="sidebar-footer">
+    <div class="sidebar-footer">
       <GlobalSerialBar :compact="isCompact" />
     </div>
   </aside>

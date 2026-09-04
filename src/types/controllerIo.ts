@@ -93,6 +93,7 @@ export interface ParameterConfig {
   max?: number
   unit?: string
   apply?: 'next_scan'
+  persistent?: boolean  // 显式申请掉电保持 (占用 EEPROM 参数存储槽位)
   description?: string
 }
 
@@ -109,6 +110,17 @@ export interface StateConfig {
   c_type: 'bool' | 'u16' | 'u32' | 'i16' | 'i32' | 'float'
   default: boolean | number
   description?: string
+}
+
+export interface RuntimeCounterConfig {
+  id: string
+  name: string
+  description?: string
+  trigger: {
+    bind: string
+    active_value: boolean
+    quality?: 'good' | 'any'
+  }
 }
 
 export interface PidConfig {
@@ -138,7 +150,7 @@ export interface NorthboundField {
 }
 
 export interface ProjectIoDocument {
-  schema: string        // 'kz3-project-io/v2'
+  schema: string        // 'kz3-project-io/v3' 或 'kz3-project-io/v2'
   project: {
     name: string
     id: string
@@ -171,8 +183,10 @@ export interface ProjectIoDocument {
       debounces: any[]
       filters: any[]
       rate_limits: any[]
-      runtimes: any[]
+      runtimes?: any[]
     }
+    runtime_counters?: RuntimeCounterConfig[]
+    requirements?: ProjectRequirements
     northbound: {
       protocols: string[]
       modbus_tcp: {
@@ -182,6 +196,20 @@ export interface ProjectIoDocument {
       fields: NorthboundField[]
     }
   }
+}
+
+export interface AcceptanceScenario {
+  title: string
+  given: string
+  when: string
+  then: string
+  status?: 'passed' | 'pending' | 'failed'
+}
+
+export interface ProjectRequirements {
+  description?: string
+  acceptance_scenarios?: AcceptanceScenario[]
+  open_items?: string[]
 }
 
 // ==============================================================================

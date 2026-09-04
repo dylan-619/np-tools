@@ -13,6 +13,7 @@ import {
   Copy,
   Sparkles,
   Activity,
+  Wifi,
   X,
 } from 'lucide-vue-next'
 import { useSjzdStore } from '../../../stores/sjzdStore'
@@ -144,6 +145,7 @@ onMounted(() => {
   }
   if (serial.connectedPort) {
     sjzd.queryDeviceInfo()
+    sjzd.queryWlanType()
   }
 })
 </script>
@@ -304,6 +306,20 @@ onMounted(() => {
           <div class="breakdown-item">
             <span class="b-label">周期上报频率 (RptFreq)：</span>
             <span class="b-value mono-text">{{ sjzd.deviceInfo.reportFreqSec !== undefined ? `${sjzd.deviceInfo.reportFreqSec} 秒` : '--' }}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label"><Wifi :size="13" style="display:inline;vertical-align:-2px;margin-right:2px;" /> 无线通信模式 (WLAN)：</span>
+            <div class="b-value-wrap">
+              <span class="b-value mono-text highlight">
+                {{ sjzd.wlanTypeInfo.mode === '4G' ? '4G Cat.1 模式 (115200bps)' : '星闪 (SLE) 模式 (230400bps)' }}
+              </span>
+              <router-link
+                :to="sjzd.wlanTypeInfo.mode === '4G' ? '/devices/sjzdv3/4g' : '/devices/sjzdv3/sle'"
+                class="inline-link-btn"
+              >
+                {{ sjzd.wlanTypeInfo.mode === '4G' ? '4G 配置' : '星闪配置' }}
+              </router-link>
+            </div>
           </div>
           <div v-if="sjzd.deviceInfo.rawText" class="breakdown-item full-width">
             <span class="b-label">最新回读原始响应：</span>
@@ -589,6 +605,22 @@ onMounted(() => {
 
 .inline-copy-btn.copied {
   color: #176b45;
+}
+
+.inline-link-btn {
+  font-size: 0.69rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #0f5f9e;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.inline-link-btn:hover {
+  background: #0f5f9e;
+  color: #ffffff;
 }
 
 .metric-icon {

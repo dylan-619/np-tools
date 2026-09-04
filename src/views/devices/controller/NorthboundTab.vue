@@ -38,9 +38,35 @@ function getModbusZoneTag(refStr: string) {
   return { label: '自定义', class: 'zone-gray' }
 }
 
+function isDoubleRegister(cType: string) {
+  return ['u32', 'i32', 'float'].includes(cType)
+}
+
+function calculateEndRef(refStr: string): string {
+  const num = parseInt(refStr, 10)
+  if (isNaN(num)) return ''
+  return String(num + 1).padStart(5, '0')
+}
+
 function toggleAccess(idx: number) {
   const f = controller.doc.project.northbound.fields[idx]
-  f.access = f.access === 'read_write' ? 'read' : 'read_write'
+  if (f.access === 'read') {
+    const b = f.bind || ''
+    const isAllowedRW =
+      b.startsWith('parameter.') ||
+      b.startsWith('command.') ||
+      (b.startsWith('runtime.') && b.endsWith('.clear'))
+    if (!isAllowedRW) {
+      controller.showMessage(
+        `安全规约限制：实体 "${b || '未绑定'}" 为输入/状态只读量，不允许配置为读写权限 (RW)。仅参数 (parameter)、命令 (command) 及运行时间清零 (runtime.*.clear) 允许写入。`,
+        false
+      )
+      return
+    }
+    f.access = 'read_write'
+  } else {
+    f.access = 'read'
+  }
 }
 
 function onBindChange(fieldIdx: number, newBind: string) {
@@ -48,10 +74,14 @@ function onBindChange(fieldIdx: number, newBind: string) {
   f.bind = newBind
 
   // 智能推导 access 与 c_type
-  if (newBind.startsWith('point.') || newBind.startsWith('state.')) {
-    f.access = 'read'
-  } else if (newBind.startsWith('parameter.') || newBind.startsWith('command.')) {
+  if (
+    newBind.startsWith('parameter.') ||
+    newBind.startsWith('command.') ||
+    (newBind.startsWith('runtime.') && newBind.endsWith('.clear'))
+  ) {
     f.access = 'read_write'
+  } else {
+    f.access = 'read'
   }
 
   const target = controller.availableBindTargets.find((t) => t.value === newBind)
@@ -144,6 +174,11 @@ async function exportNorthboundCsv() {
           <span class="chip-code">40001..49999</span>
           <span class="chip-name">Holding Regs (数值 读写)</span>
         </div>
+      </div>
+
+      <div class="spec-footer-guidance">
+        <span class="guidance-label">💡 现场说明：</span>
+        <span>北向 5 位 Modbus 地址为外部 SCADA/云端访问控制器的标准 Base 1 协议地址；南向 RTU 扩展设备中的 PDU 地址为内部从站轮询偏移（Base 0），两者独立互不干扰。32 位字段（U32/I32/Float）自动连续占用 2 个寄存器。</span>
       </div>
     </div>
 
@@ -260,6 +295,13 @@ async function exportNorthboundCsv() {
                   <span class="ref-zone-tag" :class="getModbusZoneTag(f.reference).class">
                     {{ getModbusZoneTag(f.reference).label }}
                   </span>
+                  <span
+                    v-if="isDoubleRegister(f.c_type)"
+                    class="reg-width-tag"
+                    :title="`32位类型连续占用 2 个 Modbus 寄存器：${f.reference} ~ ${calculateEndRef(f.reference)}`"
+                  >
+                    2 Reg
+                  </span>
                 </div>
               </td>
               <td style="text-align: center;">
@@ -372,6 +414,23 @@ async function exportNorthboundCsv() {
 .zone-amber { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.25); color: #7a4b00; }
 .zone-purple { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.25); color: #6f3a96; }
 .zone-gray { background: #eef3f7; border-color: #d5dde4; color: #40515f; }
+
+.spec-footer-guidance {
+  width: 100%;
+  font-size: 0.72rem;
+  color: #4b5563;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 5px;
+  padding: 5px 10px;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.guidance-label {
+  font-weight: 700;
+  color: #0369a1;
+}
 
 .panel-card {
   background: var(--bg-panel, #ffffff);
@@ -519,6 +578,18 @@ async function exportNorthboundCsv() {
   padding: 2px 5px;
   border-radius: 3px;
   white-space: nowrap;
+}
+
+.reg-width-tag {
+  font-size: 0.62rem;
+  font-family: monospace;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
 }
 
 .text-mono { font-family: monospace; }
