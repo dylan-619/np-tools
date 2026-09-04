@@ -67,7 +67,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v1
