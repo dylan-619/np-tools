@@ -55,6 +55,22 @@ flowchart TD
 
 ---
 
+## 2.1 当前固件接口适配状态（2026-09-05）
+
+> 本节是对下方早期功能规划的现行协议覆盖说明。SJZDV3 固件已补齐结构化控制台接口；工具侧不得再根据旧版 `[EEPROM]`、`[CHIP]`、`saved` 或普通调试日志推断成功。
+
+| 场景 | 固件现行契约 | NP-Tools 当前判定 |
+|---|---|---|
+| 配置读取 | `SLE_CONFIG`、`4G_CONFIG`、`RS485_CONFIG` 均使用 `BEGIN/payload/END`，带 `id`、version、revision、count、CRC32 | 只在同一事务 ID、payload 数量和 CRC32 通过后更新页面；`END status=ERROR` 表示读取完整，但配置或运行条件不满足 |
+| 保存 | `<FEATURE>_CONFIG:SAVED,revision,hash,status,restart` | 先校验保存回执，再完整 LIST，并要求 `revision` 一致；不会把单条旧日志标记为 EEPROM 已确认 |
+| 星闪透传 | `SLE_BRIDGE:ACK` 和透传状态查询 `SLE_BRIDGE:LIST` | ACK 是唯一实时状态来源；状态未知先查询；透传 active 时禁止下发 MCU 配置、查询和诊断命令，AT 指令仅在 ACK 确认透传后可发 |
+| Modbus 单点诊断 | `MB_DEBUG:BEGIN/TX/RX/DATA/RESULT/END` | 成功必须有同一 ID 的全部证据；异常、超时、CRC/I/O 错、缺 END 或其他 ID 均不会显示为成功 |
+| 4G 密码 | `4G_CONFIG:IDENTITY` 仅回传 `password=set/empty` | 不保存或显示密码明文；写后仅复核“已设置/未设置”状态 |
+
+工具侧已经执行主机协议自测（CRC32、截断/损坏列表、错误终态、保存回执、桥接、Modbus 事务）和构建检查；尚未完成目标板 UART trace、SLE/4G/RS485 链路、掉电保持和 HIL 验证，不能将主机自测描述为实板通过。
+
+---
+
 ## 3. 功能需求规格说明
 
 ### 模块一：串口连接与通信管理 (Connection Manager)

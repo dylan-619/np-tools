@@ -144,8 +144,12 @@ onMounted(() => {
     inputSn.value = saved
   }
   if (serial.connectedPort) {
-    sjzd.queryDeviceInfo()
-    sjzd.queryWlanType()
+    void (async () => {
+      const bridge = await sjzd.queryWlanBridge()
+      if (!bridge || bridge.active) return
+      await sjzd.queryDeviceInfo()
+      await sjzd.queryWlanType()
+    })()
   }
 })
 </script>

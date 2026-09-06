@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { computed, ref, onMounted, watch, nextTick } from 'vue'
 import {
   Plus,
   Trash2,
@@ -30,6 +30,7 @@ import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
+const MAX_MODBUS_POINTS = 100
 
 const showResetModal = ref(false)
 // Keep the capture console out of the way until a test starts or the user opens it.
@@ -40,6 +41,9 @@ const selectedPreset = ref('')
 const copiedAll = ref(false)
 const copiedLineIndex = ref<number | null>(null)
 const debugLogsRef = ref<HTMLElement | null>(null)
+const mcuConsoleReady = computed(
+  () => Boolean(sjzd.wlanBridgeStatus && !sjzd.wlanBridgeStatus.active)
+)
 
 watch(
   () => sjzd.modbusDebugLogs.length,
@@ -73,8 +77,8 @@ function onDataTypeChanged(pt: ModbusPointConfig) {
 }
 
 function addPoint() {
-  if (sjzd.modbusPoints.length >= 16) {
-    sjzd.showMessage('点位数量已达到上限 (最多 16 个)', false)
+  if (sjzd.modbusPoints.length >= MAX_MODBUS_POINTS) {
+    sjzd.showMessage(`点位数量已达到上限 (最多 ${MAX_MODBUS_POINTS} 个)`, false)
     return
   }
   sjzd.modbusPoints.push({
@@ -112,6 +116,42 @@ async function triggerSinglePointDebug(pt: ModbusPointConfig) {
   showDebugDrawer.value = true
   activeDebugPoint.value = pt
   await sjzd.debugModbusPoint(pt)
+}
+
+function debugStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: '等待结果',
+    ok: '响应有效',
+    exception: '从站异常',
+    timeout: '响应超时',
+    crc_error: 'CRC 错误',
+    short_frame: '短帧',
+    overflow: '接收溢出',
+    unexpected_response: '功能码不匹配',
+    malformed_length: '长度不匹配',
+    busy: 'RS485 忙',
+    invalid: '参数无效',
+    parse_error: '命令解析失败',
+    io_error: '串口 I/O 错误',
+    protocol_error: '诊断协议不完整',
+  }
+  return labels[status] || status
+}
+
+async function exportModbusDebugReport() {
+  const content = sjzd.exportModbusDebugReport()
+  if (!content || !sjzd.lastModbusDebugReport) {
+    sjzd.showMessage('尚无可导出的单点诊断报告', false)
+    return
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const path = await appSaveFile(
+    `SJZDV3-Modbus单点诊断-${timestamp}.json`,
+    content,
+    'SJZDV3 Modbus 单点诊断报告',
+    'json'
+  )
+  sjzd.showMessage(path ? `单点诊断报告已导出：${path}` : '未选择诊断报告导出位置', Boolean(!path))
 }
 
 async function copyAllDebugLogs() {
@@ -152,8 +192,8 @@ function clearDebugLogs() {
 }
 
 function clonePoint(index: number) {
-  if (sjzd.modbusPoints.length >= 16) {
-    sjzd.showMessage('点位数量已达到上限 (最多 16 个)', false)
+  if (sjzd.modbusPoints.length >= MAX_MODBUS_POINTS) {
+    sjzd.showMessage(`点位数量已达到上限 (最多 ${MAX_MODBUS_POINTS} 个)`, false)
     return
   }
   const source = sjzd.modbusPoints[index]
@@ -196,7 +236,7 @@ function parsePointsContent(fileName: string, content: string) {
   if (fileName.endsWith('.json')) {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) {
-      sjzd.modbusPoints = parsed.slice(0, 16).map((p: any) => ({
+      sjzd.modbusPoints = parsed.slice(0, MAX_MODBUS_POINTS).map((p: any) => ({
         slaveAddr: Number(p.slaveAddr) || 1,
         funcCode: Number(p.funcCode) || 3,
         regAddr: Number(p.regAddr) || 40001,
@@ -204,7 +244,11 @@ function parsePointsContent(fileName: string, content: string) {
         dataType: Number(p.dataType) || 0,
         byteOrder: Number(p.byteOrder) || 0,
       }))
-      sjzd.showMessage(`已成功导入 ${sjzd.modbusPoints.length} 个点位配置！`)
+      sjzd.showMessage(
+        parsed.length > MAX_MODBUS_POINTS
+          ? `已导入前 ${MAX_MODBUS_POINTS} 个点位；源文件其余 ${parsed.length - MAX_MODBUS_POINTS} 个未写入。`
+          : `已成功导入 ${sjzd.modbusPoints.length} 个点位配置！`
+      )
     }
   } else if (fileName.endsWith('.csv')) {
     const lines = content.split('\n').map((l) => l.trim()).filter(Boolean)
@@ -222,8 +266,12 @@ function parsePointsContent(fileName: string, content: string) {
         })
       }
     }
-    sjzd.modbusPoints = newPoints.slice(0, 16)
-    sjzd.showMessage(`已从 CSV 成功导入 ${sjzd.modbusPoints.length} 个点位！`)
+    sjzd.modbusPoints = newPoints.slice(0, MAX_MODBUS_POINTS)
+    sjzd.showMessage(
+      newPoints.length > MAX_MODBUS_POINTS
+        ? `已导入前 ${MAX_MODBUS_POINTS} 个点位；CSV 其余 ${newPoints.length - MAX_MODBUS_POINTS} 个未写入。`
+        : `已从 CSV 成功导入 ${sjzd.modbusPoints.length} 个点位！`
+    )
   }
 }
 
@@ -334,7 +382,11 @@ function handleFileImport(event: Event) {
 onMounted(() => {
   if (serial.connectedPort) {
     sjzd.modbusPoints = []
-    sjzd.queryModbusPoints()
+    void (async () => {
+      const bridge = await sjzd.queryWlanBridge()
+      if (!bridge || bridge.active) return
+      await sjzd.queryModbusPoints()
+    })()
   } else {
     sjzd.modbusPoints = []
   }
@@ -348,7 +400,7 @@ onMounted(() => {
       <div class="title-col">
         <h2>Modbus RTU 扩展从站轮询点位管理</h2>
         <p class="subtitle">
-          直观表格化维护最多 16 个下挂仪表与从站点位，具备 32 位类型自动纠错、批量下发、模板导入导出与单点调试功能。
+          直观表格化维护最多 100 个下挂仪表与从站点位，具备 32 位类型自动纠错、保存回执与完整快照 revision 复核、模板导入导出和结构化单点调试功能。
         </p>
       </div>
 
@@ -356,12 +408,22 @@ onMounted(() => {
         <div class="toolbar-group">
           <button
             class="btn btn-secondary"
-            :disabled="!serial.connectedPort || sjzd.isBusy"
+            :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
             @click="handleReadFromDevice"
-            title="从设备回读当前点位表 (RS485DEV:LIST)"
+            title="获取设备当前完整点位快照（校验 RS485_CONFIG 事务 ID、count 与 CRC32）"
           >
             <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
-            <span>从设备回读</span>
+            <span>获取完整快照</span>
+          </button>
+
+          <button
+            class="btn btn-secondary"
+            :disabled="!serial.connectedPort || sjzd.isBusy"
+            title="查询 UART1 透传状态；透传开启时不会下发 RS485 MCU 命令"
+            @click="sjzd.queryWlanBridge"
+          >
+            <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
+            <span>查询桥接</span>
           </button>
 
           <div class="preset-dropdown-wrapper">
@@ -394,7 +456,7 @@ onMounted(() => {
         <div class="toolbar-group toolbar-group-primary">
           <button
             class="btn btn-primary"
-            :disabled="!serial.connectedPort || sjzd.modbusPoints.length === 0 || sjzd.isBusy"
+            :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.modbusPoints.length === 0 || sjzd.isBusy"
             @click="sjzd.saveModbusPoints"
           >
             <Send :size="14" />
@@ -403,7 +465,7 @@ onMounted(() => {
 
           <button
             class="btn btn-danger-soft"
-            :disabled="!serial.connectedPort || sjzd.isBusy"
+            :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
             @click="showResetModal = true"
             title="清空所有从站点位 (RS485DEV:RESET)"
           >
@@ -418,7 +480,11 @@ onMounted(() => {
     <div class="table-card">
       <div class="table-top-bar">
         <div class="bar-left">
-          <span class="count-badge">当前已配置: {{ sjzd.modbusPoints.length }} / 16</span>
+          <span class="count-badge">当前已配置: {{ sjzd.modbusPoints.length }} / {{ MAX_MODBUS_POINTS }}</span>
+          <span v-if="sjzd.modbusConfigSnapshot" class="instruction-hint mono-text">
+            <Info :size="13" />
+            完整快照 id={{ sjzd.modbusConfigSnapshot.transactionId }} · {{ sjzd.modbusConfigSnapshot.revisionHex }} · CRC32 {{ sjzd.modbusConfigSnapshot.crc32 }}
+          </span>
           <span class="instruction-hint">
             <Info :size="13" />
             选择 32 位整型/浮点数类型时，读取长度将自动强制约束为 ≥ 2 个寄存器。
@@ -427,7 +493,7 @@ onMounted(() => {
 
         <button
           class="btn btn-sm btn-primary-soft"
-          :disabled="sjzd.modbusPoints.length >= 16"
+          :disabled="sjzd.modbusPoints.length >= MAX_MODBUS_POINTS"
           @click="addPoint"
         >
           <Plus :size="14" />
@@ -523,7 +589,7 @@ onMounted(() => {
                   <button
                     class="action-btn test"
                     title="单点调试 (RS485DEV:DEBUG)"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                     @click="triggerSinglePointDebug(pt)"
                   >
                     <Play :size="13" />
@@ -531,7 +597,7 @@ onMounted(() => {
                   <button
                     class="action-btn"
                     title="复制点位 (Clone)"
-                    :disabled="sjzd.modbusPoints.length >= 16"
+                    :disabled="sjzd.modbusPoints.length >= MAX_MODBUS_POINTS"
                     @click="clonePoint(idx)"
                   >
                     <Copy :size="13" />
@@ -565,7 +631,7 @@ onMounted(() => {
 
             <tr v-if="sjzd.modbusPoints.length === 0">
               <td colspan="8" class="empty-table">
-                设备当前未配置点位，可点击上方【添加点位】、【导入模板】或连接串口后点击【从设备回读】
+                设备当前完整快照为空，可点击上方【添加点位】、【导入模板】或连接串口后点击【获取完整快照】；只有 <code>RS485_CONFIG:END</code> 的 count 与 CRC32 通过后，空表才表示设备无点位配置。
               </td>
             </tr>
           </tbody>
@@ -610,6 +676,33 @@ onMounted(() => {
       </div>
 
       <div v-if="showDebugDrawer" class="debug-body">
+        <section
+          v-if="sjzd.lastModbusDebugReport"
+          class="diagnostic-report"
+          :class="{ failed: sjzd.lastModbusDebugReport.status !== 'ok' }"
+        >
+          <div class="report-heading">
+            <div>
+              <strong>单点原始日志诊断</strong>
+              <span>{{ debugStatusLabel(sjzd.lastModbusDebugReport.status) }}</span>
+            </div>
+            <button
+              class="debug-btn copy-btn"
+              title="导出本次单点诊断 JSON"
+              @click="exportModbusDebugReport"
+            >
+              <Download :size="13" />导出报告
+            </button>
+          </div>
+          <p>{{ sjzd.lastModbusDebugReport.message }}</p>
+          <div class="report-facts">
+            <span><small>请求</small><code>{{ sjzd.lastModbusDebugReport.request.txHex || '固件未回报' }}</code></span>
+            <span><small>数据区</small><code>{{ sjzd.lastModbusDebugReport.response.dataHex || '—' }}</code></span>
+            <span><small>解析值</small><code>{{ sjzd.lastModbusDebugReport.decodedValue || '—' }}</code></span>
+          </div>
+          <small v-if="sjzd.lastModbusDebugReport.decodeWarning" class="report-warning">{{ sjzd.lastModbusDebugReport.decodeWarning }}</small>
+          <small class="report-boundary">报告仅接受同一事务 ID 的 <code>MB_DEBUG:RESULT/END</code>；成功还要求 <code>BEGIN/TX/RX/DATA</code> 齐全。不等同于持续轮询、物理层或仪表量程 HIL 通过。</small>
+        </section>
         <div ref="debugLogsRef" class="debug-logs">
           <div
             v-for="(log, i) in sjzd.modbusDebugLogs"
@@ -951,8 +1044,106 @@ onMounted(() => {
 }
 
 .debug-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px 10px;
   background: var(--bg-app, #edf1f4);
+}
+
+.diagnostic-report {
+  padding: 9px 10px;
+  border: 1px solid #94cbb0;
+  border-left: 3px solid #208452;
+  border-radius: 4px;
+  background: #f2fbf5;
+}
+
+.diagnostic-report.failed {
+  border-color: #e2a0a0;
+  border-left-color: #c94747;
+  background: #fff7f7;
+}
+
+.report-heading,
+.report-heading > div,
+.report-facts,
+.report-facts span {
+  display: flex;
+  align-items: center;
+}
+
+.report-heading {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-heading > div {
+  gap: 7px;
+}
+
+.report-heading strong {
+  font-size: 0.73rem;
+}
+
+.report-heading span {
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: #176b45;
+  background: #dcf3e5;
+  font-size: 0.63rem;
+}
+
+.diagnostic-report.failed .report-heading span {
+  color: #a42e2e;
+  background: #fde3e3;
+}
+
+.diagnostic-report p,
+.report-warning,
+.report-boundary {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--text-muted, #40515f);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.report-facts {
+  gap: 1px;
+  margin-top: 8px;
+  background: rgba(80, 103, 118, 0.16);
+}
+
+.report-facts span {
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.report-facts small {
+  color: var(--text-muted, #40515f);
+  font-size: 0.6rem;
+}
+
+.report-facts code {
+  max-width: 100%;
+  overflow: hidden;
+  font: 0.64rem var(--font-mono, monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-warning {
+  color: #8a5f00;
+}
+
+.report-boundary {
+  color: #7b6438;
 }
 
 .debug-logs {

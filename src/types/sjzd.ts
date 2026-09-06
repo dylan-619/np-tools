@@ -9,6 +9,96 @@ export interface ModbusPointConfig {
   unit?: string          // e.g. "℃", "MPa", "mA"
 }
 
+/** SJZDV3 配置结构化协议中的功能域。 */
+export type SjzdConfigFeature = 'SLE' | '4G' | 'RS485'
+
+/**
+ * 已通过同一事务 ID、payload 数量与 CRC32 校验的配置快照证据。
+ * `deviceStatus=ERROR` 表示快照传输完整，但设备明确报告该配置或运行条件有问题。
+ */
+export interface SjzdConfigSnapshotEvidence {
+  transactionId: number
+  revision: number
+  revisionHex: string
+  payloadCount: number
+  crc32: string
+  deviceStatus: 'OK' | 'ERROR'
+  code?: string
+  completedAt: string
+}
+
+/** 保存结果由固件写后读校验完成后输出；仍须再做 LIST revision 复核。 */
+export interface SjzdConfigSaveReceipt {
+  feature: SjzdConfigFeature
+  status: 'OK' | 'ERROR'
+  revision?: number
+  hash?: string
+  restart?: string
+  code?: string
+  receivedAt: string
+}
+
+/** UART1 到 UART2 透传的固件确认帧。 */
+export interface SjzdBridgeStatus {
+  transactionId: number
+  requested: boolean
+  active: boolean
+  uartOwner: 'MCU' | 'SLE' | '4G'
+  wireless: 'SLE' | '4G'
+  status: 'OK' | 'ERROR'
+  code?: string
+  confirmedAt: string
+}
+
+export type ModbusDebugReportStatus =
+  | 'pending'
+  | 'ok'
+  | 'exception'
+  | 'timeout'
+  | 'crc_error'
+  | 'short_frame'
+  | 'overflow'
+  | 'unexpected_response'
+  | 'malformed_length'
+  | 'busy'
+  | 'invalid'
+  | 'parse_error'
+  | 'io_error'
+  | 'protocol_error'
+
+/** 单点 Modbus 串口诊断证据；只有完整 `MB_DEBUG:RESULT/END` 才能为终态。 */
+export interface ModbusDebugReport {
+  schema: 'np-tools.sjzd-modbus-debug-report.v1'
+  point: ModbusPointConfig
+  port: string
+  startedAt: string
+  completedAt?: string
+  status: ModbusDebugReportStatus
+  message: string
+  request: {
+    transactionId?: number
+    pointRevision?: number
+    plcAddress?: number
+    protoAddress?: number
+    timeoutMs?: number
+    txHex?: string
+  }
+  response: {
+    addr?: number
+    func?: number
+    byteCount?: number
+    dataHex?: string
+    crc?: string
+    exceptionCode?: number
+    expectedByteCount?: number
+    rxHex?: string
+    code?: string
+  }
+  decodedValue?: string
+  decodeWarning?: string
+  rawLines: string[]
+}
+
 export interface SleConfigDto {
   netName: string
   apId: number
@@ -21,6 +111,8 @@ export interface SleFieldComparison {
   eepromVal: string
   chipVal: string
   isMatched: boolean
+  /** 芯片未就绪/非 SLE 模式时，没有可比较的运行时字段。 */
+  isComparable?: boolean
 }
 
 export interface SleCurrentStatus {
@@ -32,6 +124,9 @@ export interface SleCurrentStatus {
   mac?: string
   mode?: number
   bridge?: number
+  chipAvailable?: boolean
+  snapshot?: SjzdConfigSnapshotEvidence
+  lastSave?: SjzdConfigSaveReceipt
   lastSyncTime?: string
 }
 
@@ -131,6 +226,8 @@ export interface FourGStatusInfo {
   retryReason?: string
   hasReadback?: boolean
   configErrors?: string[]
+  snapshot?: SjzdConfigSnapshotEvidence
+  lastSave?: SjzdConfigSaveReceipt
 }
 
 export const FOUR_G_EMPTY_CONFIG: FourGConfigDto = {

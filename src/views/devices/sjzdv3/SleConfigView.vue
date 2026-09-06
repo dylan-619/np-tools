@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import {
   Radio,
   RefreshCw,
@@ -26,6 +26,9 @@ const serial = useSerialStore()
 const atInput = ref('SEL_GETNAME?')
 const atHistory = ref<string[]>([])
 const copiedMac = ref(false)
+const mcuConsoleReady = computed(
+  () => Boolean(sjzd.wlanBridgeStatus && !sjzd.wlanBridgeStatus.active)
+)
 
 async function copyMac(mac?: string) {
   const text = mac || sjzd.sleCurrentStatus?.mac
@@ -49,6 +52,10 @@ const powerOptions = Object.entries(SLE_TX_POWER_MAP).map(([k, v]) => ({
 async function sendAtCommand(customCmd?: string) {
   const cmd = (typeof customCmd === 'string' ? customCmd : atInput.value).trim()
   if (!cmd || !serial.connectedPort) return
+  if (cmd !== '@WLAN=0' && cmd !== '@WLAN=1' && !sjzd.wlanBridgeStatus?.active) {
+    sjzd.showMessage('请先通过 SLE_BRIDGE:ACK 确认已开启 UART1 透传，再发送星闪 AT 指令', false)
+    return
+  }
   if (!atHistory.value.includes(cmd)) {
     atHistory.value.push(cmd)
   }
@@ -64,10 +71,16 @@ async function sendAtCommand(customCmd?: string) {
   }
 }
 
+async function refreshSleConfiguration() {
+  const bridge = await sjzd.queryWlanBridge()
+  if (!bridge || bridge.active) return
+  await sjzd.queryWlanType()
+  await sjzd.querySleConfig()
+}
+
 onMounted(() => {
   if (serial.connectedPort) {
-    sjzd.queryWlanType()
-    sjzd.querySleConfig()
+    void refreshSleConfiguration()
   }
 })
 </script>
@@ -79,7 +92,7 @@ onMounted(() => {
       <div class="title-col">
         <h2>星闪 (NearLink / SLE) 无线网络配置</h2>
         <p class="subtitle">
-          配置采集终端星闪模组的 AP ID、网络名称、发射功率，支持 EEPROM 与模组芯片双向参数比对及 AT 透传调试。
+          配置采集终端星闪模组的 AP ID、网络名称、发射功率；仅在同一事务 ID、数量和 CRC32 通过后展示 EEPROM 与芯片快照，并提供受 ACK 保护的 AT 透传调试。
         </p>
       </div>
 
@@ -87,10 +100,10 @@ onMounted(() => {
         <button
           class="btn btn-primary"
           :disabled="!serial.connectedPort || sjzd.isBusy"
-          @click="sjzd.querySleConfig"
+          @click="refreshSleConfiguration"
         >
           <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
-          <span>查询比对配置 (SLE:LIST)</span>
+          <span>查询完整配置 (SLE:LIST)</span>
         </button>
       </div>
     </header>
@@ -105,6 +118,15 @@ onMounted(() => {
       <router-link to="/devices/sjzdv3/4g" class="btn btn-sm btn-outline">
         前往 4G 配置
       </router-link>
+    </div>
+
+    <div v-if="sjzd.wlanBridgeStatus?.active" class="mode-alert-banner">
+      <ShieldAlert :size="18" class="banner-icon-amber" />
+      <div class="banner-content">
+        <strong>UART1 已确认透传到 {{ sjzd.wlanBridgeStatus.uartOwner }}。</strong>
+        <span>MCU 配置查询和写入已被工具阻止；请先退出透传，再执行 SLE 配置操作。</span>
+      </div>
+      <button class="btn btn-sm btn-outline" :disabled="sjzd.isBusy" @click="sjzd.toggleWlanBridge(false)">退出透传</button>
     </div>
 
     <!-- Top SLE Metrics Grid -->
@@ -183,7 +205,7 @@ onMounted(() => {
               <h3>星闪无线参数设置</h3>
             </div>
             <span v-if="sjzd.sleCurrentStatus?.lastSyncTime" class="header-tag-success">
-              已回读同步 ({{ sjzd.sleCurrentStatus.lastSyncTime }})
+              完整快照 v{{ sjzd.sleCurrentStatus.snapshot?.revisionHex || '--' }}
             </span>
           </div>
 
@@ -193,27 +215,27 @@ onMounted(() => {
               <div class="label-with-cur">
                 <label>星闪网络名称 (SLE_NETNAME)</label>
                 <span v-if="sjzd.sleCurrentStatus?.netName" class="cur-badge">
-                  当前回读: {{ sjzd.sleCurrentStatus.netName }}
+                  完整回读: {{ sjzd.sleCurrentStatus.netName }}
                 </span>
               </div>
               <div class="input-with-action">
                 <input
                   v-model="sjzd.sleForm.netName"
                   type="text"
-                  maxlength="16"
+                  maxlength="15"
                   placeholder="例: star_RS01"
                   class="form-input"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 />
                 <button
                   class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || !sjzd.sleForm.netName.trim() || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || !sjzd.sleForm.netName.trim() || sjzd.isBusy"
                   @click="sjzd.setSleNetName(sjzd.sleForm.netName.trim())"
                 >
                   写入名称
                 </button>
               </div>
-              <span class="field-hint">最长 16 字符 ASCII，修改后 MCU 自动复位模组生效</span>
+              <span class="field-hint">最长 15 个可打印 ASCII 字符（16B 存储区预留 NUL）。写入后必须收到 <code>SLE_CONFIG:SAVED</code>，再以 <code>SLE:LIST</code> 的 transaction ID、count、CRC32 和 revision 复核。</span>
             </div>
 
             <!-- AP ID -->
@@ -221,7 +243,7 @@ onMounted(() => {
               <div class="label-with-cur">
                 <label>星闪 AP ID (SLE_APID)</label>
                 <span v-if="sjzd.sleCurrentStatus?.apId !== undefined" class="cur-badge">
-                  当前回读: {{ sjzd.sleCurrentStatus.apId }}
+                  完整回读: {{ sjzd.sleCurrentStatus.apId }}
                 </span>
               </div>
               <div class="input-with-action">
@@ -231,11 +253,11 @@ onMounted(() => {
                   min="0"
                   max="255"
                   class="form-input"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 />
                 <button
                   class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   @click="sjzd.setSleApid(sjzd.sleForm.apId)"
                 >
                   写入 APID
@@ -249,18 +271,18 @@ onMounted(() => {
               <div class="label-with-cur">
                 <label>当前发射功率档位 (SLE_PWR)</label>
                 <span v-if="sjzd.sleCurrentStatus?.txPower" class="cur-badge">
-                  当前回读: {{ sjzd.sleCurrentStatus.txPower }} 档
+                  完整回读: {{ sjzd.sleCurrentStatus.txPower }} 档
                 </span>
               </div>
               <div class="input-with-action">
                 <CustomSelect
                   v-model="sjzd.sleForm.txPower"
                   :options="powerOptions"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 />
                 <button
                   class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   @click="sjzd.setSlePwr(sjzd.sleForm.txPower)"
                 >
                   写入功率
@@ -274,18 +296,18 @@ onMounted(() => {
               <div class="label-with-cur">
                 <label>最大发射功率上限 (SLE_MAXPWR)</label>
                 <span v-if="sjzd.sleCurrentStatus?.maxTxPower" class="cur-badge">
-                  当前回读: {{ sjzd.sleCurrentStatus.maxTxPower }} 档
+                  完整回读: {{ sjzd.sleCurrentStatus.maxTxPower }} 档
                 </span>
               </div>
               <div class="input-with-action">
                 <CustomSelect
                   v-model="sjzd.sleForm.maxTxPower"
                   :options="powerOptions"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 />
                 <button
                   class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   @click="sjzd.setSleMaxPwr(sjzd.sleForm.maxTxPower)"
                 >
                   写入上限
@@ -298,11 +320,11 @@ onMounted(() => {
             <div class="batch-apply-box">
               <button
                 class="btn btn-primary btn-full-width"
-                :disabled="!serial.connectedPort || sjzd.isBusy"
+                :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 @click="sjzd.applyAllSleConfig"
               >
                 <Send :size="14" />
-                <span>一键批量写入并同步全套参数</span>
+                <span>一键批量写入并完整复核</span>
               </button>
             </div>
           </div>
@@ -316,7 +338,7 @@ onMounted(() => {
           <div class="card-header">
             <div class="header-left">
               <Radio :size="16" class="icon-green" />
-              <h3>EEPROM 与星闪芯片底层回读比对</h3>
+              <h3>EEPROM 与星闪芯片完整快照比对</h3>
             </div>
             <span class="header-subtitle-tag">仅比对两者共有参数 (网络名、通信地址、发射功率)</span>
           </div>
@@ -327,7 +349,7 @@ onMounted(() => {
                 <tr>
                   <th>比对项目</th>
                   <th>EEPROM 设定值</th>
-                  <th>星闪芯片底层回读值</th>
+                  <th>星闪芯片运行时字段</th>
                   <th>一致性状态</th>
                 </tr>
               </thead>
@@ -335,7 +357,7 @@ onMounted(() => {
                 <tr
                   v-for="item in sjzd.sleComparisons"
                   :key="item.fieldName"
-                  :class="{ mismatch: !item.isMatched }"
+                  :class="{ mismatch: item.isComparable && !item.isMatched }"
                 >
                   <td class="font-medium">{{ item.fieldName }}</td>
                   <td class="mono-text">{{ item.eepromVal }}</td>
@@ -343,11 +365,11 @@ onMounted(() => {
                   <td>
                     <span
                       class="match-badge"
-                      :class="{ matched: item.isMatched, unmatched: !item.isMatched }"
+                      :class="{ matched: item.isMatched, unmatched: item.isComparable && !item.isMatched }"
                     >
-                      <CheckCircle2 v-if="item.isMatched" :size="12" />
-                      <AlertCircle v-else :size="12" />
-                      <span>{{ item.isMatched ? '一致' : '差异' }}</span>
+                      <CheckCircle2 v-if="item.isComparable && item.isMatched" :size="12" />
+                      <AlertCircle v-else-if="item.isComparable" :size="12" />
+                      <span>{{ !item.isComparable ? '未获取' : item.isMatched ? '一致' : '差异' }}</span>
                     </span>
                   </td>
                 </tr>
@@ -393,11 +415,26 @@ onMounted(() => {
                 class="bridge-status-badge"
                 :class="{ active: sjzd.wlanBridgeEnabled }"
               >
-                {{ sjzd.wlanBridgeEnabled ? '🟢 透传模式 (@WLAN=1)' : '⚪ 普通命令模式 (@WLAN=0)' }}
+                {{
+                  !sjzd.wlanBridgeStatus
+                    ? '⚪ 透传状态未确认'
+                    : sjzd.wlanBridgeEnabled
+                      ? `🟠 已确认透传 (${sjzd.wlanBridgeStatus.uartOwner})`
+                      : '🟢 已确认 MCU 命令模式'
+                }}
               </span>
             </div>
 
             <div class="bridge-actions">
+              <button
+                class="btn btn-sm btn-outline"
+                :disabled="!serial.connectedPort || sjzd.isBusy"
+                title="查询当前 UART1 透传状态（即使透传已开启也由 MCU 本地处理）"
+                @click="sjzd.queryWlanBridge"
+              >
+                <RefreshCw :size="13" :class="{ spin: sjzd.isBusy }" />
+                <span>查询状态</span>
+              </button>
               <button
                 v-if="sjzd.wlanBridgeEnabled"
                 class="btn btn-sm btn-danger"
@@ -425,13 +462,19 @@ onMounted(() => {
             <div v-if="sjzd.wlanBridgeEnabled" class="bridge-active-notice">
               <Zap :size="15" />
               <span>
-                当前已开启【透传模式 (@WLAN=1)】，USART1 直通星闪模组 UART2。如需恢复 MCU 配置指令（如 SLE:LIST），请随时点击上方【退出透传】或下方快捷键【@WLAN=0】。
+                已由 <code>SLE_BRIDGE:ACK</code> 确认 UART1 直通 {{ sjzd.wlanBridgeStatus?.uartOwner }}。此时 MCU 配置指令被工具阻止；发送 AT 指令前仍应以实际模组回包和现场通信验证。
+              </span>
+            </div>
+            <div v-else-if="sjzd.wlanBridgeStatus" class="bridge-disabled-notice">
+              <ShieldAlert :size="15" />
+              <span>
+                已由 <code>SLE_BRIDGE:ACK</code> 确认 UART1 由 MCU 处理；可以执行配置查询和写入。进入透传后，工具会暂停 MCU 配置命令。
               </span>
             </div>
             <div v-else class="bridge-disabled-notice">
               <ShieldAlert :size="15" />
               <span>
-                当前处于【普通命令模式 (@WLAN=0)】。点击上方【进入透传 (@WLAN=1)】后可直通星闪模组交互原厂 AT 指令。
+                透传状态尚未确认。请点击【查询状态】或【进入/退出透传】取得 <code>SLE_BRIDGE:ACK</code>；工具不会把未确认状态当作 MCU 或透传模式。
               </span>
             </div>
 
@@ -441,12 +484,12 @@ onMounted(() => {
                 type="text"
                 placeholder="键入 AT 指令 (例: SEL_GETNAME?, @WLAN=0, SEL_RST)..."
                 class="form-input mono-text"
-                :disabled="!serial.connectedPort"
+                :disabled="!serial.connectedPort || !sjzd.wlanBridgeStatus?.active"
                 @keyup.enter="sendAtCommand()"
               />
               <button
                 class="btn btn-primary"
-                :disabled="!serial.connectedPort || !atInput.trim()"
+                :disabled="!serial.connectedPort || !sjzd.wlanBridgeStatus?.active || !atInput.trim()"
                 @click="sendAtCommand()"
               >
                 <Send :size="14" />

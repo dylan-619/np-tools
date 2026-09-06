@@ -8,8 +8,9 @@
 
 - **SJZDV3 智能现场数据采集终端**：
   - **设备概览与出厂 SN 固化**：实时查询设备运行时间、开机次数、采样频率等，支持产线 12 位 SN 序列号手动敲入、复制粘贴、自动校验与批量流水号自动递增（`SN:4301xxxxxxxx` 严格定长 15 字节，重启即生效）。
-  - **星闪 (NearLink / SLE) 无线网络配置**：EEPROM 与星闪芯片底层回读双向比对（网络名、通信地址、发射功率）、功率档位换算、一键批量同步全套参数，内置原厂 AT 命令行终端与透传控制模式。
-  - **Modbus RTU 16 点位 Data Grid 维护**：数据类型（Int16/32/Float/Double）、字节序（ABCD/CDAB/BADC/DCBA）、寄存器长度智能纠错、点位拖拽排序、行业模版一键加载与 CSV/JSON 双向导入导出。
+  - **星闪 (NearLink / SLE) 无线网络配置**：按 `SLE_CONFIG:BEGIN/EEPROM/CHIP/END` 的同一事务 ID、payload 数量和 CRC32 校验 EEPROM/芯片快照；保存后校验 `SAVED` 回执与下一次 `revision`。`SLE_BRIDGE:ACK` 是唯一的实时透传状态依据，透传开启时工具会阻止 MCU 配置命令。
+  - **Modbus RTU 100 点位 Data Grid 维护**：RAW/INT16/UINT16/INT32/UINT32/FLOAT32/BOOL 数据类型、字节序（ABCD/CDAB/BADC/DCBA）、寄存器长度智能纠错、行业模版一键加载与 CSV/JSON 双向导入导出；`RS485_CONFIG:BEGIN/POINT/END` 通过 count/CRC32 后才更新点表，单点诊断仅接受同一 `MB_DEBUG` 事务的完整 `BEGIN/TX/RX/DATA/RESULT/END`。
+  - **4G Cat.1 / MQTT 配置复核**：按完整 `4G_CONFIG` 事务读取，保存后比对 `SAVED` 和 `revision`；明确区分“读取完整但 `CONFIG_INCOMPLETE`”与“配置有效”，密码始终只按 `set/empty` 状态复核。
   - **2 路 4~20mA 模拟量输入诊断**：1Hz 动态平滑趋势图、断线/超量程/正常状态诊断、历史采样导出与硬件双色 LED 状态灯测试。
   - **系统维护与安全保护**：日志级别/上报周期修改、故障计数清零、系统软复位及 EEPROM 格式化双重二次防误触确认。
 - **ST-Link 固件烧录流水线**：

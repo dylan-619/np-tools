@@ -50,11 +50,14 @@ const form = ref<FourGConfigDto>({
   keepAliveSec: 60,
   qos: 1
 })
+const mcuConsoleReady = computed(
+  () => Boolean(sjzd.wlanBridgeStatus && !sjzd.wlanBridgeStatus.active)
+)
 
 // Sync form from store whenever store updates or initially loads
 function syncFormFromStore() {
   if (!sjzd.fourGStatus.hasReadback) {
-    sjzd.showMessage('尚未回读设备当前固件配置，请先点击右上角【刷新回读】', false)
+    sjzd.showMessage('尚未获取设备完整快照，请先点击右上角【查询配置】', false)
     return
   }
   form.value = {
@@ -69,7 +72,7 @@ function syncFormFromStore() {
     keepAliveSec: sjzd.fourGConfig.keepAliveSec || 60,
     qos: sjzd.fourGConfig.qos ?? 1
   }
-  sjzd.showMessage('已从设备当前回读值同步填充至表单')
+  sjzd.showMessage('已从通过 transaction ID、count 和 CRC32 校验的 4G_CONFIG 完整快照同步至表单')
 }
 
 // Password visibility toggle
@@ -78,7 +81,7 @@ const showPassword = ref(false)
 // Single item copy from readback to form
 function copyReadbackToDraft(field: keyof FourGConfigDto) {
   if (!sjzd.fourGStatus.hasReadback) {
-    sjzd.showMessage('尚未完成回读，无法复制该项', false)
+    sjzd.showMessage('尚未获取完整快照，无法复制该项', false)
     return
   }
   if (field === 'apn') form.value.apn = sjzd.fourGConfig.apn || 'cmiot'
@@ -91,7 +94,7 @@ function copyReadbackToDraft(field: keyof FourGConfigDto) {
   else if (field === 'subscribeTopic') form.value.subscribeTopic = sjzd.fourGConfig.subscribeTopic || ''
   else if (field === 'keepAliveSec') form.value.keepAliveSec = sjzd.fourGConfig.keepAliveSec || 60
   else if (field === 'qos') form.value.qos = sjzd.fourGConfig.qos ?? 1
-  sjzd.showMessage(`已将回读项同步至表单`)
+  sjzd.showMessage('已将完整快照字段同步至表单')
 }
 
 // Readback table rows definition for reactive display
@@ -460,6 +463,10 @@ async function startWizard() {
 
   try {
     addWizardLog('=== 开始按 SN 快速开通向导 ===')
+    const bridge = await sjzd.queryWlanBridge()
+    if (!bridge || bridge.active) {
+      throw new Error('UART1 当前处于透传或状态未确认，不能执行 MCU 侧 4G 配置向导；请先退出透传')
+    }
     // Step 1: Query device info
     addWizardLog('第 1 步: 读取终端基础信息与 SN...')
     await sjzd.queryDeviceInfo()
@@ -504,13 +511,13 @@ async function startWizard() {
       qos: form.value.qos
     })
     await delay(800)
-    addWizardLog('4G/MQTT 参数写入完成，正在回读验证合法性...')
+    addWizardLog('4G/MQTT 参数写入完成，正在获取并校验 4G:LIST 完整快照...')
     await sjzd.queryFourGConfig()
     await delay(600)
     if (!sjzd.fourGStatus.configOperational) {
-      addWizardLog('[警告] 4G 回读配置校验未通过，请检查 Broker 或端口！')
+      addWizardLog('[警告] 设备返回了完整快照，但 META.config=incomplete；请按错误掩码补齐 Broker、端口或 MQTT 必填项。')
     } else {
-      addWizardLog('[成功] 4G/MQTT EEPROM 配置校验通过 (Config=valid)')
+      addWizardLog('[提示] 设备报告 Config=valid，且 4G_CONFIG transaction ID、count、CRC32 已通过校验；本次保存 revision 也已复核。')
     }
     wizardStep.value = 5
 
@@ -532,12 +539,18 @@ async function startWizard() {
   }
 }
 
+async function refreshFourGConfiguration() {
+  const bridge = await sjzd.queryWlanBridge()
+  if (!bridge || bridge.active) return
+  await sjzd.queryWlanType()
+  await sjzd.queryFourGConfig()
+  syncFormFromStore()
+}
+
 // Lifecycle
 onMounted(async () => {
   if (serial.connectedPort) {
-    await sjzd.queryWlanType()
-    await sjzd.queryFourGConfig()
-    syncFormFromStore()
+    await refreshFourGConfiguration()
   }
 })
 </script>
@@ -566,7 +579,7 @@ onMounted(async () => {
           </span>
         </div>
         <p class="subtitle">
-          支持无线工作模式切换 (SLE / 4G)、MQTT Broker 接入点配置、按 SN 一键开通向导与 Cat.1 通信链路诊断。
+          支持无线工作模式切换 (SLE / 4G)、MQTT Broker 接入点配置、按 SN 一键开通向导与 Cat.1 通信链路诊断；配置读回以结构化事务完整性校验为准。
         </p>
       </div>
 
@@ -574,8 +587,8 @@ onMounted(async () => {
         <button
           class="btn btn-primary"
           :disabled="!serial.connectedPort || sjzd.isBusy"
-          title="回读当前无线模式与 4G MQTT 参数"
-          @click="async () => { await sjzd.queryWlanType(); await sjzd.queryFourGConfig(); syncFormFromStore() }"
+          title="先确认 UART1 透传状态，再查询当前无线模式与完整 4G MQTT 快照"
+          @click="refreshFourGConfiguration"
         >
           <RefreshCw :size="14" :class="{ spin: sjzd.isBusy }" />
           <span>查询配置 (4G:LIST)</span>
@@ -584,7 +597,7 @@ onMounted(async () => {
         <button
           v-if="sjzd.wlanTypeInfo.mode === '4G'"
           class="btn btn-secondary"
-          :disabled="!serial.connectedPort || sjzd.isBusy"
+          :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
           title="强制 4G 模组断开重连 (4G:RECONNECT)"
           @click="sjzd.reconnectFourG"
         >
@@ -594,7 +607,7 @@ onMounted(async () => {
 
         <button
           class="btn btn-danger"
-          :disabled="!serial.connectedPort || sjzd.isBusy || sjzd.wlanTypeInfo.mode === '4G'"
+          :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.wlanTypeInfo.mode === '4G'"
           :title="sjzd.wlanTypeInfo.mode === '4G' ? '清除 4G 配置前必须先切回 SLE 模式' : '清空 EEPROM 中的 4G/MQTT 参数'"
           @click="promptResetConfig"
         >
@@ -603,6 +616,15 @@ onMounted(async () => {
         </button>
       </div>
     </header>
+
+    <div v-if="sjzd.wlanBridgeStatus?.active" class="mode-alert-banner">
+      <ShieldAlert :size="18" class="banner-icon-amber" />
+      <div class="banner-content">
+        <strong>UART1 已确认透传到 {{ sjzd.wlanBridgeStatus.uartOwner }}。</strong>
+        <span>MCU 侧 4G 查询、保存、切换与重连已被工具保护性阻止；请先在星闪页退出透传。</span>
+      </div>
+      <router-link to="/devices/sjzdv3/sle" class="btn btn-sm btn-outline">前往退出透传</router-link>
+    </div>
 
     <!-- Top KPI Status Cards -->
     <div class="metrics-grid">
@@ -625,7 +647,7 @@ onMounted(async () => {
         </div>
         <button
           class="switch-mode-btn"
-          :disabled="!serial.connectedPort || sjzd.isBusy"
+          :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
           :title="sjzd.wlanTypeInfo.mode === '4G' ? '切换为 SLE 星闪模式' : '切换为 4G Cat.1 模式'"
           @click="promptModeSwitch(sjzd.wlanTypeInfo.mode === '4G' ? 'SLE' : '4G')"
         >
@@ -780,11 +802,11 @@ onMounted(async () => {
                   type="text"
                   placeholder="默认使用 cmiot (可填写 ctnet / 3gnet)"
                   class="form-input"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 />
                 <button
                   class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   @click="sjzd.setFourGApn(form.apn || 'cmiot')"
                 >
                   写入 APN
@@ -803,11 +825,11 @@ onMounted(async () => {
                     type="text"
                     placeholder="例: 106.57.244.54 或 iot.example.com"
                     class="form-input"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   />
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || !form.host.trim() || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || !form.host.trim() || sjzd.isBusy"
                     @click="sjzd.setMqttHost(form.host.trim())"
                   >
                     写入
@@ -825,11 +847,11 @@ onMounted(async () => {
                     max="65535"
                     placeholder="8005 或 1883"
                     class="form-input"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   />
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || !form.port || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || !form.port || sjzd.isBusy"
                     @click="sjzd.setMqttPort(form.port)"
                   >
                     写入
@@ -847,7 +869,7 @@ onMounted(async () => {
                   type="text"
                   placeholder="默认使用设备 12 位 SN (例: 260303000001)"
                   class="form-input mono-text"
-                  :disabled="!serial.connectedPort || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 />
                 <button
                   class="btn btn-sm btn-outline"
@@ -859,7 +881,7 @@ onMounted(async () => {
                 </button>
                 <button
                   class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || !form.clientId.trim() || sjzd.isBusy"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || !form.clientId.trim() || sjzd.isBusy"
                   @click="sjzd.setMqttClientId(form.clientId.trim())"
                 >
                   写入
@@ -878,11 +900,11 @@ onMounted(async () => {
                     type="text"
                     placeholder="如无鉴权可留空"
                     class="form-input"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   />
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                     @click="sjzd.setMqttUser(form.username.trim())"
                   >
                     写入
@@ -907,7 +929,7 @@ onMounted(async () => {
                       :type="showPassword ? 'text' : 'password'"
                       :placeholder="sjzd.fourGStatus.passwordIsSet ? '●●●●●● (终端已设置密码，如需修改请输入新密码)' : '未设置密码，如需设置请在此输入'"
                       class="form-input password-input"
-                      :disabled="!serial.connectedPort || sjzd.isBusy"
+                      :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                     />
                     <button
                       type="button"
@@ -921,7 +943,7 @@ onMounted(async () => {
                   </div>
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                     @click="sjzd.setMqttPass(form.password)"
                   >
                     写入
@@ -943,11 +965,11 @@ onMounted(async () => {
                     type="text"
                     placeholder="例: devices/<SN>/up"
                     class="form-input mono-text"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   />
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || !form.publishTopic.trim() || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || !form.publishTopic.trim() || sjzd.isBusy"
                     @click="sjzd.setMqttPubTopic(form.publishTopic.trim())"
                   >
                     写入
@@ -963,11 +985,11 @@ onMounted(async () => {
                     type="text"
                     placeholder="例: devices/<SN>/down"
                     class="form-input mono-text"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   />
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || !form.subscribeTopic.trim() || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || !form.subscribeTopic.trim() || sjzd.isBusy"
                     @click="sjzd.setMqttSubTopic(form.subscribeTopic.trim())"
                   >
                     写入
@@ -988,11 +1010,11 @@ onMounted(async () => {
                     max="1200"
                     placeholder="60"
                     class="form-input"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   />
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || !form.keepAliveSec || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || !form.keepAliveSec || sjzd.isBusy"
                     @click="sjzd.setMqttKeepalive(form.keepAliveSec)"
                   >
                     写入
@@ -1006,14 +1028,14 @@ onMounted(async () => {
                   <select
                     v-model.number="form.qos"
                     class="form-select"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                   >
                     <option :value="0">QoS 0 (最多交付一次)</option>
                     <option :value="1">QoS 1 (至少交付一次，推荐)</option>
                   </select>
                   <button
                     class="btn btn-sm btn-secondary"
-                    :disabled="!serial.connectedPort || sjzd.isBusy"
+                    :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                     @click="sjzd.setMqttQos(form.qos)"
                   >
                     写入
@@ -1026,19 +1048,19 @@ onMounted(async () => {
             <div class="form-actions-bar">
               <button
                 class="btn btn-outline btn-md"
-                title="将右侧当前回读的全部参数复制并填入左侧草稿表单"
+                title="将右侧已校验完整快照字段复制并填入左侧草稿表单"
                 @click="syncFormFromStore"
               >
                 <ArrowDownLeft :size="14" />
-                <span>从回读值同步至表单</span>
+                <span>从完整快照同步至表单</span>
               </button>
               <button
                 class="btn btn-primary btn-md"
-                :disabled="!serial.connectedPort || sjzd.isBusy"
+                :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
                 @click="handleBatchSave"
               >
                 <CheckCircle2 :size="16" />
-                <span>批量保存所有参数并回读校验</span>
+                <span>批量保存并完整复核</span>
               </button>
             </div>
           </div>
@@ -1049,12 +1071,12 @@ onMounted(async () => {
           <div class="card-header">
             <div class="header-left">
               <TableProperties :size="16" class="icon-green" />
-              <h3>设备参数回读与状态对照 (4G:LIST)</h3>
+              <h3>设备参数完整快照与状态对照 (4G:LIST)</h3>
             </div>
             <div class="header-right">
               <button
                 class="btn btn-xs btn-outline"
-                title="将右侧回读参数全部填充至左侧表单"
+                title="将右侧完整快照字段全部填充至左侧表单"
                 @click="syncFormFromStore"
               >
                 <ArrowDownLeft :size="12" />
@@ -1064,10 +1086,10 @@ onMounted(async () => {
                 class="btn btn-xs btn-primary"
                 :disabled="!serial.connectedPort || sjzd.isBusy"
                 title="重新向设备查询 4G / MQTT 参数 (4G:LIST)"
-                @click="async () => { await sjzd.queryFourGConfig() }"
+                @click="refreshFourGConfiguration"
               >
                 <RefreshCw :size="12" :class="{ spin: sjzd.isBusy }" />
-                <span>刷新回读</span>
+                <span>刷新完整快照</span>
               </button>
             </div>
           </div>
@@ -1080,7 +1102,7 @@ onMounted(async () => {
                 <span class="strip-v mono-text">{{ sjzd.fourGStatus.hasReadback ? (sjzd.fourGStatus.state || 'UNKNOWN') : '-- (待回读)' }}</span>
               </div>
               <div class="strip-item">
-                <span class="strip-k">配置校验:</span>
+                <span class="strip-k">设备报告配置:</span>
                 <span
                   class="status-pill"
                   :class="sjzd.fourGStatus.hasReadback ? (sjzd.fourGStatus.configOperational ? 'pill-valid' : 'pill-incomplete') : 'pill-unknown'"
@@ -1098,16 +1120,26 @@ onMounted(async () => {
                 </span>
               </div>
               <div class="strip-item">
-                <span class="strip-k">回读时间:</span>
-                <span class="strip-v">{{ sjzd.fourGStatus.hasReadback ? (sjzd.fourGStatus.lastSyncTime || '已回读') : '未回读 (点击刷新)' }}</span>
+                <span class="strip-k">快照时间:</span>
+                <span class="strip-v">{{ sjzd.fourGStatus.hasReadback ? (sjzd.fourGStatus.lastSyncTime || '已解析') : '未获取 (点击刷新)' }}</span>
+              </div>
+              <div v-if="sjzd.fourGStatus.snapshot" class="strip-item">
+                <span class="strip-k">事务证据:</span>
+                <span class="strip-v mono-text">
+                  id={{ sjzd.fourGStatus.snapshot.transactionId }} · {{ sjzd.fourGStatus.snapshot.revisionHex }} · CRC32 {{ sjzd.fourGStatus.snapshot.crc32 }}
+                </span>
               </div>
             </div>
+
+            <p class="field-hint">
+              仅在 <code>4G_CONFIG:BEGIN/END</code> 事务 ID 一致、payload 数量和 CRC32 均通过后显示。<code>END status=ERROR,code=CONFIG_INCOMPLETE</code> 表示读取完整，但设备配置本身待完善。
+            </p>
 
             <!-- Config Errors Alert Banner if firmware reported 4G_CONFIG_ERROR -->
             <div v-if="sjzd.fourGStatus.configErrors && sjzd.fourGStatus.configErrors.length > 0" class="config-errors-banner">
               <AlertTriangle :size="14" class="err-icon" />
               <div class="err-content">
-                <span class="err-title">固件配置校验异常：</span>
+                <span class="err-title">设备报告配置待完善：</span>
                 <span class="err-desc">设备报告待完善参数 <strong>{{ sjzd.fourGStatus.configErrors.join('、') }}</strong>，请在左侧表单补齐后写入！</span>
               </div>
             </div>
@@ -1118,7 +1150,7 @@ onMounted(async () => {
                 <thead>
                   <tr>
                     <th style="width: 28%;">参数项 / 指令</th>
-                    <th style="width: 32%;">固件回读值</th>
+                    <th style="width: 32%;">固件完整回读字段</th>
                     <th style="width: 25%;">草稿值</th>
                     <th style="width: 15%; text-align: center;">操作</th>
                   </tr>
@@ -1154,7 +1186,7 @@ onMounted(async () => {
                         v-if="!row.isPass"
                         class="btn btn-xs btn-outline row-fill-btn"
                         :disabled="!sjzd.fourGStatus.hasReadback"
-                        title="将该回读项填入左侧表单草稿"
+                        title="将该完整回读字段填入左侧表单草稿"
                         @click="copyReadbackToDraft(row.field)"
                       >
                         <ArrowDownLeft :size="11" />
@@ -1286,7 +1318,7 @@ onMounted(async () => {
             </div>
             <div class="wizard-log-terminal">
               <div v-if="wizardLog.length === 0" class="log-placeholder">
-                点击上方“一键执行自动化开通流程”后，将在此实时打印每一步的交互及回读校验结果...
+                点击上方“一键执行自动化开通流程”后，将在此实时打印每一步的交互、保存回执和完整快照复核结果...
               </div>
               <div
                 v-for="(item, idx) in wizardLog"
@@ -1542,14 +1574,14 @@ onMounted(async () => {
             <span class="tip-num">3</span>
             <div>
               <strong>密码安全性与明文保护</strong>
-              <p>出于安全性考虑，固件在 <code>4G:LIST</code> 回读中不会回传密码明文（回读仅显示 <code>&lt;set&gt;</code> 或 <code>&lt;empty&gt;</code>）。更新密码需在表单输入新值后单独或批量下发。</p>
+              <p>出于安全性考虑，固件在 <code>4G:LIST</code> 输出中不会回传密码明文（仅显示 <code>&lt;set&gt;</code> 或 <code>&lt;empty&gt;</code>）。工具会校验列表事务完整性，并且仅复核密码“已设置/未设置”状态；更新密码需在表单输入新值后单独或批量下发。</p>
             </div>
           </div>
           <div class="tip-item">
             <span class="tip-num">4</span>
             <div>
               <strong>主题命名与设备 SN 统一规范</strong>
-              <p>建议严格遵照 <code>devices/&lt;SN&gt;/up</code> 与 <code>devices/&lt;SN&gt;/down</code> 规范，可在表单点击「按 SN 推导」或使用「按 SN 快速开通向导」一键完成自动化配置与校验。</p>
+              <p>建议严格遵照 <code>devices/&lt;SN&gt;/up</code> 与 <code>devices/&lt;SN&gt;/down</code> 规范，可在表单点击「按 SN 推导」或使用「按 SN 快速开通向导」完成下发、保存回执与完整快照 revision 复核；上线、掉电保持和端到端通信仍需现场验证。</p>
             </div>
           </div>
         </div>
