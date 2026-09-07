@@ -11,6 +11,7 @@ import {
   Activity,
   Wrench,
   Flame,
+  MessageSquareText,
   Settings,
   LayoutDashboard,
   ChevronDown,
@@ -284,6 +285,17 @@ function groupIsCollapsed(group: ProductGroup) {
           >
             <TerminalSquare :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">通用串口监视器</span>
+          </button>
+
+          <button
+            class="nav-item"
+            :class="{ active: route.path === '/mqtt' }"
+            aria-label="通用 MQTT 调试"
+            title="通用 MQTT 调试 (Broker 订阅与消息发布)"
+            @click="navigateTo('/mqtt')"
+          >
+            <MessageSquareText :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">通用 MQTT 调试</span>
           </button>
 
           <button

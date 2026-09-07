@@ -10,6 +10,7 @@ use std::sync::Arc;
 use tauri::ipc::Channel;
 
 mod kz3_http;
+mod mqtt;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -314,6 +315,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(ConnectionManager::new())
         .manage(kz3_http::Kz3HttpClient::new())
+        .manage(Arc::new(mqtt::MqttManager::new()))
         .manage(flash_mgr)
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -325,6 +327,11 @@ pub fn run() {
             serial_set_rts,
             serial_start_recording,
             serial_stop_recording,
+            // 公共 MQTT 调试
+            mqtt::mqtt_connect,
+            mqtt::mqtt_disconnect,
+            mqtt::mqtt_subscribe,
+            mqtt::mqtt_publish,
             // SJZDV3 Commands
             sjzd_send_sn,
             sjzd_send_modbus_points,

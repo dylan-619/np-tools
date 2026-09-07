@@ -14,6 +14,12 @@ const router = createRouter({
       meta: { title: '通用串口调试' }
     },
     {
+      path: '/mqtt',
+      name: 'MqttDebugger',
+      component: () => import('../views/MqttView.vue'),
+      meta: { title: '通用 MQTT 调试' }
+    },
+    {
       path: '/devices/sjzdv3',
       name: 'SjzdOverview',
       component: () => import('../views/devices/sjzdv3/DeviceOverviewView.vue'),
