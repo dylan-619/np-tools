@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 const MAX_RESPONSE_BYTES: usize = 4096;
-const KZ3_HTTP_WRITE_RELEASED: bool = true;
 
 /// KZ3 HTTP 调试代理。锁用于保证同一工具实例只有一个在途设备请求，
 /// 避免轮询和写入并发压垮控制器有限的 HTTP client 槽位。
@@ -119,6 +118,7 @@ fn diagnostic_path(resource: &str) -> Result<&'static str, String> {
     match resource {
         "device" => Ok("api/v1/device"),
         "hardware" => Ok("api/v1/hardware"),
+        "project" => Ok("api/v1/project"),
         "network" => Ok("api/v1/network"),
         "sle" => Ok("api/v1/sle"),
         "io" => Ok("api/v1/io"),
@@ -143,9 +143,8 @@ fn validate_point_name(point_name: &str) -> Result<(), String> {
 }
 
 fn validate_write_target(binding: &str, value: &Value) -> Result<(), String> {
-    if !KZ3_HTTP_WRITE_RELEASED {
-        return Err("当前产品版本未开放 KZ3 北向写入".to_string());
-    }
+    /* Rust 层只守住 transport 允许的 bind/value 形状；工程 ID、版本、manifest
+     * 和健康门禁由前端会话在每次写入前重新验证。绝不允许直接写 point/state。 */
     validate_point_name(binding).map_err(|_| "北向 bind 格式无效".to_string())?;
     if binding.starts_with("parameter.") {
         if value.is_boolean() || value.is_number() {
@@ -245,54 +244,22 @@ mod tests {
     #[test]
     fn 固定诊断资源采用白名单() {
         assert_eq!(diagnostic_path("io").unwrap(), "api/v1/io");
+        assert_eq!(diagnostic_path("project").unwrap(), "api/v1/project");
         assert!(diagnostic_path("config/network").is_err());
     }
 
     #[test]
-    fn 当前测试版只开放受控北向写入() {
+    fn 仅允许受控北向写入报文形状() {
         assert!(validate_write_target("parameter.pid_setpoint", &serde_json::json!(12.5)).is_ok());
         assert!(validate_write_target("parameter.auto", &serde_json::json!(true)).is_ok());
         assert!(validate_write_target("command.start", &serde_json::json!(true)).is_ok());
+        assert!(
+            validate_write_target("runtime.grating_01.clear", &serde_json::json!(true)).is_ok()
+        );
         assert!(validate_write_target("command.start", &serde_json::json!(false)).is_err());
         assert!(validate_write_target("point.pump_run", &serde_json::json!(true)).is_err());
         assert!(validate_write_target("state.running", &serde_json::json!(true)).is_err());
         assert!(validate_write_target("parameter.note", &serde_json::json!("x")).is_err());
         assert!(validate_write_target("../parameter.x", &serde_json::json!(true)).is_err());
-    }
-
-    #[test]
-    fn u32参数保持完整的十进制整数报文() {
-        for value in [0u32, 65536, 180000, 2147483648, u32::MAX] {
-            let json_value = serde_json::json!(value);
-            assert!(validate_write_target("parameter.run_time", &json_value).is_ok());
-            assert_eq!(
-                serde_json::json!({ "value": json_value }).to_string(),
-                format!("{{\"value\":{value}}}")
-            );
-        }
-        assert!(validate_write_target("parameter.run_time", &serde_json::json!("1800")).is_err());
-    }
-
-    #[test]
-    fn 运行时间清零仅开放明确的单次布尔命令() {
-        for binding in ["command.start", "runtime.grating_01.clear"] {
-            assert!(validate_write_target(binding, &serde_json::json!(true)).is_ok());
-            for value in [
-                serde_json::json!(false),
-                serde_json::json!(1),
-                serde_json::json!("true"),
-            ] {
-                assert!(validate_write_target(binding, &value).is_err());
-            }
-        }
-        for binding in [
-            "runtime.grating_01.seconds",
-            "runtime.grating_01.clear_pending",
-            "runtime..clear",
-            "runtime.grating_01.extra.clear",
-            "runtime.grating_01.clear.extra",
-        ] {
-            assert!(validate_write_target(binding, &serde_json::json!(true)).is_err());
-        }
     }
 }

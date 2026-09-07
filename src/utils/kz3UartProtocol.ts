@@ -1,9 +1,11 @@
 import type {
   Kz3ConfigGroup,
+  Kz3Cat1Candidate,
   Kz3EthernetCandidate,
   Kz3ProtocolEnvelope,
   Kz3SleCandidate,
   Kz3SystemRole,
+  Kz3WirelessCandidate,
 } from '../types/kz3Maintenance'
 
 export const KZ3_UART_CONFIG = Object.freeze({
@@ -16,11 +18,14 @@ export const KZ3_UART_CONFIG = Object.freeze({
 
 export const KZ3_SLE_FIXED_ADDRESS = '0'
 export const KZ3_SLE_FIXED_APID = '1'
+export const KZ3_UART_MAX_COMMAND_BYTES = 766
 
 export const KZ3_QUERY_COMMANDS: Record<Kz3ConfigGroup, string> = {
   system: '@CFG,SYS,SHOW',
   ethernet: '@CFG,ETH,SHOW',
   sle: '@CFG,SLE,SHOW',
+  wireless: '@CFG,WIRELESS,SHOW',
+  cat1: '@CFG,4G,SHOW',
   io: '@CFG,IO,SHOW',
   debug: '@DEBUG',
 }
@@ -50,14 +55,51 @@ function assertAsciiCommand(command: string): string {
   if ([...normalized].some((character) => character.charCodeAt(0) > 0x7f)) {
     throw new Error('UART1 命令只能包含 ASCII 字符')
   }
-  if (new TextEncoder().encode(normalized).length > 255) {
-    throw new Error('UART1 单条有效命令不能超过 255 字节')
+  if (new TextEncoder().encode(normalized).length > KZ3_UART_MAX_COMMAND_BYTES) {
+    throw new Error(`UART1 单条有效命令连同 CRLF 不能超过 ${KZ3_UART_MAX_COMMAND_BYTES + 2} 字节`)
   }
   const upper = normalized.toUpperCase()
   if (BLOCKED_PREFIXES.some((prefix) => upper === prefix || upper.startsWith(prefix))) {
     throw new Error('该命令属于退役或高风险入口，已在发送前拦截')
   }
   return normalized
+}
+
+function isSafePercentEncodedField(value: string): boolean {
+  return /^(?:[A-Za-z0-9!~*'()._-]|%[0-9A-Fa-f]{2})*$/.test(value) && !/%(?:00|0A|0D)/i.test(value)
+}
+
+function isAllowedCat1Command(command: string): boolean {
+  const parts = command.split(',')
+  if (parts[0] !== '@CFG' || parts[1] !== '4G') return false
+  const isPort = (value: string) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535
+  const isKeepalive = (value: string) => /^\d+$/.test(value) && Number(value) >= 30 && Number(value) <= 1200
+  const isQos = (value: string) => value === '0' || value === '1'
+  const isRequiredText = (value: string) => value.length > 0 && isSafePercentEncodedField(value)
+  const isOptionalText = (value: string) => isSafePercentEncodedField(value)
+
+  if (parts.length === 3 && parts[2] === 'SHOW') return true
+  if (parts.length === 3 && parts[2] === 'RECONNECT') return true
+  if (parts.length === 11 && parts[2] === 'INIT') {
+    return (
+      isRequiredText(parts[3]) &&
+      isRequiredText(parts[4]) &&
+      isPort(parts[5]) &&
+      isOptionalText(parts[6]) &&
+      isOptionalText(parts[7]) &&
+      isOptionalText(parts[8]) &&
+      isKeepalive(parts[9]) &&
+      isQos(parts[10])
+    )
+  }
+  if (parts.length !== 4) return false
+  if (parts[2] === 'PORT') return isPort(parts[3])
+  if (parts[2] === 'KEEPALIVE') return isKeepalive(parts[3])
+  if (parts[2] === 'QOS') return isQos(parts[3])
+  if (!['APN', 'HOST', 'USER', 'PASS', 'TOPIC'].includes(parts[2])) return false
+  return ['APN', 'HOST'].includes(parts[2])
+    ? isRequiredText(parts[3])
+    : isOptionalText(parts[3])
 }
 
 function isAllowedCommand(command: string): boolean {
@@ -75,6 +117,10 @@ function isAllowedCommand(command: string): boolean {
     /^@CFG,SLE,(PWR|MAXPWR|MODE),[^,]+$/.test(command) ||
     command.startsWith('@CFG,SLE,NAME,') ||
     /^@CFG,SLE,INIT,0,[^,]*,1,[^,]+,[^,]+,[^,]+$/.test(command) ||
+    command === '@CFG,WIRELESS,SHOW' ||
+    /^@CFG,WIRELESS,MODE,(SLE|CAT1|1|2)$/.test(command) ||
+    /^@CFG,WIRELESS,REPORT,(?:0|[1-9]\d{0,2})$/.test(command) && Number(command.split(',')[3]) <= 255 ||
+    isAllowedCat1Command(command) ||
     command === '@CFG,IO,INIT,CONTROLLER' ||
     /^@CFG,IO,INIT,RTU_SLAVE,\d+$/.test(command) ||
     command === '@DEBUG=0' ||
@@ -129,6 +175,33 @@ function normalizeUint(value: string, minimum: number, maximum: number, name: st
   return String(parsed)
 }
 
+function normalizeCat1Text(value: string, maximumBytes: number, name: string, required = false): string {
+  if (required && value.length === 0) throw new Error(`${name} 不能为空`)
+  if ([...value].some((character) => {
+    const code = character.charCodeAt(0)
+    return code < 0x20 || code > 0x7e
+  })) {
+    throw new Error(`${name} 只能使用可打印 ASCII 字符，且不能包含换行`)
+  }
+  if (new TextEncoder().encode(value).length > maximumBytes) {
+    throw new Error(`${name} 最长 ${maximumBytes} 字节`)
+  }
+  return encodeURIComponent(value).replace(/%[0-9a-f]{2}/gi, (match) => match.toUpperCase())
+}
+
+function normalizedCat1Candidate(candidate: Kz3Cat1Candidate) {
+  return {
+    apn: normalizeCat1Text(candidate.apn, 31, 'APN', true),
+    host: normalizeCat1Text(candidate.host, 63, 'MQTT Host', true),
+    port: normalizeUint(candidate.port, 1, 65535, 'MQTT 端口'),
+    username: normalizeCat1Text(candidate.username, 31, 'MQTT 用户名'),
+    password: normalizeCat1Text(candidate.password, 63, 'MQTT 密码'),
+    topic: normalizeCat1Text(candidate.topic, 31, 'Topic 前缀'),
+    keepalive: normalizeUint(candidate.keepalive, 30, 1200, 'Keepalive'),
+    qos: normalizeUint(candidate.qos, 0, 1, 'QoS'),
+  }
+}
+
 export function buildIdentityCommand(serialNumber: string): string {
   const value = serialNumber.trim()
   if (!/^\d{12}$/.test(value)) throw new Error('SN 必须是 12 位十进制数字')
@@ -148,6 +221,16 @@ export function buildEthernetCommands(candidate: Kz3EthernetCandidate): string[]
     validateKz3Command(`@CFG,ETH,GW,${gateway}`),
     validateKz3Command(`@CFG,ETH,PORT,${port}`),
   ]
+}
+
+/**
+ * 只由已通过 UART1 Ethernet 字段校验的候选值生成 HTTP 目标，不承担网段发现或扫描职责。
+ */
+export function buildKz3HttpBaseUrl(candidate: Kz3EthernetCandidate): string {
+  const commands = buildEthernetCommands(candidate)
+  const ip = commands[0].split(',')[3]
+  const port = commands[3].split(',')[3]
+  return `http://${ip}:${port}`
 }
 
 function normalizeSleName(value: string): string {
@@ -180,6 +263,58 @@ export function buildSleInitCommand(candidate: Kz3SleCandidate): string {
   return validateKz3Command(
     `@CFG,SLE,INIT,${KZ3_SLE_FIXED_ADDRESS},${name},${KZ3_SLE_FIXED_APID},${power},${maxPower},${mode}`
   )
+}
+
+export function buildWirelessModeCommand(mode: Kz3WirelessCandidate['mode']): string {
+  return validateKz3Command(`@CFG,WIRELESS,MODE,${mode}`)
+}
+
+export function buildWirelessReportCommand(reportSeconds: string): string {
+  return validateKz3Command(
+    `@CFG,WIRELESS,REPORT,${normalizeUint(reportSeconds, 0, 255, '无线报告周期原始值')}`
+  )
+}
+
+export function buildCat1InitCommand(candidate: Kz3Cat1Candidate): string {
+  const normalized = normalizedCat1Candidate(candidate)
+  return validateKz3Command(
+    `@CFG,4G,INIT,${normalized.apn},${normalized.host},${normalized.port},${normalized.username},${normalized.password},${normalized.topic},${normalized.keepalive},${normalized.qos}`
+  )
+}
+
+/**
+ * 只发送与 SHOW 快照不同的非敏感字段。用户名与密码无法从设备回显，
+ * 因此只有输入非空的新值时才会更新；清空凭证必须用明确的 INIT 操作。
+ */
+export function buildCat1UpdateCommands(
+  candidate: Kz3Cat1Candidate,
+  current: Record<string, string>
+): string[] {
+  if (current.VALID !== '1') {
+    throw new Error('设备不存在有效 Cat.1 配置；请使用“首次初始化 (INIT)”建立完整记录')
+  }
+  const normalized = normalizedCat1Candidate(candidate)
+  const commands: string[] = []
+  const addIfChanged = (field: string, value: string, currentValue: string | undefined) => {
+    if (value !== (currentValue ?? '')) {
+      commands.push(validateKz3Command(`@CFG,4G,${field},${value}`))
+    }
+  }
+
+  addIfChanged('APN', normalized.apn, normalizeCat1Text(current.APN ?? '', 31, '当前 APN'))
+  addIfChanged('HOST', normalized.host, normalizeCat1Text(current.HOST ?? '', 63, '当前 MQTT Host'))
+  addIfChanged('PORT', normalized.port, current.PORT)
+  addIfChanged('TOPIC', normalized.topic, normalizeCat1Text(current.TOPIC ?? '', 31, '当前 Topic 前缀'))
+  addIfChanged('KEEPALIVE', normalized.keepalive, current.KEEPALIVE)
+  addIfChanged('QOS', normalized.qos, current.QOS)
+  if (candidate.username.length > 0) commands.push(validateKz3Command(`@CFG,4G,USER,${normalized.username}`))
+  if (candidate.password.length > 0) commands.push(validateKz3Command(`@CFG,4G,PASS,${normalized.password}`))
+  if (commands.length === 0) throw new Error('草稿与设备 SHOW 快照没有可写入的差异')
+  return commands
+}
+
+export function buildCat1ReconnectCommand(): string {
+  return validateKz3Command('@CFG,4G,RECONNECT')
 }
 
 export function buildRoleCommand(role: Kz3SystemRole, address: string): string {
@@ -229,6 +364,20 @@ export const KZ3_PRESET_COMMANDS: PresetCommandItem[] = [
     name: '查询星闪无线状态',
     cmd: '@CFG,SLE,SHOW',
     description: '查询 SLE 地址、网络名、发射功率、模组 READY、MAC 及本轮 AT 参数确认状态',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '查询无线承载状态',
+    cmd: '@CFG,WIRELESS,SHOW',
+    description: '查询 SLE / Cat.1 的运行承载、保存值、上报周期和 Cat.1 链路状态',
+    category: 'query',
+    danger: 'none',
+  },
+  {
+    name: '查询 Cat.1/MQTT 配置',
+    cmd: '@CFG,4G,SHOW',
+    description: '查询 Cat.1 保存记录；用户名和密码只返回 SET / EMPTY，不回显凭证',
     category: 'query',
     danger: 'none',
   },
@@ -297,6 +446,8 @@ export function getCommandGroup(command: string): Kz3ConfigGroup {
   if (command.startsWith('@CFG,SYS,')) return 'system'
   if (command.startsWith('@CFG,ETH,')) return 'ethernet'
   if (command.startsWith('@CFG,SLE,')) return 'sle'
+  if (command.startsWith('@CFG,WIRELESS,')) return 'wireless'
+  if (command.startsWith('@CFG,4G,')) return 'cat1'
   if (command.startsWith('@CFG,IO,')) return 'io'
   return 'debug'
 }
@@ -308,6 +459,31 @@ export function getFollowUpQuery(command: string): string | null {
 
 function decodeSleName(value: string): string {
   return value.replace(/%2C/gi, ',').replace(/%25/gi, '%')
+}
+
+function decodePercentText(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+/** 供会话记录、确认框和公共串口 TX 回显使用，避免保存 MQTT 凭证。 */
+export function redactKz3Command(command: string): string {
+  const normalized = command.trim()
+  const parts = normalized.split(',')
+  if (parts[0] !== '@CFG' || parts[1] !== '4G') return normalized
+  if (parts[2] === 'INIT' && parts.length === 11) {
+    parts[6] = '***'
+    parts[7] = '***'
+    return parts.join(',')
+  }
+  if ((parts[2] === 'USER' || parts[2] === 'PASS') && parts.length === 4) {
+    parts[3] = '***'
+    return parts.join(',')
+  }
+  return normalized
 }
 
 export function parseKz3ProtocolLine(line: string): Kz3ProtocolEnvelope | null {
@@ -322,7 +498,11 @@ export function parseKz3ProtocolLine(line: string): Kz3ProtocolEnvelope | null {
     if (separator <= 0) continue
     const key = segment.slice(0, separator).toUpperCase()
     const value = segment.slice(separator + 1)
-    fields[key] = family === 'SLE' && key === 'NAME' ? decodeSleName(value) : value
+    fields[key] = family === 'SLE' && key === 'NAME'
+      ? decodeSleName(value)
+      : family === '4G' && ['APN', 'HOST', 'TOPIC'].includes(key)
+        ? decodePercentText(value)
+        : value
   }
   return { ok, family, fields, raw }
 }

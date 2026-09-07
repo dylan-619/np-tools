@@ -26,22 +26,32 @@ import {
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 import { appSaveFile } from '../../../api/sjzdApi'
 import { useSerialStore } from '../../../stores/serialStore'
+import { useControllerDebugStore } from '../../../stores/controllerDebugStore'
 import { useKz3MaintenanceStore } from '../../../stores/kz3MaintenanceStore'
 import type {
   Kz3ConfigGroup,
+  Kz3Cat1Candidate,
   Kz3EthernetCandidate,
   Kz3SleCandidate,
   Kz3SystemRole,
+  Kz3WirelessCandidate,
 } from '../../../types/kz3Maintenance'
 import {
+  buildCat1InitCommand,
+  buildCat1ReconnectCommand,
+  buildCat1UpdateCommands,
   buildDebugCommand,
   buildEthernetCommands,
+  buildKz3HttpBaseUrl,
   buildIdentityCommand,
   buildRoleCommand,
   buildSleInitCommand,
+  buildWirelessModeCommand,
+  buildWirelessReportCommand,
   KZ3_SLE_FIXED_ADDRESS,
   KZ3_SLE_FIXED_APID,
   KZ3_UART_CONFIG,
+  redactKz3Command,
   sleConfirmationLevel,
 } from '../../../utils/kz3UartProtocol'
 
@@ -49,6 +59,7 @@ type Section = 'overview' | Kz3ConfigGroup | 'session'
 
 const serial = useSerialStore()
 const maintenance = useKz3MaintenanceStore()
+const httpDebug = useControllerDebugStore()
 const activeSection = ref<Section>('overview')
 const pageMessage = ref<{ text: string; error: boolean } | null>(null)
 const customCommandInput = ref('')
@@ -67,6 +78,20 @@ const sle = ref<Kz3SleCandidate>({
   maxPower: '5',
   mode: '0',
 })
+const wireless = ref<Kz3WirelessCandidate>({
+  mode: 'SLE',
+  reportSeconds: '15',
+})
+const cat1 = ref<Kz3Cat1Candidate>({
+  apn: '',
+  host: '',
+  port: '1883',
+  username: '',
+  password: '',
+  topic: 'devices',
+  keepalive: '60',
+  qos: '1',
+})
 const role = ref<Kz3SystemRole>('CONTROLLER')
 const roleAddress = ref('1')
 const confirmAction = ref<{ title: string; message: string; commands: string[] } | null>(null)
@@ -77,10 +102,12 @@ const sections: Array<{
   caption: string
   icon: typeof Cpu
 }> = [
-  { id: 'overview', label: '设备总览', caption: '五组配置快照', icon: Cpu },
+  { id: 'overview', label: '设备总览', caption: '七组配置快照', icon: Cpu },
   { id: 'system', label: '生产身份', caption: 'SN / 型号 / 地址', icon: Fingerprint },
   { id: 'ethernet', label: 'Ethernet', caption: 'RUN / SAVED', icon: EthernetPort },
   { id: 'sle', label: '星闪 SLE', caption: 'EEPROM / 模组确认', icon: Radio },
+  { id: 'wireless', label: '无线承载', caption: 'SLE / Cat.1 模式', icon: Activity },
+  { id: 'cat1', label: 'Cat.1 / MQTT', caption: '首配 / 差异 / 重连', icon: Settings2 },
   { id: 'io', label: '系统角色', caption: 'Controller / RTU', icon: Database },
   { id: 'debug', label: '调试日志', caption: '持久化 DEBUG 开关', icon: TerminalSquare },
   { id: 'session', label: '会话记录', caption: '原始回包与审计', icon: FileClock },
@@ -117,6 +144,23 @@ const latestSnapshotAt = computed(() => {
     .sort()
   return timestamps[timestamps.length - 1] || ''
 })
+const savedHttpUrl = computed(() => {
+  const fields = maintenance.snapshots.ethernet?.fields
+  if (!fields?.SAVED_IP || !fields.SAVED_MASK || !fields.SAVED_GW || !fields.SAVED_PORT) return ''
+  try {
+    return buildKz3HttpBaseUrl({
+      ip: fields.SAVED_IP,
+      mask: fields.SAVED_MASK,
+      gateway: fields.SAVED_GW,
+      port: fields.SAVED_PORT,
+    })
+  } catch {
+    return ''
+  }
+})
+const latestNetworkRecovery = computed(
+  () => maintenance.networkRecoveryAttempts[maintenance.networkRecoveryAttempts.length - 1]
+)
 
 function showMessage(text: string, error = false) {
   pageMessage.value = { text, error }
@@ -155,9 +199,39 @@ async function query(group: Kz3ConfigGroup) {
 async function queryAll() {
   try {
     await maintenance.queryAll()
-    showMessage('五组配置查询完成；请按各层状态判断是否真正生效')
+    showMessage('七组配置查询完成；请按各层状态判断是否真正生效')
   } catch (error) {
     showMessage(String(error), true)
+  }
+}
+
+async function reconnectHttpAtSavedAddress() {
+  const target = savedHttpUrl.value
+  if (!target) {
+    showMessage('请先通过 @CFG,ETH,SHOW 回读完整 SAVED IP、MASK、GW 与 PORT', true)
+    return
+  }
+  const attemptId = maintenance.startNetworkRecoveryAttempt(target)
+  try {
+    if (httpDebug.transportState !== 'disconnected') httpDebug.disconnect()
+    httpDebug.baseUrl = target
+    await httpDebug.connect()
+    const status =
+      httpDebug.compatibilityState === 'matched'
+        ? 'http_reachable_matched'
+        : httpDebug.compatibilityState === 'mismatch'
+          ? 'http_reachable_mismatch'
+          : 'http_reachable_partial'
+    maintenance.finishNetworkRecoveryAttempt(attemptId, status)
+    showMessage(
+      httpDebug.compatibilityState === 'matched'
+        ? `HTTP 已连通：${target}；工程 ID、版本与北向 manifest 已匹配，在线页仍需单独解锁写入`
+        : `HTTP 已连通：${target}；工程身份校验状态为 ${httpDebug.compatibilityState}，在线页保持只读`,
+      false
+    )
+  } catch (error) {
+    maintenance.finishNetworkRecoveryAttempt(attemptId, 'failed', String(error))
+    showMessage(`候选 HTTP 地址未连通：${String(error)}；工具未扫描其他网段或地址`, true)
   }
 }
 
@@ -202,7 +276,7 @@ function requestWrite(title: string, message: string, builder: () => string | st
   try {
     const built = builder()
     const commands = Array.isArray(built) ? built : [built]
-    const commandPreview = commands.map((command, index) => `${index + 1}. ${command}`).join('\n')
+    const commandPreview = commands.map((command, index) => `${index + 1}. ${redactKz3Command(command)}`).join('\n')
     confirmAction.value = {
       title,
       message: `${message}\n\n即将按顺序发送 ${commands.length} 条配置指令：\n${commandPreview}`,
@@ -286,6 +360,34 @@ watch(
 )
 
 watch(
+  () => maintenance.snapshots.wireless,
+  (snapshot) => {
+    if (!snapshot) return
+    wireless.value = {
+      mode: snapshot.fields.SAVED === 'CAT1' ? 'CAT1' : 'SLE',
+      reportSeconds: snapshot.fields.REPORT_RAW || wireless.value.reportSeconds,
+    }
+  }
+)
+
+watch(
+  () => maintenance.snapshots.cat1,
+  (snapshot) => {
+    if (!snapshot) return
+    cat1.value = {
+      apn: snapshot.fields.APN ?? cat1.value.apn,
+      host: snapshot.fields.HOST ?? cat1.value.host,
+      port: snapshot.fields.PORT || cat1.value.port,
+      username: '',
+      password: '',
+      topic: snapshot.fields.TOPIC ?? cat1.value.topic,
+      keepalive: snapshot.fields.KEEPALIVE || cat1.value.keepalive,
+      qos: snapshot.fields.QOS || cat1.value.qos,
+    }
+  }
+)
+
+watch(
   () => maintenance.snapshots.io,
   (snapshot) => {
     if (!snapshot) return
@@ -307,7 +409,7 @@ onMounted(() => {
         <div>
           <div class="eyebrow">KZ3 · UART1 DEVICE MAINTENANCE</div>
           <h1>设备初始化与维护工作台</h1>
-          <p>结构化配置 SN、Ethernet、星闪、系统角色与调试日志；不修改工程 YAML</p>
+          <p>结构化配置 SN、Ethernet、SLE、Cat.1/MQTT、系统角色与调试日志；不修改工程 YAML</p>
         </div>
       </div>
       <div class="header-actions">
@@ -428,6 +530,20 @@ onMounted(() => {
                 <button
                   class="toolbar-chip"
                   :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@CFG,WIRELESS,SHOW')"
+                >
+                  @WIRELESS
+                </button>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
+                  @click="sendDirectCommand('@CFG,4G,SHOW')"
+                >
+                  @4G
+                </button>
+                <button
+                  class="toolbar-chip"
+                  :disabled="!maintenanceReady || maintenance.isBusy"
                   @click="sendDirectCommand('@CFG,IO,SHOW')"
                 >
                   @IO
@@ -482,6 +598,20 @@ onMounted(() => {
                 {{ ['尚未确认', 'EEPROM 有效', '模组基础就绪', 'AT 参数已确认'][sleLevel] }}
               </small>
             </button>
+            <button class="summary-card" @click="activeSection = 'wireless'">
+              <div class="card-top"><Activity :size="18" /><span>无线承载</span></div>
+              <strong>{{ field('wireless', 'RUN') }}</strong>
+              <small :class="hasSnapshot('wireless') && !isOne('wireless', 'REBOOT_REQUIRED') ? 'good' : 'warn'">
+                {{ !hasSnapshot('wireless') ? '尚未查询' : isOne('wireless', 'REBOOT_REQUIRED') ? '保存值待断电复核' : '运行 / 保存状态已读取' }}
+              </small>
+            </button>
+            <button class="summary-card" @click="activeSection = 'cat1'">
+              <div class="card-top"><Settings2 :size="18" /><span>Cat.1 / MQTT</span></div>
+              <strong>{{ field('cat1', 'HOST') }}</strong>
+              <small :class="isOne('cat1', 'VALID') ? 'good' : 'warn'">
+                {{ isOne('cat1', 'VALID') ? '配置有效；凭证未回显' : '未配置 / 未确认' }}
+              </small>
+            </button>
             <button class="summary-card" @click="activeSection = 'io'">
               <div class="card-top"><Database :size="18" /><span>系统角色</span></div>
               <strong>{{ field('io', 'ACTIVE_ROLE') }}</strong>
@@ -497,6 +627,8 @@ onMounted(() => {
             <div class="matrix-row"><strong>SYS</strong><span>{{ field('system', 'VALID') === '1' ? 'VALID' : 'UNKNOWN' }}</span><span>{{ field('system', 'SN') }}</span><span>不适用</span></div>
             <div class="matrix-row"><strong>ETH</strong><span>{{ field('ethernet', 'SAVED_IP') }}</span><span>{{ field('ethernet', 'RUN_IP') }}</span><span>{{ field('ethernet', 'LINK') === '1' ? 'LINK UP' : '未确认' }}</span></div>
             <div class="matrix-row"><strong>SLE</strong><span>{{ field('sle', 'VALID') === '1' ? 'VALID' : 'INVALID/未知' }}</span><span>{{ field('sle', 'READY') === '1' ? 'READY' : 'NOT READY' }}</span><span>{{ field('sle', 'CFG_APPLIED') === '1' ? 'AT ACK' : '待 AT 确认' }}</span></div>
+            <div class="matrix-row"><strong>WIRELESS</strong><span>{{ field('wireless', 'SAVED') }}</span><span>{{ field('wireless', 'RUN') }}</span><span>{{ field('wireless', 'REBOOT_REQUIRED') === '1' ? '待断电复核' : '链路另验' }}</span></div>
+            <div class="matrix-row"><strong>CAT1</strong><span>{{ field('cat1', 'VALID') === '1' ? 'VALID' : 'INVALID/未知' }}</span><span>PORT {{ field('cat1', 'PORT') }}</span><span>{{ field('wireless', 'CAT1_ONLINE') === '1' ? 'ONLINE' : '未确认' }}</span></div>
             <div class="matrix-row"><strong>IO</strong><span>{{ field('io', 'SAVED_ROLE') }}</span><span>{{ field('io', 'ACTIVE_ROLE') }}</span><span>RS485 HIL 另验</span></div>
           </div>
         </section>
@@ -533,6 +665,13 @@ onMounted(() => {
             <h3>RUN / SAVED 对照</h3>
             <div class="compare-table"><div class="compare-head"><span>字段</span><span>RUN</span><span>SAVED</span></div><div><strong>IP</strong><code>{{ field('ethernet', 'RUN_IP') }}</code><code>{{ field('ethernet', 'SAVED_IP') }}</code></div><div><strong>MASK</strong><code>{{ field('ethernet', 'RUN_MASK') }}</code><code>{{ field('ethernet', 'SAVED_MASK') }}</code></div><div><strong>GW</strong><code>{{ field('ethernet', 'RUN_GW') }}</code><code>{{ field('ethernet', 'SAVED_GW') }}</code></div><div><strong>PORT</strong><code>{{ field('ethernet', 'RUN_PORT') }}</code><code>{{ field('ethernet', 'SAVED_PORT') }}</code></div></div>
             <div class="state-banner" :class="isOne('ethernet', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('ethernet', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('ethernet', 'REBOOT_REQUIRED') ? '已保存，尚未成为运行配置' : 'RUN 与 SAVED 一致' }}</div>
+            <div class="network-reconnect-card">
+              <strong>重启后 HTTP 复连（不扫描）</strong>
+              <p>完成现场许可的重启后，工具仅访问已由 <code>@CFG,ETH,SHOW</code> 读回的一个 SAVED 地址；不会扫描 ARP、端口或其他网段。</p>
+              <code class="reconnect-url">{{ savedHttpUrl || '先回读完整 SAVED Ethernet 配置' }}</code>
+              <button class="button secondary" :disabled="!savedHttpUrl || httpDebug.transportState === 'connecting'" @click="reconnectHttpAtSavedAddress"><RefreshCw :size="13" :class="{ spin: httpDebug.transportState === 'connecting' }" /> 用候选地址复连并预检</button>
+              <small v-if="latestNetworkRecovery">最近尝试：{{ latestNetworkRecovery.status }} · {{ latestNetworkRecovery.candidateUrl }}<template v-if="latestNetworkRecovery.error"> · {{ latestNetworkRecovery.error }}</template></small>
+            </div>
             <small>LINK={{ field('ethernet', 'LINK') }} 只表示链路状态，不证明 HTTP 业务可用。</small>
           </div>
         </section>
@@ -559,6 +698,47 @@ onMounted(() => {
               <li :class="{ done: isOne('sle', 'CFG_APPLIED') }"><span>4</span><div><strong>本轮 AT 参数确认</strong><small>ADDR {{ field('sle', 'AT_ADDR') }} · NAME {{ field('sle', 'AT_NAME') }} · PWR {{ field('sle', 'AT_PWR') }}</small></div></li>
             </ol>
             <div class="sle-facts"><span>实际地址 <strong>{{ field('sle', 'ADDR') }}</strong></span><span>配置地址 <strong>{{ field('sle', 'CFG_ADDR') }}</strong></span><span>APID <strong>{{ field('sle', 'APID') }}</strong></span><span>上报周期 <strong>{{ field('sle', 'RPT_SEC') }}s</strong></span></div>
+          </div>
+        </section>
+
+        <section v-else-if="activeSection === 'wireless'" class="panel-section two-column">
+          <div class="editor-card">
+            <div class="section-heading compact"><div><span class="section-kicker">WIRELESS OWNER · EEPROM 96..127</span><h2>无线承载与报告周期</h2></div><button class="button small" :disabled="!maintenanceReady || maintenance.isBusy" @click="query('wireless')"><RefreshCw :size="13" /> 查询</button></div>
+            <div class="form-grid">
+              <label class="form-field"><span>下次启动无线承载</span><select v-model="wireless.mode"><option value="SLE">SLE</option><option value="CAT1">Cat.1 / MQTT</option></select><small>固件会先校验目标承载的保存记录；切换后需断电复核。</small></label>
+              <label class="form-field"><span>报告周期原始值</span><input v-model="wireless.reportSeconds" class="mono" inputmode="numeric"><small>0..255；设备同时回显换算后的 REPORT_SEC。</small></label>
+            </div>
+            <p class="warning-box">模式切换的 OK 只证明 EEPROM 已保存。固件返回 POWER_CYCLE_REQUIRED 后，必须在安全条件下断电再上电、重新 SHOW，不能把串口软重启当作无线承载已经切换。</p>
+            <div class="debug-actions"><button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认保存无线承载模式', '保存的无线承载在下次断电上电后才会成为 RUN。请先确认目标 SLE 或 Cat.1 记录有效。', () => buildWirelessModeCommand(wireless.mode))"><Radio :size="14" /> 保存承载模式</button><button class="button secondary" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认更新无线报告周期', '仅更新无线公共记录；工具会在 ACK 后读取 SHOW 复核保存值。', () => buildWirelessReportCommand(wireless.reportSeconds))"><Save :size="14" /> 更新报告周期</button></div>
+          </div>
+          <div class="snapshot-card">
+            <h3>RUN / SAVED 与链路状态</h3>
+            <dl><div><dt>RUN</dt><dd>{{ field('wireless', 'RUN') }}</dd></div><div><dt>SAVED</dt><dd>{{ field('wireless', 'SAVED') }}</dd></div><div><dt>配置有效</dt><dd :class="isOne('wireless', 'VALID') ? 'good' : 'warn'">{{ field('wireless', 'VALID') }}</dd></div><div><dt>报告周期</dt><dd class="mono">{{ field('wireless', 'REPORT_SEC') }} s / RAW {{ field('wireless', 'REPORT_RAW') }}</dd></div><div><dt>Cat.1 链路</dt><dd>{{ field('wireless', 'CAT1_ONLINE') === '1' ? 'ONLINE' : '未确认' }} / STATE {{ field('wireless', 'CAT1_STATE') }}</dd></div></dl>
+            <div class="state-banner" :class="isOne('wireless', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('wireless', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('wireless', 'REBOOT_REQUIRED') ? '保存模式尚未成为 RUN，待断电复核' : '未报告承载切换等待状态' }}</div>
+            <small>PORT=READY 仅表示无线端口资源就绪；Cat.1 ONLINE 也不证明 MQTT broker 鉴权、上报或现场链路通过。</small>
+          </div>
+        </section>
+
+        <section v-else-if="activeSection === 'cat1'" class="panel-section two-column">
+          <div class="editor-card">
+            <div class="section-heading compact"><div><span class="section-kicker">CAT.1 / MQTT OWNER · EEPROM 128..383</span><h2>Cat.1 / MQTT 配置</h2></div><button class="button small" :disabled="!maintenanceReady || maintenance.isBusy" @click="query('cat1')"><RefreshCw :size="13" /> 查询</button></div>
+            <div class="form-grid">
+              <label class="form-field"><span>APN</span><input v-model="cat1.apn" class="mono" maxlength="31"><small>1..31 B 可打印 ASCII</small></label>
+              <label class="form-field"><span>MQTT Host</span><input v-model="cat1.host" class="mono" maxlength="63"><small>1..63 B 可打印 ASCII</small></label>
+              <label class="form-field"><span>MQTT 端口</span><input v-model="cat1.port" class="mono" inputmode="numeric"><small>1..65535</small></label>
+              <label class="form-field"><span>Topic 前缀</span><input v-model="cat1.topic" class="mono" maxlength="31"><small>留空时固件按 devices 生成 Topic</small></label>
+              <label class="form-field"><span>MQTT 用户名（仅新值）</span><input v-model="cat1.username" class="mono" autocomplete="off" maxlength="31"><small>SHOW 只返回 SET / EMPTY；留空不会覆盖已保存用户名。</small></label>
+              <label class="form-field"><span>MQTT 密码（仅新值）</span><input v-model="cat1.password" type="password" class="mono" autocomplete="new-password" maxlength="63"><small>从不回显、不写入会话/串口日志；留空不会覆盖已保存密码。</small></label>
+              <label class="form-field"><span>Keepalive（秒）</span><input v-model="cat1.keepalive" class="mono" inputmode="numeric"><small>30..1200</small></label>
+              <label class="form-field"><span>QoS</span><select v-model="cat1.qos"><option value="0">0</option><option value="1">1</option></select><small>仅支持 0 或 1</small></label>
+            </div>
+            <p class="info-box">首次配置或需要清空凭证时使用完整 INIT；已存在有效记录时，建议“写入草稿差异”，只发送变化的非敏感字段以及明确输入的新凭证。每条命令均在 OK 后自动 SHOW 复核。</p>
+            <div class="debug-actions wrap-actions"><button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认重建完整 Cat.1 配置', 'INIT 会替换完整 256B Cat.1 记录。输入框留空的用户名或密码将明确写为空；确认框和会话记录已脱敏。', () => buildCat1InitCommand(cat1))"><Save :size="14" /> 首次初始化 / 重建 (INIT)</button><button class="button primary" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认写入 Cat.1 草稿差异', '设备必须已有 VALID Cat.1 记录。仅写入与 SHOW 快照不一致的字段；未输入的用户名/密码保持不变。', () => buildCat1UpdateCommands(cat1, maintenance.snapshots.cat1?.fields || {}))"><Settings2 :size="14" /> 写入草稿差异</button><button class="button secondary" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认请求 Cat.1 重连', '仅当当前 RUN=CAT1 且保存配置有效时设备才会接受。此操作不会替代 broker 连通性或业务上报验证。', () => buildCat1ReconnectCommand())"><RefreshCw :size="14" /> 请求重连</button></div>
+          </div>
+          <div class="snapshot-card">
+            <h3>保存记录回读</h3>
+            <dl><div><dt>VALID</dt><dd :class="isOne('cat1', 'VALID') ? 'good' : 'warn'">{{ field('cat1', 'VALID') }}</dd></div><div><dt>APN</dt><dd class="mono">{{ field('cat1', 'APN') }}</dd></div><div><dt>HOST</dt><dd class="mono">{{ field('cat1', 'HOST') }}</dd></div><div><dt>PORT</dt><dd class="mono">{{ field('cat1', 'PORT') }}</dd></div><div><dt>TOPIC</dt><dd class="mono">{{ field('cat1', 'TOPIC') }}</dd></div><div><dt>KEEPALIVE / QoS</dt><dd class="mono">{{ field('cat1', 'KEEPALIVE') }} / {{ field('cat1', 'QOS') }}</dd></div><div><dt>USERNAME</dt><dd>{{ field('cat1', 'USER') }}</dd></div><div><dt>PASSWORD</dt><dd>{{ field('cat1', 'PASS') }}</dd></div></dl>
+            <p class="warning-box">该产品当前 MQTT / HTTP 均为明文链路。工具只可减少误操作，不能替代隔离网络、证书、认证或密钥注入设计。</p>
           </div>
         </section>
 
@@ -708,6 +888,12 @@ dd { margin: 0; font-size: 11px; font-weight: 700; }
 .state-banner { display: flex; align-items: center; gap: 7px; margin: 12px 0 7px; padding: 8px; border-radius: 4px; font-size: 10px; font-weight: 800; }
 .state-banner.warning { color: #805016; background: #fff4df; border: 1px solid #ddb979; }
 .state-banner.success { color: #176b45; background: #edf8f2; border: 1px solid #9bcbb0; }
+.network-reconnect-card { display: flex; flex-direction: column; gap: 7px; margin: 10px 0; padding: 9px; border: 1px solid #b8cad7; border-left: 3px solid #2879a8; border-radius: 4px; background: #f1f7fb; }
+.network-reconnect-card > strong { color: #204d68; font-size: 10px; }
+.network-reconnect-card p, .network-reconnect-card small { margin: 0; color: #526b7a; font-size: 9px; line-height: 1.5; }
+.network-reconnect-card code { font-family: var(--font-mono); }
+.reconnect-url { overflow: hidden; padding: 5px 6px; color: #174d6b; background: #fff; border: 1px solid #d1dde5; border-radius: 3px; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+.network-reconnect-card .button { align-self: flex-start; }
 .confirmation-ladder { margin: 0; padding: 0; list-style: none; }
 .confirmation-ladder li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: center; min-height: 48px; position: relative; color: #6c7e89; }
 .confirmation-ladder li > span { width: 24px; height: 24px; display: grid; place-items: center; z-index: 1; border: 2px solid #b8c4cb; border-radius: 50%; background: #f8fafb; font: 800 9px var(--font-mono); }
@@ -731,6 +917,7 @@ dd { margin: 0; font-size: 11px; font-weight: 700; }
 .role-compare strong { font-size: 12px; }
 .role-compare code { font-size: 9px; }
 .debug-actions { display: flex; gap: 8px; margin-top: 13px; }
+.debug-actions.wrap-actions { flex-wrap: wrap; }
 .debug-current { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .debug-current strong { color: #174d6b; font: 800 23px var(--font-mono); }
 .debug-current small { margin-top: 7px; color: #687c88; font-size: 9px; }

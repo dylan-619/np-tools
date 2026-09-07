@@ -1,11 +1,12 @@
-use app_types::{
-    AiSampleDto, DeviceInfoResult, ModbusPointConfig, SleFieldComparison,
-};
+use app_types::{AiSampleDto, DeviceInfoResult, ModbusPointConfig, SleFieldComparison};
 use regex::Regex;
 use std::sync::LazyLock;
 
 pub const DEVICE_SN_PREFIX: &str = "4301";
-pub const MAX_MODBUS_POINTS: usize = 16;
+/// 与 SJZDV3 固件 `MODBUS_DEV_MAX_NUM` 保持一致，桌面端不得再截断为 16 点。
+pub const MAX_MODBUS_POINTS: usize = 100;
+/// SJZDV3 UART1 接收缓冲区大小；批量点位命令必须在发送前受此上限约束。
+pub const MAX_SJZ_UART1_COMMAND_BYTES: usize = 2048;
 
 #[derive(Debug, Clone)]
 pub struct EncodedCommand {
@@ -62,8 +63,12 @@ pub fn encode_sle_netname(name: &str) -> Result<EncodedCommand, String> {
     if clean.is_empty() {
         return Err("星闪网络名称不能为空".into());
     }
-    if clean.len() > 16 {
-        return Err(format!("星闪网络名称最长 16 字符（当前 {} 字符）", clean.len()));
+    // 固件为 16B 存储区保留一个 NUL 终止符，因此可写入的 ASCII 名称最多 15 字节。
+    if clean.len() > 15 {
+        return Err(format!(
+            "星闪网络名称最长 15 字符（当前 {} 字符）",
+            clean.len()
+        ));
     }
     if clean.bytes().any(|b| !(0x20..=0x7e).contains(&b)) {
         return Err("星闪网络名称仅支持可打印 ASCII 字符".into());
@@ -97,13 +102,22 @@ pub fn encode_wlan_bridge(enable: bool) -> EncodedCommand {
 
 pub fn validate_point(pt: &ModbusPointConfig) -> Result<ModbusPointConfig, String> {
     if pt.slave_addr == 0 || pt.slave_addr > 247 {
-        return Err(format!("从站地址须在 1~247 之间（当前: {}）", pt.slave_addr));
+        return Err(format!(
+            "从站地址须在 1~247 之间（当前: {}）",
+            pt.slave_addr
+        ));
     }
     if ![1, 2, 3, 4].contains(&pt.func_code) {
-        return Err(format!("功能码仅支持 1(线圈), 2(离散输入), 3(保持寄存器), 4(输入寄存器)（当前: {}）", pt.func_code));
+        return Err(format!(
+            "功能码仅支持 1(线圈), 2(离散输入), 3(保持寄存器), 4(输入寄存器)（当前: {}）",
+            pt.func_code
+        ));
     }
     if pt.reg_addr == 0 || pt.reg_addr > 65535 {
-        return Err(format!("PLC 寄存器地址须在 1~65535 之间（当前: {}）", pt.reg_addr));
+        return Err(format!(
+            "PLC 寄存器地址须在 1~65535 之间（当前: {}）",
+            pt.reg_addr
+        ));
     }
     if pt.length == 0 || pt.length > 31 {
         return Err(format!("读取长度须在 1~31 之间（当前: {}）", pt.length));
@@ -125,7 +139,11 @@ pub fn validate_point(pt: &ModbusPointConfig) -> Result<ModbusPointConfig, Strin
 
 pub fn encode_modbus_points(points: &[ModbusPointConfig]) -> Result<EncodedCommand, String> {
     if points.len() > MAX_MODBUS_POINTS {
-        return Err(format!("点位总数不能超过 {} 个（当前: {}）", MAX_MODBUS_POINTS, points.len()));
+        return Err(format!(
+            "点位总数不能超过 {} 个（当前: {}）",
+            MAX_MODBUS_POINTS,
+            points.len()
+        ));
     }
     let mut parts = Vec::new();
     for pt in points {
@@ -140,8 +158,15 @@ pub fn encode_modbus_points(points: &[ModbusPointConfig]) -> Result<EncodedComma
             valid.byte_order
         ));
     }
-    let body = parts.join(";");
-    Ok(EncodedCommand::new(format!("RS485DEV:{}", body), false))
+    let command = EncodedCommand::new(format!("RS485DEV:{}", parts.join(";")), false);
+    if command.payload.len() > MAX_SJZ_UART1_COMMAND_BYTES {
+        return Err(format!(
+            "Modbus 配置命令超过 SJZDV3 UART1 的 {} 字节上限（当前: {}）",
+            MAX_SJZ_UART1_COMMAND_BYTES,
+            command.payload.len()
+        ));
+    }
+    Ok(command)
 }
 
 pub fn encode_modbus_list() -> EncodedCommand {
@@ -152,7 +177,12 @@ pub fn encode_modbus_reset() -> EncodedCommand {
     EncodedCommand::new("RS485DEV:RESET", false)
 }
 
-pub fn encode_modbus_debug(addr: u8, func: u8, reg: u32, len: u8) -> Result<EncodedCommand, String> {
+pub fn encode_modbus_debug(
+    addr: u8,
+    func: u8,
+    reg: u32,
+    len: u8,
+) -> Result<EncodedCommand, String> {
     let dummy = ModbusPointConfig {
         slave_addr: addr,
         func_code: func,
@@ -165,7 +195,10 @@ pub fn encode_modbus_debug(addr: u8, func: u8, reg: u32, len: u8) -> Result<Enco
     };
     let valid = validate_point(&dummy)?;
     Ok(EncodedCommand::new(
-        format!("RS485DEV:DEBUG:{},{},{},{}", valid.slave_addr, valid.func_code, valid.reg_addr, valid.length),
+        format!(
+            "RS485DEV:DEBUG:{},{},{},{}",
+            valid.slave_addr, valid.func_code, valid.reg_addr, valid.length
+        ),
         false,
     ))
 }
@@ -232,29 +265,23 @@ pub fn encode_eeprom_clear() -> EncodedCommand {
 // Response Parsers
 // ==============================================================================
 
-static RE_AI: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"AI1:\s*([0-9.]+)\s*mA,\s*AI2:\s*([0-9.]+)\s*mA").unwrap()
-});
+static RE_AI: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"AI1:\s*([0-9.]+)\s*mA,\s*AI2:\s*([0-9.]+)\s*mA").unwrap());
 
-static RE_ANSI_STRIP: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\x1B\[[0-9;?]*[a-zA-Z]").unwrap()
-});
+static RE_ANSI_STRIP: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\x1B\[[0-9;?]*[a-zA-Z]").unwrap());
 
-static RE_DEV_SN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:SN|DeviceSN|Device\s*SN)[:=]\s*([0-9A-Za-z]+)").unwrap()
-});
+static RE_DEV_SN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:SN|DeviceSN|Device\s*SN)[:=]\s*([0-9A-Za-z]+)").unwrap());
 
-static RE_DEV_TYPE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:Type|DevType|Model)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
-});
+static RE_DEV_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:Type|DevType|Model)[:=]\s*([0-9A-Za-z._-]+)").unwrap());
 
-static RE_DEV_ADDR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:Addr|Address)[:=]\s*([0-9A-Za-z]+)").unwrap()
-});
+static RE_DEV_ADDR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:Addr|Address)[:=]\s*([0-9A-Za-z]+)").unwrap());
 
-static RE_DEV_HW: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:HW|Hardware|HwVer)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
-});
+static RE_DEV_HW: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:HW|Hardware|HwVer)[:=]\s*([0-9A-Za-z._-]+)").unwrap());
 
 static RE_DEV_FW: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(?:FW|Firmware|AppVersion|Version|FwVer)[:=]\s*([0-9A-Za-z._-]+)").unwrap()
@@ -268,9 +295,8 @@ static RE_DEV_UPTIME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(?:UPTIME|Runtime|TotRunTim|TotRunTime|RTM)[:=]\s*(\d+)").unwrap()
 });
 
-static RE_DEV_RPT_FREQ: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:RptFreq|ReportFreq|RTFRE)[:=]\s*(\d+)").unwrap()
-});
+static RE_DEV_RPT_FREQ: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:RptFreq|ReportFreq|RTFRE)[:=]\s*(\d+)").unwrap());
 
 pub fn parse_ai_sample(text: &str, timestamp_ms: u64) -> Option<AiSampleDto> {
     if let Some(caps) = RE_AI.captures(text) {
@@ -292,13 +318,20 @@ pub fn parse_dev_info(text: &str) -> DeviceInfoResult {
     let sn = RE_DEV_SN.captures(clean_str).map(|c| c[1].to_string());
     let dev_type = RE_DEV_TYPE.captures(clean_str).map(|c| c[1].to_string());
     let dev_addr = RE_DEV_ADDR.captures(clean_str).map(|c| c[1].to_string());
-    let hw = RE_DEV_HW.captures(clean_str).map(|c| c[1].to_string()).or_else(|| {
-        dev_type.as_ref().map(|t| format!("SJZDV3-{}", t))
-    });
+    let hw = RE_DEV_HW
+        .captures(clean_str)
+        .map(|c| c[1].to_string())
+        .or_else(|| dev_type.as_ref().map(|t| format!("SJZDV3-{}", t)));
     let fw = RE_DEV_FW.captures(clean_str).map(|c| c[1].to_string());
-    let boot = RE_DEV_BOOT.captures(clean_str).and_then(|c| c[1].parse::<u64>().ok());
-    let uptime = RE_DEV_UPTIME.captures(clean_str).and_then(|c| c[1].parse::<u64>().ok());
-    let report_freq = RE_DEV_RPT_FREQ.captures(clean_str).and_then(|c| c[1].parse::<u32>().ok());
+    let boot = RE_DEV_BOOT
+        .captures(clean_str)
+        .and_then(|c| c[1].parse::<u64>().ok());
+    let uptime = RE_DEV_UPTIME
+        .captures(clean_str)
+        .and_then(|c| c[1].parse::<u64>().ok());
+    let report_freq = RE_DEV_RPT_FREQ
+        .captures(clean_str)
+        .and_then(|c| c[1].parse::<u32>().ok());
 
     DeviceInfoResult {
         sn,
@@ -400,18 +433,20 @@ static RE_NETNAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)(?:NetName|Net_Name|Name)=['"]?([^,'"\s\(\)]+)['"]?"#).unwrap()
 });
 
-static RE_DEV_ADDR_SLE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:DevAddr|DeviceAddr|Addr)=(\d+)").unwrap()
-});
+static RE_DEV_ADDR_SLE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:DevAddr|DeviceAddr|Addr)=(\d+)").unwrap());
 
-static RE_TX_PWR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:TxPwr|Tx_Pwr|PWR|Power)=(\d+)").unwrap()
-});
+static RE_TX_PWR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(?:TxPwr|Tx_Pwr|PWR|Power)=(\d+)").unwrap());
 
 pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
     let mut comparisons = Vec::new();
     let clean = RE_ANSI_STRIP.replace_all(text, "");
-    let lines: Vec<&str> = clean.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+    let lines: Vec<&str> = clean
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
 
     let mut eeprom_netname = String::new();
     let mut eeprom_devaddr = String::new();
@@ -422,7 +457,8 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
     let mut chip_pwr = String::new();
 
     for line in &lines {
-        let is_eeprom = line.contains("[EEPROM]") || (!line.contains("[CHIP]") && (line.contains("APID") || line.contains("MaxTxPwr")));
+        let is_eeprom = line.contains("[EEPROM]")
+            || (!line.contains("[CHIP]") && (line.contains("APID") || line.contains("MaxTxPwr")));
         let is_chip = line.contains("[CHIP]") || line.contains("Mac=");
 
         if is_eeprom {
@@ -452,13 +488,19 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
         // Single key lines fallback
         if !is_eeprom && !is_chip {
             if let Some(c) = RE_NETNAME.captures(line) {
-                if eeprom_netname.is_empty() { eeprom_netname = c[1].to_string(); }
+                if eeprom_netname.is_empty() {
+                    eeprom_netname = c[1].to_string();
+                }
             }
             if let Some(c) = RE_DEV_ADDR_SLE.captures(line) {
-                if eeprom_devaddr.is_empty() { eeprom_devaddr = c[1].to_string(); }
+                if eeprom_devaddr.is_empty() {
+                    eeprom_devaddr = c[1].to_string();
+                }
             }
             if let Some(c) = RE_TX_PWR.captures(line) {
-                if eeprom_pwr.is_empty() { eeprom_pwr = c[1].to_string(); }
+                if eeprom_pwr.is_empty() {
+                    eeprom_pwr = c[1].to_string();
+                }
             }
         }
     }
@@ -473,8 +515,16 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
         comparisons.push(SleFieldComparison {
             field_name: "星闪网络名称 (NetName)".into(),
             is_matched,
-            eeprom_val: if eeprom_netname.is_empty() { "--".into() } else { eeprom_netname },
-            chip_val: if chip_netname.is_empty() { "--".into() } else { chip_netname },
+            eeprom_val: if eeprom_netname.is_empty() {
+                "--".into()
+            } else {
+                eeprom_netname
+            },
+            chip_val: if chip_netname.is_empty() {
+                "--".into()
+            } else {
+                chip_netname
+            },
         });
     }
 
@@ -488,8 +538,16 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
         comparisons.push(SleFieldComparison {
             field_name: "从机通信地址 (DevAddr)".into(),
             is_matched,
-            eeprom_val: if eeprom_devaddr.is_empty() { "--".into() } else { eeprom_devaddr },
-            chip_val: if chip_devaddr.is_empty() { "--".into() } else { chip_devaddr },
+            eeprom_val: if eeprom_devaddr.is_empty() {
+                "--".into()
+            } else {
+                eeprom_devaddr
+            },
+            chip_val: if chip_devaddr.is_empty() {
+                "--".into()
+            } else {
+                chip_devaddr
+            },
         });
     }
 
@@ -503,8 +561,16 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
         comparisons.push(SleFieldComparison {
             field_name: "当前发射功率 (Tx Power)".into(),
             is_matched,
-            eeprom_val: if eeprom_pwr.is_empty() { "--".into() } else { format!("{} 档", eeprom_pwr) },
-            chip_val: if chip_pwr.is_empty() { "--".into() } else { format!("{} 档", chip_pwr) },
+            eeprom_val: if eeprom_pwr.is_empty() {
+                "--".into()
+            } else {
+                format!("{} 档", eeprom_pwr)
+            },
+            chip_val: if chip_pwr.is_empty() {
+                "--".into()
+            } else {
+                format!("{} 档", chip_pwr)
+            },
         });
     }
 
@@ -514,6 +580,43 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn max_length_modbus_point() -> ModbusPointConfig {
+        ModbusPointConfig {
+            slave_addr: 247,
+            func_code: 4,
+            reg_addr: 65535,
+            length: 31,
+            data_type: 6,
+            byte_order: 3,
+            name: None,
+            unit: None,
+        }
+    }
+
+    #[test]
+    fn encodes_all_100_modbus_points_within_uart1_capacity() {
+        let points = vec![max_length_modbus_point(); MAX_MODBUS_POINTS];
+        let command = encode_modbus_points(&points).expect("100 点配置必须可编码");
+
+        assert!(command.text.starts_with("RS485DEV:"));
+        assert_eq!(command.text.matches(';').count(), MAX_MODBUS_POINTS - 1);
+        assert!(command.payload.len() <= MAX_SJZ_UART1_COMMAND_BYTES);
+    }
+
+    #[test]
+    fn rejects_more_than_100_modbus_points() {
+        let points = vec![max_length_modbus_point(); MAX_MODBUS_POINTS + 1];
+        let error = encode_modbus_points(&points).expect_err("101 点配置必须拒绝");
+
+        assert!(error.contains("100"));
+    }
+
+    #[test]
+    fn sle_netname_reserves_terminating_nul_byte() {
+        assert!(encode_sle_netname("123456789012345").is_ok());
+        assert!(encode_sle_netname("1234567890123456").is_err());
+    }
 
     #[test]
     fn test_parse_modbus_points_embedded_log() {

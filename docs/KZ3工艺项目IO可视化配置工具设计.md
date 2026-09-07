@@ -871,7 +871,7 @@ Modbus TCP 当前固定显示：
 | c_type | 从 bind 推导并锁定；必要时显示等价类型，不允许不一致 |
 | access | point/state 只允许 read；parameter/command 必须 read_write；工具层禁止物理 point 直写 |
 | reference | 5 位 Modicon 地址，按类型和权限限制地址区 |
-| width | bool/u16 为 1，float/u32 为 2；`i32` 目标应为 2，但当前实现有歧义，修复前禁用；`u8` 当前不开放 |
+| width | 当前固件生成器的 manifest 按 bool/u16/i32 为 1、float/u32 为 2 编码；工具必须逐字节镜像该现状。`i32` 不是当前 HTTP owner 可写类型，工具保持禁用；`u8` 当前不开放 |
 | compatibility | 新增/兼容修改/破坏性变更 |
 
 `bind` 是数据 owner，不是 UI 标签。工具必须按 owner 限制候选、权限和地址区：
@@ -1013,40 +1013,25 @@ Given/When/Then 场景表字段：场景名、Given 初始状态、When 输入/�
 
 发布过的快照只读。后续编辑创建工作副本，不在原快照上原地修改。
 
-### 7.11 在线调试工作台（受控北向写入测试交付）
+### 7.11 在线调试工作台（工程契约校验与受控写入）
 
 NP-Tools 通过独立路由提供“在线调试”工作模式，消费控制器已有 HTTP v1 API。进入该模式后自动收窄
 全局导航、隐藏无关串口状态并冻结工程编辑；调试会话、样本和写入证据不写回 `project_io.yaml`。
-当前测试交付开放只读监视、诊断和受控北向写入。写入默认锁定，仅用于工程师执行 HIL/现场验证；
-开放测试入口不等于 HIL 或生产控制已经验收。
+当前固件已提供 `/api/v1/project` 和点位 `GET/POST`。工具按固件生成器的规范重算北向 manifest，只有工程 ID、版本、算法、hash 和点数匹配时才可能申请受控写入；工具构建、诊断读取、owner 接受或读回均不等于 HIL 或生产控制验收。
 
 | 能力 | 当前实现 | 明确边界 |
 | --- | --- | --- |
-| 本地 HTTP 代理 | Rust/Tauri 后端只允许 8 个固定诊断资源和 `/api/v1/point/<name>` | 禁止任意 URL、任意路径和 URL 凭据；仅允许 HTTP 根地址 |
-| 固定诊断 | 串行读取 device/hardware/network/sle/io/config/services/health | 保留设备 tick、HTTP status、错误码和原始 body |
+| 本地 HTTP 代理 | Rust/Tauri 后端只允许固定诊断资源、`/api/v1/point/<name>` GET 和严格形状的 POST | 禁止任意 URL、任意路径、URL 凭据、`point/state` 直接写入；仅允许 HTTP 根地址 |
+| 固定诊断 | 串行读取 device/hardware/project/network/sle/io/config/services/health | 保留 HTTP status、错误码和原始 body |
+| 工程兼容性 | 读取 `/api/v1/project`，重算 ID/版本/点表 manifest/点数 | `matched` 只证明北向访问契约；原始 YAML `configuration_hash`、逻辑与 HIL 不能由工具独立证明 |
 | 点位监视 | 从当前北向映射生成本地 descriptor，最多同时轮询 12 点；监视组按工程保存在本机 | 设备不枚举点位；设备质量与工具本地陈旧分别显示 |
 | 板级 I/O | DI/AI 标为采样，DO/AO 标为软件目标 | 软件目标、寄存器回读影子和物理反馈不得混称“当前值” |
-| Parameter 写入 | 支持 BOOL/FLOAT/U32 `read_write`，写前 GET、单次 POST、写后 GET | U32 按完整 JSON 整数下发，按类型范围与工程 min/max 的交集校验；U16/I16/I32 写入链路仍未开放；成功不证明持久化 |
-| Command 写入 | 支持 `command.*` 和 `runtime.<name>.clear` 的 BOOL `true` 单次触发 | 受控测试入口已开放；不保持、不连发、不自动重试，成功后保留当前许可；其他 runtime 字段不开放写入 |
-| 写入门禁 | 默认锁定；工程师填写本组测试依据并显式确认后开放 10 分钟 | 成功写入后续期；要求连接预检、工程未变化、四项健康正常、无 active fault；离页、断线或异常自动上锁 |
-| 审计证据 | 分开记录 transport、owner accepted、readback、logic、physical | 后两层由工程师结合 HIL/现场证据标注，默认 `unknown` |
+| Parameter/Command 写入 | BOOL/FLOAT parameter 和 BOOL 单次 command（含 runtime clear）可在受控门禁下写入 | U16/U32、`point.*`、`state.*`、物理 I/O 和只读字段保持禁用 |
+| 写入门禁 | 工程契约匹配、操作员、四项健康、无 active fault、显式依据和 10 分钟许可 | 每次写前重新读取 health/io/project；HTTP 无 CAS、request ID、认证或 TLS，失败不重试 |
+| 审计证据 | 记录诊断、写前值、请求值、owner 接受、写后读回和人工备注 | owner 接受、读回或备注不等于逻辑、物理或 HIL 结论 |
 
-当前设备没有 `/api/v1/project`、点位 manifest、认证、TLS、客户端 CAS、command request ID/TTL 和结果
-细分错误码，因此兼容性最多标为 `partial`。受控写入只定位为待验证的隔离实验/HIL 能力，不能包装为
-生产在线控制或在线强制。`/api/v1/io.remote_write_allowed` 是兼容板级
-投影，不能作为生成点位 POST 权限门禁。
-
-2026-09-03 按固件 `User/Src/network.c`、`network_protocol.c` 和 `data_manager.c` 核对：
-`Network.WriteItem` 已接入 `DataManager_WriteParameterU32`，旧设计中“U16/U32 均缺少写 owner”的
-结论不再适用于 U32。接口路径使用北向字段 `name`，不是内部 `bind`；请求仅包含 `value`，例如
-`POST /api/v1/point/G1_RUN_T` 配合 `{"value":1800}`。U32 不使用字符串、小数或科学计数形式的
-报文，不拆成两个 Modbus 寄存器；BOOL 参数使用 JSON boolean，FLOAT 参数使用有限 JSON number。
-累计运行时间清零别名经生成器映射为 BOOL command，只发送一次 `{"value":true}`。
-
-数值输入、最终提交共用类型和范围校验：U32 为 0..4294967295 的整数，并收窄到工程 min/max，
-输入步进为 1；FLOAT 保留小数输入。整数监视变化、写前快照检查和写后读回均精确比较，只有 FLOAT
-使用舍入容差。设备返回 U32 小数、负数或越界值时标记类型不匹配并解除写入许可。工具不会向旧固件
-降级为其他格式或自动重试；设备烧录版本及真实写入效果仍需工程师验证。
+兼容性状态为 `unverified`、`partial`、`matched` 或 `mismatch`。认证、TLS、客户端 CAS、command request ID/TTL 和结果细分错误码仍未提供。`/api/v1/io.remote_write_allowed`
+是兼容板级投影，不能作为生成点位 POST 权限门禁；详细残余差距见 [KZ3 固件接口差距记录](../../KZ3_F427_SLE_V1/docs/NP-Tools固件接口差距记录.md)。
 
 轮询采用单会话串行调度，同一时刻最多一个在途设备请求。每个周期读取 `/io`、`/health`、一个慢速
 诊断资源和用户选择的少量点位，不对全部北向字段进行高频扫描。页面关闭后停止轮询。断开或重连后，
@@ -1062,7 +1047,7 @@ NP-Tools 通过独立路由提供“在线调试”工作模式，消费控制�
 会话日志与证据使用固定底部 Dock。无有效采样时统一显示 `—`、`UNKNOWN` 或“无采样”，严禁把缺失证据
 显示为 `0`、`OFF` 或正常值。
 
-写入弹窗必须是稳定的独立合成层，不得因后台周期采样被卸载、重新挂载或触发全屏模糊重绘。弹窗内的
+当前写入弹窗与事务语义必须保持以下边界：写入弹窗是稳定的独立合成层，不得因后台周期采样被卸载、重新挂载或触发全屏模糊重绘。弹窗内的
 “打开时读值”取打开瞬间快照，目标值和测试依据由本地表单持有；后台监视可以继续刷新，正式提交时仍按
 “写前 GET—单次 POST—写后 GET”获取权威写前值和读回证据。提交按钮的可用状态不得直接绑定
 `pollInFlight` 等周期性瞬态标志；点击提交后应停止后续轮询、等待当前轮询自然排空，再进入写事务，避免

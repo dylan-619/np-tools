@@ -5,6 +5,7 @@ import type {
   Kz3CommandResult,
   Kz3ConfigGroup,
   Kz3MaintenanceStatus,
+  Kz3NetworkRecoveryAttempt,
   Kz3SessionRecord,
   Kz3Snapshot,
 } from '../types/kz3Maintenance'
@@ -15,6 +16,7 @@ import {
   KZ3_UART_CONFIG,
   KZ3_QUERY_COMMANDS,
   parseKz3ProtocolLine,
+  redactKz3Command,
   snapshotNeedsReboot,
   validateKz3Command,
 } from '../utils/kz3UartProtocol'
@@ -37,6 +39,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
   const status = ref<Kz3MaintenanceStatus>('disconnected')
   const snapshots = ref<Partial<Record<Kz3ConfigGroup, Kz3Snapshot>>>({})
   const records = ref<Kz3SessionRecord[]>([])
+  const networkRecoveryAttempts = ref<Kz3NetworkRecoveryAttempt[]>([])
   const currentCommand = ref('')
   const lastError = ref('')
   const initialized = ref(false)
@@ -121,11 +124,12 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
     }
     if (pending) throw new Error(`上一条命令仍在等待响应：${pending.command}`)
 
-    currentCommand.value = normalized
+    const auditCommand = redactKz3Command(normalized)
+    currentCommand.value = auditCommand
     const group = getCommandGroup(normalized)
     const resultPromise = new Promise<Kz3CommandResult>((resolve) => {
       pending = {
-        command: normalized,
+        command: auditCommand,
         group,
         rawLines: [],
         startedAt: new Date().toISOString(),
@@ -167,6 +171,8 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
       system: 'SYS',
       ethernet: 'ETH',
       sle: 'SLE',
+      wireless: 'WIRELESS',
+      cat1: '4G',
       io: 'IO',
       debug: 'DEBUG',
     }
@@ -178,6 +184,23 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
         group: 'debug',
         fields: { DEBUG: debugValue ?? '' },
         raw: result.protocolLine,
+        receivedAt: result.completedAt,
+        port,
+      }
+      return
+    }
+    if (result.group === 'cat1') {
+      const fields = result.rawLines.reduce<Record<string, string>>((merged, line) => {
+        const candidate = parseKz3ProtocolLine(line)
+        return candidate?.ok && candidate.family === '4G'
+          ? { ...merged, ...candidate.fields }
+          : merged
+      }, {})
+      if (Object.keys(fields).length === 0) return
+      snapshots.value.cat1 = {
+        group: 'cat1',
+        fields,
+        raw: result.rawLines.filter((line) => parseKz3ProtocolLine(line)?.family === '4G').join('\n'),
         receivedAt: result.completedAt,
         port,
       }
@@ -231,7 +254,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
   }
 
   async function queryAll() {
-    for (const group of ['system', 'ethernet', 'sle', 'io', 'debug'] as Kz3ConfigGroup[]) {
+    for (const group of ['system', 'ethernet', 'sle', 'wireless', 'cat1', 'io', 'debug'] as Kz3ConfigGroup[]) {
       const result = await runQuery(group)
       if (result.status === 'communication_error') break
     }
@@ -239,6 +262,33 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
 
   function clearSession() {
     records.value = []
+    networkRecoveryAttempts.value = []
+  }
+
+  function startNetworkRecoveryAttempt(candidateUrl: string): string {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    networkRecoveryAttempts.value.push({
+      id,
+      candidateUrl,
+      startedAt: new Date().toISOString(),
+      status: 'prepared',
+    })
+    if (networkRecoveryAttempts.value.length > 50) {
+      networkRecoveryAttempts.value.splice(0, networkRecoveryAttempts.value.length - 50)
+    }
+    return id
+  }
+
+  function finishNetworkRecoveryAttempt(
+    id: string,
+    status: Exclude<Kz3NetworkRecoveryAttempt['status'], 'prepared'>,
+    error?: string
+  ) {
+    const attempt = networkRecoveryAttempts.value.find((item) => item.id === id)
+    if (!attempt) return
+    attempt.status = status
+    attempt.completedAt = new Date().toISOString()
+    attempt.error = error
   }
 
   function exportSession() {
@@ -250,6 +300,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
         connectedPort: serial.connectedPort,
         snapshots: snapshots.value,
         records: records.value,
+        networkRecoveryAttempts: networkRecoveryAttempts.value,
         verificationBoundary: '工具记录仅证明 UART1 协议收发；未替代实板、SLE 无线链路或现场验证。',
       },
       null,
@@ -261,6 +312,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
     status,
     snapshots,
     records,
+    networkRecoveryAttempts,
     currentCommand,
     lastError,
     isBusy,
@@ -271,6 +323,8 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
     runWrite,
     queryAll,
     clearSession,
+    startNetworkRecoveryAttempt,
+    finishNetworkRecoveryAttempt,
     exportSession,
   }
 })

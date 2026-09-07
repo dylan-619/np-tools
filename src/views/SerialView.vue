@@ -73,10 +73,11 @@ const BUILTIN_COMMANDS: SerialCommandPreset[] = [
 
   // 双星闪协调器
   { name: '协调器状态', cmd: '@STATUS', desc: '双 Radio 状态机、STA/READY 与 Ethernet 摘要', category: 'xtq' },
-  { name: '硬件信息', cmd: '@DEVINFO', desc: '固件构建与硬件版本信息', category: 'xtq' },
-  { name: 'Radio 1 状态', cmd: '@RADIO:0', desc: '第一颗星闪芯片角色与工作状态', category: 'xtq' },
-  { name: 'Radio 2 状态', cmd: '@RADIO:1', desc: '第二颗星闪芯片角色与工作状态', category: 'xtq' },
-  { name: '同步状态', cmd: '@SYNC', desc: '路由与点缓存同步状态', category: 'xtq' },
+  { name: '读取身份', cmd: '@CFG GET DeviceIdentity', desc: '读取协调器 SN、产品类型和硬件版本', category: 'xtq' },
+  { name: '读取拓扑', cmd: '@CFG GET CoordinatorConfig', desc: '读取工作模式与双 Radio 角色配置', category: 'xtq' },
+  { name: '读取 Radio 1', cmd: '@CFG GET Radio1Config', desc: '读取第一颗 Radio 的 EEPROM 目标配置', category: 'xtq' },
+  { name: '读取 Radio 2', cmd: '@CFG GET Radio2Config', desc: '读取第二颗 Radio 的 EEPROM 目标配置', category: 'xtq' },
+  { name: '读取 Capability 0', cmd: '@CFG GET DeviceCapability0', desc: '读取第 0 个终端协议/无线地址适配槽位', category: 'xtq' },
 ]
 
 const CUSTOM_COMMANDS_KEY = 'np_tools_custom_serial_commands'

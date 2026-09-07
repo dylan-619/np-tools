@@ -9,6 +9,10 @@ import {
 import { useControllerStore } from './controllerStore'
 import { PROFILE_CATALOG } from '../utils/controllerIoCatalog'
 import {
+  buildKz3PointManifest,
+  KZ3_POINT_MANIFEST_ALGORITHM
+} from '../utils/kz3ProjectManifest'
+import {
   isRuntimeClearBinding,
   pointValueMatchesType,
   pointValuesEqual,
@@ -28,6 +32,7 @@ import type {
   PointDescriptor,
   PointQuality,
   PointSample,
+  ProjectDiagnostic,
   WriteEvent
 } from '../types/controllerDebug'
 
@@ -89,6 +94,43 @@ function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function isUnsigned32(value: unknown): value is number {
+  return Number.isInteger(value) && typeof value === 'number' && value >= 0 && value <= 0xffffffff
+}
+
+function isUnsigned16(value: unknown): value is number {
+  return Number.isInteger(value) && typeof value === 'number' && value >= 0 && value <= 0xffff
+}
+
+function parseProjectDiagnostic(value: unknown): ProjectDiagnostic {
+  if (!value || typeof value !== 'object') throw new Error('/project data 必须为对象')
+  const data = value as Record<string, unknown>
+  const strings = [
+    'project_id',
+    'project_version',
+    'firmware_build_id',
+    'point_manifest_algorithm',
+    'point_manifest_hash'
+  ] as const
+  for (const key of strings) {
+    if (typeof data[key] !== 'string' || !data[key]) {
+      throw new Error(`/project 缺少有效字段 ${key}`)
+    }
+  }
+  if (!isUnsigned16(data.schema_version) || data.schema_version === 0) {
+    throw new Error('/project schema_version 必须为非零 U16')
+  }
+  if (!isUnsigned32(data.configuration_hash) || !isUnsigned32(data.config_revision)) {
+    throw new Error('/project configuration_hash/config_revision 必须为 U32')
+  }
+  if (!isUnsigned16(data.point_count)) throw new Error('/project point_count 必须为 U16')
+  const manifestHash = data.point_manifest_hash
+  if (typeof manifestHash !== 'string' || !/^[a-f0-9]{64}$/.test(manifestHash)) {
+    throw new Error('/project point_manifest_hash 必须为 64 位小写 SHA-256')
+  }
+  return data as unknown as ProjectDiagnostic
+}
+
 export const useControllerDebugStore = defineStore('controllerDebug', () => {
   const controller = useControllerStore()
   const baseUrl = ref('http://192.168.11.59:8080')
@@ -100,6 +142,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   )
   const transportState = ref<DebugTransportState>('disconnected')
   const compatibilityState = ref<CompatibilityState>('unverified')
+  const compatibilityReason = ref('尚未读取设备工程身份')
   const session = ref<DeviceDebugSession | null>(null)
   const diagnostics = ref<Kz3Diagnostics>({})
   const selectedPointNames = ref<string[]>([])
@@ -118,9 +161,25 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   let pollTimer: number | null = null
   let diagnosticCursor = 0
   let lastWriteAt = 0
+  let sessionProjectContractSignature = ''
 
   function projectSignature(): string {
     return `${controller.doc.project.id}@${controller.doc.project.version}`
+  }
+
+  function projectContractSignature(): string {
+    const project = controller.doc.project
+    return JSON.stringify([
+      project.id,
+      project.version,
+      project.northbound.fields.map((field) => [
+        field.name,
+        field.bind,
+        field.c_type,
+        field.access,
+        String(field.reference)
+      ])
+    ])
   }
 
   function monitorStorageKey(): string {
@@ -160,6 +219,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       let unit: string | undefined
       let min: number | undefined
       let max: number | undefined
+      let persistent: boolean | undefined
       let source: string | undefined
       let category: PointDescriptor['category'] = 'unknown'
       let valueSemantic = '业务北向值（设备未提供描述元数据）'
@@ -170,11 +230,18 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         const parameter = project.application_variables.parameters.find(
           (item) => item.name === name
         )
-        description = parameter?.description || 'RAM 参数；设备复位后恢复工程默认值'
+        persistent = parameter?.persistent === true
+        description =
+          parameter?.description ||
+          (persistent
+            ? '掉电保持参数；当前 owner 成功后会提交参数存储，重启后仍需单独复核'
+            : 'RAM 参数；设备复位后恢复工程默认值')
         unit = parameter?.unit
         min = parameter?.min
         max = parameter?.max
-        valueSemantic = 'RAM 参数当前值（非持久化配置）'
+        valueSemantic = persistent
+          ? '掉电保持参数当前值；写后读回不等于重启恢复或现场效果已验证'
+          : 'RAM 参数当前值（非持久化配置）'
       } else if (isRuntimeClearBinding(field.bind)) {
         category = 'command'
         description = field.description || '累计运行时间清零；单次触发后需核对秒数与清零状态'
@@ -219,17 +286,14 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       let writeDisabledReason: string | undefined
       if (field.access !== 'read_write') {
         writeDisabledReason = '工程北向契约为只读'
-      } else if (
-        category === 'parameter' &&
-        (field.c_type === 'bool' || field.c_type === 'float' || field.c_type === 'u32')
-      ) {
+      } else if (category === 'parameter' && (field.c_type === 'bool' || field.c_type === 'float')) {
         writeSupported = true
       } else if (category === 'command' && field.c_type === 'bool') {
         writeSupported = true
-      } else if (category === 'parameter' && ['u16', 'i16', 'i32'].includes(field.c_type)) {
-        writeDisabledReason = `当前固件尚未实现 ${field.c_type.toUpperCase()} parameter 写入链路`
+      } else if (category === 'parameter' && ['u16', 'u32', 'i16', 'i32'].includes(field.c_type)) {
+        writeDisabledReason = `当前 KZ3 HTTP owner 仅实现 BOOL/FLOAT parameter 写入，${field.c_type.toUpperCase()} 保持禁用`
       } else {
-        writeDisabledReason = '当前固件仅允许 BOOL/FLOAT/U32 parameter 或 BOOL command 写入'
+        writeDisabledReason = '当前固件仅允许 BOOL/FLOAT parameter 或 BOOL 单次 command 写入'
       }
 
       return {
@@ -238,6 +302,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         unit,
         min,
         max,
+        persistent,
         source,
         category,
         valueSemantic,
@@ -266,10 +331,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   })
   const projectIdentityChanged = computed(() => {
     if (!session.value) return false
-    return (
-      session.value.expectedProjectId !== controller.doc.project.id ||
-      session.value.expectedProjectVersion !== controller.doc.project.version
-    )
+    return sessionProjectContractSignature !== projectContractSignature()
   })
   const writePermitRemainingSeconds = computed(() => {
     if (writePermitUntil.value === null) return 0
@@ -279,11 +341,12 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   const canEnableWrites = computed(
     () =>
       isConnected.value &&
-      compatibilityState.value === 'partial' &&
+      compatibilityState.value === 'matched' &&
       !projectIdentityChanged.value &&
       !controllerFaultActive.value &&
       operatorName.value.trim().length > 0 &&
       diagnostics.value.device !== undefined &&
+      diagnostics.value.project !== undefined &&
       diagnostics.value.health !== undefined &&
       diagnostics.value.io !== undefined &&
       allHealthHealthy.value &&
@@ -327,6 +390,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       case 'hardware':
         diagnostics.value.hardware = envelope as Kz3Diagnostics['hardware']
         break
+      case 'project':
+        diagnostics.value.project = envelope as Kz3Diagnostics['project']
+        break
       case 'network':
         diagnostics.value.network = envelope as Kz3Diagnostics['network']
         break
@@ -361,6 +427,18 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     transportState.value = 'degraded'
   }
 
+  function setCompatibility(
+    next: CompatibilityState,
+    expectedSessionId: string | undefined,
+    reason?: string
+  ) {
+    if (!isActiveSession(expectedSessionId)) return
+    compatibilityState.value = next
+    if (reason) compatibilityReason.value = reason
+    const activeSession = session.value
+    if (activeSession && activeSession.sessionId === expectedSessionId) activeSession.compatibilityState = next
+  }
+
   async function readDiagnostic(
     resource: DiagnosticResource,
     quiet = false,
@@ -377,6 +455,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       ) {
         throw new Error(`/${resource} 响应不符合 KZ3 v1 诊断外层契约`)
       }
+      if (resource === 'project') parseProjectDiagnostic(envelope.data)
       assignDiagnostic(resource, envelope)
       markSuccess(expectedSessionId)
       if (resource === 'health') consecutiveHealthErrors.value = 0
@@ -404,6 +483,90 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     }
   }
 
+  /**
+   * 以固件 `GET /api/v1/project` 的身份和点表 manifest 约束当前会话。
+   * configuration_hash 基于固件输入 YAML 的原始字节；工具只持有解析后的工程，
+   * 因此不把它伪装成可比较的本地 hash。
+   */
+  async function verifyProjectCompatibility(
+    expectedSessionId = session.value?.sessionId,
+    quiet = false
+  ): Promise<void> {
+    const envelope = diagnostics.value.project
+    if (!envelope) throw new Error('尚未取得 /api/v1/project 工程身份')
+    const deviceProject = parseProjectDiagnostic(envelope.data)
+    const localSignature = projectContractSignature()
+    const localManifest = await buildKz3PointManifest(controller.doc.project.northbound.fields)
+    if (!isActiveSession(expectedSessionId)) {
+      throw new Error('工程校验完成前调试会话已结束，已丢弃结果')
+    }
+    if (localSignature !== projectContractSignature()) {
+      throw new Error('本地工程在 manifest 计算期间发生变化，请重新连接后校验')
+    }
+
+    const activeSession = session.value
+    const previousObservedProject =
+      activeSession && activeSession.sessionId === expectedSessionId
+        ? activeSession.observedProject
+        : undefined
+    if (activeSession && activeSession.sessionId === expectedSessionId) {
+      activeSession.expectedManifestAlgorithm = localManifest.algorithm
+      activeSession.expectedManifestHash = localManifest.hash
+      activeSession.expectedPointCount = localManifest.pointCount
+      activeSession.observedProject = { ...deviceProject }
+    }
+
+    const mismatch = [
+      deviceProject.project_id !== controller.doc.project.id
+        ? `工程 ID 设备=${deviceProject.project_id}，本地=${controller.doc.project.id}`
+        : '',
+      deviceProject.project_version !== controller.doc.project.version
+        ? `工程版本设备=${deviceProject.project_version}，本地=${controller.doc.project.version}`
+        : '',
+      deviceProject.point_manifest_algorithm !== KZ3_POINT_MANIFEST_ALGORITHM
+        ? `manifest 算法不支持：${deviceProject.point_manifest_algorithm}`
+        : '',
+      deviceProject.point_count !== localManifest.pointCount
+        ? `点数设备=${deviceProject.point_count}，本地=${localManifest.pointCount}`
+        : '',
+      deviceProject.point_manifest_hash !== localManifest.hash
+        ? '北向点表 manifest hash 不一致'
+        : '',
+      previousObservedProject &&
+      previousObservedProject.configuration_hash !== deviceProject.configuration_hash
+        ? '会话期间 configuration_hash 已变化，设备完整工程可能已重刷'
+        : '',
+      previousObservedProject &&
+      previousObservedProject.firmware_build_id !== deviceProject.firmware_build_id
+        ? '会话期间 firmware_build_id 已变化，设备固件可能已重刷'
+        : '',
+      previousObservedProject &&
+      previousObservedProject.schema_version !== deviceProject.schema_version
+        ? '会话期间 schema_version 已变化，设备点表契约可能已更新'
+        : ''
+    ].filter(Boolean)
+
+    if (mismatch.length > 0) {
+      const reason = `工程契约不匹配：${mismatch.join('；')}`
+      setCompatibility('mismatch', expectedSessionId, reason)
+      disableWrites(reason)
+      if (!quiet) appendLog('error', 'session', 'KZ3 工程与点表校验失败', reason)
+      return
+    }
+
+    const reason =
+      '工程 ID、版本、北向字段顺序/类型/权限/reference 与设备 manifest 一致；configuration_hash 基于原始 YAML 字节，当前仅记录设备值、不作本地比较'
+    setCompatibility('matched', expectedSessionId, reason)
+    if (!quiet) {
+      appendLog(
+        'success',
+        'session',
+        'KZ3 工程与北向点表校验通过',
+        `build=${deviceProject.firmware_build_id}；config_revision=${deviceProject.config_revision}；manifest=${localManifest.hash.slice(0, 12)}…`
+      )
+    }
+  }
+
   async function readPoint(
     name: string,
     quiet = false,
@@ -424,12 +587,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       }
       const descriptor = pointDescriptors.value.find((item) => item.name === name)
       if (descriptor && !pointValueMatchesType(descriptor.c_type, data.value)) {
-        compatibilityState.value = 'mismatch'
-        const currentSession = session.value
-        if (currentSession && currentSession.sessionId === expectedSessionId) {
-          currentSession.compatibilityState = 'mismatch'
-        }
-        disableWrites(`点位 ${name} 类型与当前工程不一致，已解除写入许可`)
+        const reason = `点位 ${name} 类型与当前工程不一致，已解除写入许可`
+        setCompatibility('mismatch', expectedSessionId, reason)
+        disableWrites(reason)
         throw new Error(`点位 ${name} 设备值类型与工程 ${descriptor.c_type} 不一致`)
       }
       const previous = samples.value[name]
@@ -461,9 +621,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       markFailure(expectedSessionId)
       if (!isActiveSession(expectedSessionId)) throw error
       if (error instanceof HttpResponseError && error.status === 404) {
-        compatibilityState.value = 'mismatch'
-        if (session.value) session.value.compatibilityState = 'mismatch'
-        disableWrites(`设备缺少当前工程点位 ${name}，工程兼容性已标记 mismatch`)
+        const reason = `设备缺少当前工程点位 ${name}，工程兼容性已标记 mismatch`
+        setCompatibility('mismatch', expectedSessionId, reason)
+        disableWrites(reason)
       }
       if (!quiet) appendLog('error', 'point', `读取点位 ${name} 失败`, errorDetail(error))
       throw error
@@ -475,11 +635,13 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     disableWrites()
     transportState.value = 'connecting'
     compatibilityState.value = 'unverified'
+    compatibilityReason.value = '正在读取设备工程身份与北向点表 manifest'
     diagnostics.value = {}
     samples.value = {}
     consecutiveErrors.value = 0
     consecutiveHealthErrors.value = 0
     const project = controller.doc.project
+    sessionProjectContractSignature = projectContractSignature()
     session.value = {
       sessionId: createId('kz3-debug'),
       startedAt: Date.now(),
@@ -500,6 +662,15 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
 
     try {
       await readDiagnostic('device', false, sessionId)
+      try {
+        await readDiagnostic('project', false, sessionId)
+        await verifyProjectCompatibility(sessionId)
+      } catch (error) {
+        if (!isActiveSession(sessionId)) throw error
+        const reason = `工程身份或点表校验未完成：${errorDetail(error)}`
+        setCompatibility('partial', sessionId, reason)
+        appendLog('warning', 'session', 'KZ3 会话保持只读', reason)
+      }
       const remaining: DiagnosticResource[] = [
         'hardware',
         'network',
@@ -517,8 +688,10 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         }
       }
       if (!isActiveSession(sessionId)) return
-      compatibilityState.value = 'partial'
-      if (session.value?.sessionId === sessionId) session.value.compatibilityState = 'partial'
+      if (compatibilityState.value === 'unverified') {
+        setCompatibility('partial', sessionId, '尚未完成工程身份与点表校验')
+      }
+      const finalCompatibility = compatibilityState.value as CompatibilityState
       const stored = loadStoredMonitorList()
       if (
         selectedPointNames.value.length === 0 ||
@@ -529,12 +702,14 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         selectedPointNames.value =
           stored.length > 0 ? stored : pointDescriptors.value.slice(0, 8).map((item) => item.name)
       }
-      appendLog(
-        'warning',
-        'session',
-        '设备已连接，但工程兼容性只能部分确认',
-        '当前固件没有 /project 或点位 manifest；写入前必须人工核对设备、工程与现场条件'
-      )
+      if (finalCompatibility === 'partial') {
+        appendLog(
+          'warning',
+          'session',
+          '设备已连接，但工程身份或点表未完成校验；保持全局只读',
+          compatibilityReason.value
+        )
+      }
       startPolling()
     } catch (error) {
       if (session.value?.sessionId === sessionId) {
@@ -552,6 +727,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     if (session.value) session.value.endedAt = Date.now()
     transportState.value = 'disconnected'
     compatibilityState.value = 'unverified'
+    compatibilityReason.value = '会话已结束'
+    sessionProjectContractSignature = ''
     appendLog('info', 'session', '已断开 KZ3 HTTP 调试会话')
   }
 
@@ -567,9 +744,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     pollInFlight.value = true
     try {
       if (projectIdentityChanged.value) {
-        compatibilityState.value = 'mismatch'
-        session.value.compatibilityState = 'mismatch'
-        disableWrites('打开工程身份已变化，已解除写入许可；请重新连接设备')
+        const reason = '本地工程 ID、版本或北向点表已变化，已解除写入许可；请重新连接设备'
+        setCompatibility('mismatch', sessionId, reason)
+        disableWrites(reason)
       }
 
       try {
@@ -585,12 +762,22 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       }
       if (!isActiveSession(sessionId)) return
 
-      const slowResources: DiagnosticResource[] = ['services', 'network', 'sle', 'device']
+      // 仅对已匹配会话继续拉取 project，避免旧固件缺少该端点时每 5 秒制造错误日志。
+      const slowResources: DiagnosticResource[] =
+        compatibilityState.value === 'matched'
+          ? ['services', 'network', 'sle', 'device', 'project']
+          : ['services', 'network', 'sle', 'device']
       const slowResource = slowResources[diagnosticCursor % slowResources.length]
       diagnosticCursor += 1
       try {
         await readDiagnostic(slowResource, true, sessionId)
+        if (slowResource === 'project') await verifyProjectCompatibility(sessionId, true)
       } catch {
+        if (slowResource === 'project' && compatibilityState.value !== 'mismatch') {
+          const reason = '周期工程身份或点表校验失败，已解除写入许可；请核对设备后重新解锁'
+          setCompatibility('partial', sessionId, reason)
+          disableWrites(reason)
+        }
         /* 日志已记录 */
       }
 
@@ -675,7 +862,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   function enableWrites(reason: string) {
     if (!canEnableWrites.value) {
       throw new Error(
-        '当前设备状态不满足写入门禁，请填写工程师并检查连接、工程身份、四项健康状态和控制器故障'
+        '当前设备状态不满足写入门禁：需要工程 ID/版本/北向 manifest 精确匹配、工程师信息、健康与无 active fault'
       )
     }
     if (session.value) {
@@ -744,6 +931,14 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     try {
       if (!sessionId) throw new Error('写入前设备会话已经结束')
       await waitForPollingIdle()
+      // 写入许可可能在等待轮询让路期间失效；不能沿用连接时的健康快照。
+      await readDiagnostic('health', true, sessionId)
+      await readDiagnostic('io', true, sessionId)
+      await readDiagnostic('project', true, sessionId)
+      await verifyProjectCompatibility(sessionId, true)
+      if (!canEnableWrites.value || compatibilityState.value !== 'matched' || projectIdentityChanged.value) {
+        throw new Error('写入前工程身份、健康或控制器状态校验未通过，已取消本次写入')
+      }
       const before = await readPoint(name, true, sessionId)
       event.beforeValue = before.value
       if (
@@ -791,7 +986,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         'write',
         descriptor.category === 'command'
           ? `已触发一次命令 ${name}`
-          : `已写入 RAM 参数 ${name} = ${String(value)}`,
+          : descriptor.persistent
+            ? `已提交掉电保持参数 ${name} = ${String(value)}；重启后需另行复核`
+            : `已写入 RAM 参数 ${name} = ${String(value)}`,
         `HTTP ${response.status}；owner accepted；readback=${event.readbackObserved}；逻辑/物理效果仍为 unknown`
       )
       return event
@@ -883,14 +1080,16 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   )
 
   watch(
-    () => projectSignature(),
+    () => projectContractSignature(),
     () => {
       samples.value = {}
       selectedPointNames.value = loadStoredMonitorList()
       if (session.value && session.value.endedAt === undefined) {
+        const reason = '本地工程 ID、版本或北向点表已变化，已解除写入许可；请结束会话后重新连接'
         compatibilityState.value = 'mismatch'
+        compatibilityReason.value = reason
         session.value.compatibilityState = 'mismatch'
-        disableWrites('打开工程身份已变化，已解除写入许可；请结束会话后重新连接')
+        disableWrites(reason)
       }
     }
   )
@@ -901,6 +1100,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     siteName,
     transportState,
     compatibilityState,
+    compatibilityReason,
     session,
     diagnostics,
     selectedPointNames,
@@ -930,6 +1130,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     suspend,
     pollOnce,
     readDiagnostic,
+    verifyProjectCompatibility,
     readPoint,
     togglePointSelection,
     clearPointSelection,

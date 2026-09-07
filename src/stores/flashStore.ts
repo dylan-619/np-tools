@@ -1,9 +1,24 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { flashProbeTool, flashStart, flashCancel } from '../api/flashApi'
-import type { FlashToolInfo, FlashProgressEvent, FlashLogEntry } from '../types/flash'
+import { computed, ref, watch } from 'vue'
+import {
+  flashCancel,
+  flashInspectImage,
+  flashListProductProfiles,
+  flashProbeTarget,
+  flashProbeTool,
+  flashStart,
+} from '../api/flashApi'
+import type {
+  FlashImageInspection,
+  FlashLogEntry,
+  FlashProductProfile,
+  FlashProgressEvent,
+  FlashTargetInfo,
+  FlashToolInfo,
+} from '../types/flash'
 
 const CLI_PATH_STORAGE_KEY = 'np_tools_flash_cli_path'
+const DEFAULT_PROFILE_ID = 'sjzdv3_f412'
 
 function loadPersistedCliPath(): string {
   if (typeof localStorage === 'undefined') return ''
@@ -65,8 +80,14 @@ export const useFlashStore = defineStore('flash', () => {
   })
 
   const customCliPath = ref(loadPersistedCliPath())
+  const productProfiles = ref<FlashProductProfile[]>([])
+  const selectedProfileId = ref(DEFAULT_PROFILE_ID)
   const selectedHexPath = ref('')
   const selectedProbeSn = ref('')
+  const imageInspection = ref<FlashImageInspection | null>(null)
+  const targetInfo = ref<FlashTargetInfo | null>(null)
+  const isInspectingImage = ref(false)
+  const isProbingTarget = ref(false)
   const isFlashing = ref(false)
   const progress = ref<FlashProgressEvent>({
     state: 'idle',
@@ -78,7 +99,26 @@ export const useFlashStore = defineStore('flash', () => {
   const isProbing = ref(false)
   const errorMsg = ref('')
 
+  const selectedProfile = computed(() =>
+    productProfiles.value.find((profile) => profile.id === selectedProfileId.value)
+  )
+  const isImageValidated = computed(
+    () => imageInspection.value?.validated === true && imageInspection.value.profileId === selectedProfileId.value
+  )
+  const canStartFlashing = computed(
+    () => Boolean(toolInfo.value.isAvailable && selectedProfile.value && selectedHexPath.value && isImageValidated.value)
+  )
+
   let logIdSeq = 0
+
+  watch([selectedHexPath, selectedProfileId], () => {
+    imageInspection.value = null
+    targetInfo.value = null
+  })
+
+  watch(selectedProbeSn, () => {
+    targetInfo.value = null
+  })
 
   function addLog(text: string, forceType?: FlashLogEntry['type']) {
     const cleaned = cleanLogText(text)
@@ -110,15 +150,97 @@ export const useFlashStore = defineStore('flash', () => {
     }
   }
 
+  async function loadProductProfiles() {
+    try {
+      const profiles = await flashListProductProfiles()
+      productProfiles.value = profiles
+      if (!profiles.some((profile) => profile.id === selectedProfileId.value)) {
+        selectedProfileId.value = profiles[0]?.id || ''
+      }
+    } catch (e: any) {
+      errorMsg.value = `读取烧录产品档案失败: ${e}`
+    }
+  }
+
+  async function inspectSelectedImage(): Promise<FlashImageInspection | null> {
+    if (!selectedProfileId.value) {
+      errorMsg.value = '请先选择烧录产品档案！'
+      return null
+    }
+    if (!selectedHexPath.value) {
+      errorMsg.value = '请先选择带地址的 Intel HEX 固件文件！'
+      return null
+    }
+
+    isInspectingImage.value = true
+    errorMsg.value = ''
+    imageInspection.value = null
+    try {
+      const inspection = await flashInspectImage(selectedProfileId.value, selectedHexPath.value)
+      imageInspection.value = inspection
+      addLog(`[镜像审查] ${inspection.message}`, 'success')
+      return inspection
+    } catch (e: any) {
+      errorMsg.value = `镜像审查未通过: ${e}`
+      addLog(`[镜像审查] 拒绝：${e}`, 'error')
+      return null
+    } finally {
+      isInspectingImage.value = false
+    }
+  }
+
+  async function probeSelectedTarget(): Promise<FlashTargetInfo | null> {
+    if (!toolInfo.value.cliPath) {
+      errorMsg.value = '未找到 STM32_Programmer_CLI 工具，请先完成工具检测！'
+      return null
+    }
+    if (!selectedProfileId.value) {
+      errorMsg.value = '请先选择烧录产品档案！'
+      return null
+    }
+
+    isProbingTarget.value = true
+    errorMsg.value = ''
+    targetInfo.value = null
+    try {
+      const target = await flashProbeTarget(
+        toolInfo.value.cliPath,
+        selectedProfileId.value,
+        selectedProbeSn.value || undefined
+      )
+      targetInfo.value = target
+      addLog(`[目标核验] ${target.message}`, target.isCompatible ? 'success' : 'error')
+      if (!target.isCompatible) {
+        errorMsg.value = target.message
+      }
+      return target
+    } catch (e: any) {
+      errorMsg.value = `目标 MCU 核验失败: ${e}`
+      addLog(`[目标核验] 失败：${e}`, 'error')
+      return null
+    } finally {
+      isProbingTarget.value = false
+    }
+  }
+
   async function startFlashing() {
     if (!toolInfo.value.cliPath) {
       errorMsg.value = '未找到 STM32_Programmer_CLI 工具，请在设置中配置有效路径！'
       return
     }
     if (!selectedHexPath.value) {
-      errorMsg.value = '请先选择需要烧录的 HEX / BIN 固件文件！'
+      errorMsg.value = '请先选择需要烧录的 Intel HEX 固件文件！'
       return
     }
+    if (!selectedProfile.value) {
+      errorMsg.value = '请先选择烧录产品档案！'
+      return
+    }
+
+    const inspection = await inspectSelectedImage()
+    if (!inspection) return
+    const target = await probeSelectedTarget()
+    if (!target?.isCompatible) return
 
     isFlashing.value = true
     errorMsg.value = ''
@@ -130,11 +252,12 @@ export const useFlashStore = defineStore('flash', () => {
       message: '正在初始化烧录任务...',
       isTerminal: false,
     }
-    addLog('正在启动 SWD 固件烧录任务 (Erase + Write + Verify)...', 'cmd')
+    addLog(`正在启动 ${selectedProfile.value.label} 的 SWD 烧录任务 (Write + Verify)...`, 'cmd')
 
     try {
       await flashStart(
         toolInfo.value.cliPath,
+        selectedProfileId.value,
         selectedHexPath.value,
         selectedProbeSn.value || undefined,
         (event) => {
@@ -183,8 +306,17 @@ export const useFlashStore = defineStore('flash', () => {
   return {
     toolInfo,
     customCliPath,
+    productProfiles,
+    selectedProfileId,
+    selectedProfile,
     selectedHexPath,
     selectedProbeSn,
+    imageInspection,
+    targetInfo,
+    isInspectingImage,
+    isProbingTarget,
+    isImageValidated,
+    canStartFlashing,
     isFlashing,
     progress,
     flashLogs,
@@ -192,6 +324,9 @@ export const useFlashStore = defineStore('flash', () => {
     errorMsg,
     addLog,
     probeTool,
+    loadProductProfiles,
+    inspectSelectedImage,
+    probeSelectedTarget,
     startFlashing,
     cancelFlashing,
     clearLogs,

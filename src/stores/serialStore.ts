@@ -17,6 +17,26 @@ import type {
 } from '../types/serial'
 import { formatSerialConfig } from '../utils/serialFormat'
 
+/**
+ * UART 是公共日志面板，不能因为 KZ3 Cat.1 配置而把凭证写入内存日志、
+ * 录制导出或屏幕。实际发送字节保持原样，只有回显文本被脱敏。
+ */
+function redactSensitiveTxText(text: string): string {
+  const normalized = text.trim()
+  const parts = normalized.split(',')
+  if (parts[0] !== '@CFG' || parts[1] !== '4G') return text
+  if (parts[2] === 'INIT' && parts.length === 11) {
+    parts[6] = '***'
+    parts[7] = '***'
+    return parts.join(',')
+  }
+  if ((parts[2] === 'USER' || parts[2] === 'PASS') && parts.length === 4) {
+    parts[3] = '***'
+    return parts.join(',')
+  }
+  return text
+}
+
 const SERIAL_CONFIG_STORAGE_KEY = 'np_tools_serial_config'
 
 const DEFAULT_SERIAL_CONFIG: SerialOpenConfig = {
@@ -26,6 +46,11 @@ const DEFAULT_SERIAL_CONFIG: SerialOpenConfig = {
   stopBits: 'one',
   parity: 'none',
   flowControl: 'none',
+}
+
+interface SerialConnectOptions {
+  /** 仅供受控重启恢复使用，保留既有会话日志与流量计数。 */
+  preserveSession?: boolean
 }
 
 function loadPersistedSerialConfig(): SerialOpenConfig {
@@ -175,7 +200,7 @@ export const useSerialStore = defineStore('serial', () => {
     }
   }
 
-  async function connect(portName?: string) {
+  async function connect(portName?: string, options: SerialConnectOptions = {}) {
     const target = portName || selectedPort.value
     if (!target) return
 
@@ -237,11 +262,16 @@ export const useSerialStore = defineStore('serial', () => {
         }
       )
       connectedPort.value = target
-      logs.value = []
       lineBuffer = ''
-      rxBytes.value = 0
-      txBytes.value = 0
-      appendLog('rx', `=== 已成功打开串口 ${target} (${formatSerialConfig(config.value)}) ===`)
+      if (!options.preserveSession) {
+        logs.value = []
+        rxBytes.value = 0
+        txBytes.value = 0
+      }
+      appendLog(
+        'rx',
+        `=== ${options.preserveSession ? '已恢复打开' : '已成功打开'}串口 ${target} (${formatSerialConfig(config.value)}) ===`
+      )
     } catch (err: any) {
       errorMsg.value = `打开串口失败: ${String(err)}`
       connectedPort.value = null
@@ -284,7 +314,13 @@ export const useSerialStore = defineStore('serial', () => {
 
   async function sendRaw(
     text: string,
-    options: { isHex?: boolean; addCR?: boolean; addLF?: boolean; exactBytes?: boolean } = {}
+    options: {
+      isHex?: boolean
+      addCR?: boolean
+      addLF?: boolean
+      exactBytes?: boolean
+      logText?: string
+    } = {}
   ): Promise<void> {
     if (!connectedPort.value || !text) return
 
@@ -307,10 +343,12 @@ export const useSerialStore = defineStore('serial', () => {
       echoText = text.replace(/\r?\n$/, '')
     }
 
+    if (options.logText !== undefined) echoText = options.logText
+
     try {
       await writePort(connectedPort.value, payload)
       txBytes.value += payload.length
-      appendLog('tx', echoText)
+      appendLog('tx', redactSensitiveTxText(echoText))
     } catch (err: any) {
       const detail = String(err)
       errorMsg.value = `发送失败: ${detail}`

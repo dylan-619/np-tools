@@ -15,20 +15,27 @@ import {
   TerminalSquare
 } from 'lucide-vue-next'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
-import { appSaveFile } from '../../../api/sjzdApi'
+import { appOpenFile, appSaveFile } from '../../../api/sjzdApi'
 import { useSerialStore } from '../../../stores/serialStore'
 import { useXtqCoordinatorStore } from '../../../stores/xtqCoordinatorStore'
-import { XTQ_OWNERS, type XtqOwner } from '../../../types/xtqCoordinator'
 import {
+  XTQ_CAPABILITY_SLOT_COUNT,
+  XTQ_OWNERS,
+  type XtqOwner
+} from '../../../types/xtqCoordinator'
+import {
+  buildSyncPayload,
+  capabilityOwnerForSlot,
   configErrorLabels,
   enumLabel,
+  validateCapabilityValue,
   XTQ_MODE_LABELS,
   XTQ_NETWORK_STATE_LABELS,
   XTQ_RADIO_STATE_LABELS,
   XTQ_ROLE_LABELS
 } from '../../../utils/xtqCoordinatorProtocol'
 
-type Section = 'overview' | 'configuration' | 'session'
+type Section = 'overview' | 'configuration' | 'capabilities' | 'sync' | 'session'
 
 const serial = useSerialStore()
 const coordinator = useXtqCoordinatorStore()
@@ -40,8 +47,21 @@ const editors = reactive<Record<XtqOwner, string>>({
   Radio2Config: '',
   EthernetConfig: ''
 })
+const capabilitySlots = Array.from({ length: XTQ_CAPABILITY_SLOT_COUNT }, (_, slot) => slot)
+const selectedCapabilitySlot = ref(0)
+const capabilityEditor = ref('')
+const capabilityDrafts = ref<Partial<Record<number, string>>>({})
+const syncEditor = ref(
+  JSON.stringify(
+    { version: 1, enabled: false, cache_ttl_seconds: 600, rules: [] },
+    null,
+    2
+  )
+)
 const message = ref<{ text: string; error: boolean } | null>(null)
 const pendingWrite = ref<XtqOwner | null>(null)
+const pendingCapabilityWrite = ref(false)
+const pendingSyncUpload = ref(false)
 
 const sections = [
   { id: 'overview' as const, label: '运行总览', caption: '@STATUS 实时诊断', icon: Activity },
@@ -50,6 +70,18 @@ const sections = [
     label: '配置快照',
     caption: 'Owner 读取与受控写入',
     icon: Database
+  },
+  {
+    id: 'capabilities' as const,
+    label: '终端适配',
+    caption: '32 槽位 Capability 台账',
+    icon: Cpu
+  },
+  {
+    id: 'sync' as const,
+    label: '同步规则',
+    caption: '预检、CRC 与状态摘要核对',
+    icon: FileJson
   },
   { id: 'session' as const, label: '会话记录', caption: '命令、回包与边界', icon: TerminalSquare }
 ]
@@ -70,6 +102,34 @@ const statusLabel = computed(
 const configErrors = computed(() =>
   coordinator.status ? configErrorLabels(coordinator.status.config_errors) : []
 )
+const selectedCapability = computed(
+  () => coordinator.capabilitySnapshots[selectedCapabilitySlot.value]
+)
+const importedCapabilityCount = computed(() => Object.keys(capabilityDrafts.value).length)
+const syncPreflight = computed(() => {
+  try {
+    return { prepared: buildSyncPayload(syncEditor.value), error: '' }
+  } catch (error) {
+    return { prepared: null, error: String(error) }
+  }
+})
+const radioConfigOverview = computed(() =>
+  [1, 2].map((index) => {
+    const owner = `Radio${index}Config` as XtqOwner
+    const value = coordinator.snapshots[owner]?.value
+    return {
+      index,
+      owner,
+      available: Boolean(value),
+      netName: typeof value?.net_name === 'string' ? value.net_name : '未读取',
+      txPower: typeof value?.tx_power === 'number' ? value.tx_power : '—',
+      maxTxPower: typeof value?.max_tx_power === 'number' ? value.max_tx_power : '—',
+      configuredAddress:
+        typeof value?.local_radio_addr === 'number' ? value.local_radio_addr : '—',
+      apId: typeof value?.ap_id === 'number' ? value.ap_id : '—'
+    }
+  })
+)
 
 watch(
   () => coordinator.snapshots,
@@ -80,6 +140,17 @@ watch(
     }
   },
   { deep: true }
+)
+
+watch(
+  () => [selectedCapabilitySlot.value, coordinator.capabilitySnapshots[selectedCapabilitySlot.value]],
+  () => {
+    const slot = selectedCapabilitySlot.value
+    capabilityEditor.value =
+      capabilityDrafts.value[slot] ||
+      (selectedCapability.value ? JSON.stringify(selectedCapability.value.value, null, 2) : '')
+  },
+  { immediate: true }
 )
 
 function showMessage(text: string, error = false) {
@@ -110,6 +181,10 @@ function delta(path: 'routes' | 'points' | 'sync') {
   return String(current.sync.target_failures - previous.sync.target_failures)
 }
 
+function formatStatusValue(value: string | number | null) {
+  return value === null ? '未上报' : String(value)
+}
+
 async function identify() {
   try {
     const record = await coordinator.queryStatus()
@@ -124,8 +199,183 @@ async function identify() {
 
 async function readAll() {
   try {
-    await coordinator.readAllOwners()
-    showMessage('五类 owner 已读取；编辑区已基于设备当前完整对象更新')
+    const records = await coordinator.readAllOwners()
+    const successful = records.filter((record) => record.status === 'ok').length
+    showMessage(
+      successful === XTQ_OWNERS.length
+        ? '五类 owner 已读取；编辑区已基于设备当前完整对象更新'
+        : `Owner 扫描结束：成功 ${successful}/${records.length}，请查看会话记录`,
+      successful !== XTQ_OWNERS.length
+    )
+  } catch (error) {
+    showMessage(String(error), true)
+  }
+}
+
+function selectCapabilitySlot(slot: number) {
+  selectedCapabilitySlot.value = slot
+}
+
+function capabilityDescription(slot: number) {
+  const snapshot = coordinator.capabilitySnapshots[slot]
+  if (capabilityDrafts.value[slot]) return '已导入草稿，待逐槽确认'
+  if (!snapshot) return '尚未读取'
+  return snapshot.value.enabled
+    ? `${snapshot.value.sn} · APP ${snapshot.value.reported_app_addr}`
+    : '已禁用'
+}
+
+async function readSelectedCapability() {
+  try {
+    const record = await coordinator.readCapability(selectedCapabilitySlot.value)
+    showMessage(
+      record.status === 'ok'
+        ? `${capabilityOwnerForSlot(selectedCapabilitySlot.value)} 已读取`
+        : coordinator.lastError,
+      record.status !== 'ok'
+    )
+  } catch (error) {
+    showMessage(String(error), true)
+  }
+}
+
+async function readAllCapabilities() {
+  try {
+    const records = await coordinator.readAllCapabilities()
+    const successful = records.filter((record) => record.status === 'ok').length
+    showMessage(
+      successful === XTQ_CAPABILITY_SLOT_COUNT
+        ? '32 个 Capability 槽位已读取'
+        : `Capability 扫描结束：成功 ${successful}/${records.length}，请查看会话记录`,
+      successful !== XTQ_CAPABILITY_SLOT_COUNT
+    )
+  } catch (error) {
+    showMessage(String(error), true)
+  }
+}
+
+function requestCapabilityWrite() {
+  if (!selectedCapability.value)
+    return showMessage('写入前必须先读取当前槽位；导入文件只作为草稿，不直接写设备', true)
+  if (!capabilityEditor.value.trim()) return showMessage('Capability JSON 不能为空', true)
+  try {
+    validateCapabilityValue(JSON.parse(capabilityEditor.value))
+    pendingCapabilityWrite.value = true
+  } catch (error) {
+    showMessage(`Capability 预检失败：${String(error)}`, true)
+  }
+}
+
+async function confirmCapabilityWrite() {
+  pendingCapabilityWrite.value = false
+  const slot = selectedCapabilitySlot.value
+  try {
+    const record = await coordinator.writeCapability(slot, capabilityEditor.value)
+    if (record.status !== 'ok') return showMessage(coordinator.lastError || record.response, true)
+    const drafts = { ...capabilityDrafts.value }
+    delete drafts[slot]
+    capabilityDrafts.value = drafts
+    showMessage(`${capabilityOwnerForSlot(slot)} 已写入且读回一致`)
+  } catch (error) {
+    showMessage(String(error), true)
+  }
+}
+
+async function exportCapabilities() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const content = JSON.stringify(
+    {
+      schema: 'np-tools.xtq-capabilities.v1',
+      exportedAt: new Date().toISOString(),
+      slots: capabilitySlots.flatMap((slot) => {
+        const snapshot = coordinator.capabilitySnapshots[slot]
+        return snapshot ? [{ slot, value: snapshot.value }] : []
+      })
+    },
+    null,
+    2
+  )
+  const path = await appSaveFile(
+    `XTQ-Capability-草稿-${timestamp}.json`,
+    content,
+    'XTQ Capability 草稿',
+    'json'
+  )
+  showMessage(path ? `Capability 草稿已导出：${path}` : '未选择导出位置', !path)
+}
+
+async function importCapabilities() {
+  const file = await appOpenFile('XTQ Capability 草稿 (*.json)', ['json'])
+  if (!file) return
+  try {
+    const parsed = JSON.parse(file.content) as { slots?: Array<{ slot?: unknown; value?: unknown }> }
+    if (!Array.isArray(parsed.slots)) throw new Error('文件缺少 slots 数组')
+    const drafts: Partial<Record<number, string>> = {}
+    for (const item of parsed.slots) {
+      if (
+        !Number.isInteger(item.slot) ||
+        Number(item.slot) < 0 ||
+        Number(item.slot) >= XTQ_CAPABILITY_SLOT_COUNT
+      ) {
+        throw new Error(`存在无效槽位：${String(item.slot)}`)
+      }
+      const value = validateCapabilityValue(item.value)
+      drafts[Number(item.slot)] = JSON.stringify(value, null, 2)
+    }
+    capabilityDrafts.value = drafts
+    const firstSlot = Object.keys(drafts).map(Number).sort((left, right) => left - right)[0]
+    if (firstSlot !== undefined) {
+      selectedCapabilitySlot.value = firstSlot
+      capabilityEditor.value = drafts[firstSlot] || ''
+    }
+    showMessage(`已导入 ${Object.keys(drafts).length} 个 Capability 草稿；仍需逐槽读取、确认和写入`)
+  } catch (error) {
+    showMessage(`Capability 草稿导入失败：${String(error)}`, true)
+  }
+}
+
+async function importSyncDraft() {
+  const file = await appOpenFile('XTQ 同步规则 (*.json)', ['json'])
+  if (!file) return
+  try {
+    const prepared = buildSyncPayload(file.content)
+    syncEditor.value = prepared.canonicalJson
+    showMessage(`已导入并规范化同步规则：${prepared.ruleCount} 条规则、${prepared.mappingCount} 条映射`)
+  } catch (error) {
+    showMessage(`同步规则导入失败：${String(error)}`, true)
+  }
+}
+
+async function exportSyncDraft() {
+  if (!syncPreflight.value.prepared)
+    return showMessage(`同步规则未通过预检：${syncPreflight.value.error}`, true)
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const path = await appSaveFile(
+    `XTQ-同步规则-${timestamp}.json`,
+    syncPreflight.value.prepared.canonicalJson,
+    'XTQ 同步规则',
+    'json'
+  )
+  showMessage(path ? `同步规则已导出：${path}` : '未选择导出位置', !path)
+}
+
+function requestSyncUpload() {
+  if (!coordinator.identified) return showMessage('上传前必须先识别协调器并读取 @STATUS', true)
+  if (!syncPreflight.value.prepared)
+    return showMessage(`同步规则预检失败：${syncPreflight.value.error}`, true)
+  pendingSyncUpload.value = true
+}
+
+async function confirmSyncUpload() {
+  pendingSyncUpload.value = false
+  try {
+    const record = await coordinator.uploadSyncConfiguration(syncEditor.value)
+    showMessage(
+      record.status === 'ok'
+        ? coordinator.lastSyncUpload?.verificationMessage || '同步规则已上传，等待状态摘要核对'
+        : coordinator.lastError || record.response,
+      record.status !== 'ok'
+    )
   } catch (error) {
     showMessage(String(error), true)
   }
@@ -259,8 +509,9 @@ onBeforeUnmount(() => coordinator.stopPolling())
         <div class="scope-note">
           <strong>固件能力边界</strong>
           <p>
-            <code>@SYNC GET</code> 与完整 Radio
-            观测接口尚未实现，当前只展示真实摘要，不推断规则内容或功率档位。
+            已支持 Capability 槽位、<code>@SYNC BEGIN/COMMIT</code> 上传和新版
+            <code>@SYNC GET</code> 完整规则读回；Radio 深度实时观测仍未实现。收到
+            <code>OK_REBOOTING</code> 后，工具最多 30 秒仅重开本次已知串口路径，不扫描或连接其他端口。
           </p>
         </div>
       </aside>
@@ -407,6 +658,64 @@ onBeforeUnmount(() => coordinator.stopPolling())
               {{ configErrors.join(', ') || '无' }}</strong></span>
           </section>
 
+          <section v-if="coordinator.status" class="panel status-history">
+            <div class="panel-title">
+              <Activity :size="18" />
+              <div>
+                <h2>状态时间线与结构化差异</h2>
+                <small>
+                  当前会话保留最近 {{ coordinator.statusHistory.length }}/300 个有效 <code>@STATUS</code>
+                  采样；仅比较固件已定义的字段。
+                </small>
+              </div>
+              <button class="btn" :disabled="!coordinator.statusHistory.length" @click="coordinator.clearStatusHistory">
+                清空时间线
+              </button>
+            </div>
+            <div class="history-summary">
+              <span><small>最近采样</small><strong>{{ formatTime(coordinator.statusHistory[coordinator.statusHistory.length - 1]?.capturedAt || '') }}</strong></span>
+              <span><small>最近差异</small><strong>{{ coordinator.latestStatusDifferences.length }} 项</strong></span>
+              <span><small>导出范围</small><strong>原始采样 + 受控字段差异</strong></span>
+            </div>
+            <div v-if="coordinator.statusHistory.length < 2" class="history-empty">
+              已记录首个基线采样；下一次成功读取 <code>@STATUS</code> 后显示差异。
+            </div>
+            <div v-else-if="!coordinator.latestStatusDifferences.length" class="history-empty">
+              与上一有效采样相比，受控诊断字段没有变化。
+            </div>
+            <div v-else class="difference-list">
+              <div v-for="difference in coordinator.latestStatusDifferences" :key="difference.path" class="difference-row">
+                <strong>{{ difference.label }}</strong><code>{{ formatStatusValue(difference.before) }}</code><span>→</span><code>{{ formatStatusValue(difference.after) }}</code>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="coordinator.status" class="panel radio-config-compare">
+            <div class="panel-title">
+              <Radio :size="18" />
+              <div>
+                <h2>双 Radio 配置对照</h2>
+                <small>运行状态来自 <code>@STATUS</code>；网络名与功率仅来自已读取 EEPROM owner。</small>
+              </div>
+              <button
+                class="btn"
+                :disabled="!coordinator.identified || coordinator.isBusy"
+                @click="readAll"
+              >
+                <RefreshCw :size="14" />读取配置
+              </button>
+            </div>
+            <div class="radio-config-grid">
+              <article v-for="radio in radioConfigOverview" :key="radio.owner" class="radio-config-card">
+                <strong>Radio {{ radio.index }} · {{ radio.owner }}</strong>
+                <span><small>网络名</small><code>{{ radio.netName }}</code></span>
+                <span><small>目标 / 最大功率</small><code>{{ radio.txPower }} / {{ radio.maxTxPower }}</code></span>
+                <span><small>配置地址 / AP ID</small><code>{{ radio.configuredAddress }} / {{ radio.apId }}</code></span>
+                <em v-if="!radio.available">尚未读取 owner，不能将运行地址推断为配置地址。</em>
+              </article>
+            </div>
+          </section>
+
           <div v-else class="empty-state">
             <Radio :size="42" />
             <h2>先识别协调器</h2>
@@ -469,6 +778,140 @@ onBeforeUnmount(() => coordinator.stopPolling())
           </section>
         </template>
 
+        <template v-else-if="activeSection === 'capabilities'">
+          <div class="section-toolbar">
+            <div>
+              <h2>终端协议与无线地址适配</h2>
+              <p>32 个 EEPROM 固定槽位。导入只生成草稿，写入始终逐槽、读前与读后核对。</p>
+            </div>
+            <div class="toolbar-actions">
+              <button class="btn" @click="importCapabilities">导入草稿</button>
+              <button class="btn" :disabled="!coordinator.capabilityReadCount" @click="exportCapabilities">
+                <Download :size="14" />导出已读
+              </button>
+              <button
+                class="btn primary"
+                :disabled="!coordinator.identified || coordinator.isBusy"
+                @click="readAllCapabilities"
+              >
+                <RefreshCw :size="14" />扫描 32 槽位
+              </button>
+            </div>
+          </div>
+          <section class="capability-layout">
+            <article class="panel capability-list">
+              <div class="capability-list-header">
+                <strong>槽位台账</strong>
+                <small>已读取 {{ coordinator.capabilityReadCount }}/32 · 导入草稿 {{ importedCapabilityCount }}</small>
+              </div>
+              <button
+                v-for="slot in capabilitySlots"
+                :key="slot"
+                class="capability-slot"
+                :class="{
+                  active: selectedCapabilitySlot === slot,
+                  enabled: coordinator.capabilitySnapshots[slot]?.value.enabled,
+                  draft: capabilityDrafts[slot]
+                }"
+                @click="selectCapabilitySlot(slot)"
+              >
+                <strong>{{ String(slot).padStart(2, '0') }}</strong><span>{{ capabilityDescription(slot) }}</span>
+              </button>
+            </article>
+            <article class="panel capability-editor">
+              <div class="panel-title">
+                <Database :size="18" />
+                <div>
+                  <h2>{{ capabilityOwnerForSlot(selectedCapabilitySlot) }}</h2>
+                  <small>{{ selectedCapability ? formatTime(selectedCapability.receivedAt) : '先读取此槽位，再允许写入' }}</small>
+                </div>
+                <button
+                  class="icon-btn"
+                  :disabled="!ready || coordinator.isBusy"
+                  title="读取当前槽位"
+                  @click="readSelectedCapability"
+                >
+                  <RefreshCw :size="14" />
+                </button>
+              </div>
+              <div class="capability-hint">
+                <span>0=SPARK_LINK 时地址必须为 0；2=FACTORY 时必须提供固定地址。</span>
+                <span>codec：0=NONE，1=SPARK_V1，2=SJZ_LEGACY。</span>
+              </div>
+              <textarea
+                v-model="capabilityEditor"
+                spellcheck="false"
+                :placeholder="`先读取 ${capabilityOwnerForSlot(selectedCapabilitySlot)}`"
+              />
+              <div class="owner-actions">
+                <span>设备端写 EEPROM 后立即读回，不重启协调器。</span>
+                <button
+                  class="btn primary"
+                  :disabled="!ready || !selectedCapability || coordinator.isBusy"
+                  @click="requestCapabilityWrite"
+                >
+                  <Send :size="14" />确认并写入此槽位
+                </button>
+              </div>
+            </article>
+          </section>
+        </template>
+
+        <template v-else-if="activeSection === 'sync'">
+          <div class="section-toolbar">
+            <div>
+              <h2>同步规则规范化上传</h2>
+              <p>桌面端冻结为固件可解析的规范 JSON；上传后仅用现有 <code>@STATUS</code> 核对规则数与长度摘要。</p>
+            </div>
+            <div class="toolbar-actions">
+              <button class="btn" @click="importSyncDraft">导入 JSON</button>
+              <button class="btn" @click="exportSyncDraft"><Download :size="14" />导出规范稿</button>
+              <button
+                class="btn primary"
+                :disabled="!coordinator.identified || coordinator.isBusy || !syncPreflight.prepared"
+                @click="requestSyncUpload"
+              >
+                <Send :size="14" />预检后上传
+              </button>
+            </div>
+          </div>
+          <section class="sync-layout">
+            <article class="panel sync-editor">
+              <div class="panel-title">
+                <FileJson :size="18" />
+                <div>
+                  <h2>规则草稿</h2>
+                  <small>最多 16 条规则、128 条映射、32768 B；上传前将统一字段顺序与数据类型大小写。</small>
+                </div>
+              </div>
+              <textarea v-model="syncEditor" spellcheck="false" />
+            </article>
+            <aside class="sync-summary">
+              <article class="panel preflight-card" :class="{ invalid: !syncPreflight.prepared }">
+                <strong>{{ syncPreflight.prepared ? '本地预检通过' : '本地预检未通过' }}</strong>
+                <template v-if="syncPreflight.prepared">
+                  <span>规范化长度 <code>{{ syncPreflight.prepared.byteLength }} B</code></span>
+                  <span>CRC32 <code>{{ syncPreflight.prepared.crc32 }}</code></span>
+                  <span>规则 / 映射 <code>{{ syncPreflight.prepared.ruleCount }} / {{ syncPreflight.prepared.mappingCount }}</code></span>
+                </template>
+                <p v-else>{{ syncPreflight.error }}</p>
+              </article>
+              <article v-if="coordinator.lastSyncUpload" class="panel preflight-card" :class="{ invalid: !coordinator.lastSyncUpload.summaryMatched }">
+                <strong>最近一次上传摘要核对</strong>
+                <span>设备 sequence：{{ coordinator.lastSyncUpload.sequenceBefore }} → {{ coordinator.lastSyncUpload.sequenceAfter }}</span>
+                <span>设备长度 / 规则：{{ coordinator.lastSyncUpload.deviceJsonLength }} / {{ coordinator.lastSyncUpload.deviceRuleCount }}</span>
+                <p>{{ coordinator.lastSyncUpload.verificationMessage }}</p>
+              </article>
+              <article class="panel sync-boundary">
+                <AlertTriangle :size="18" />
+                <p>
+                  当前固件未提供同步规则完整读回接口。<code>@STATUS</code> 摘要匹配不等同于 Flash 内容一致、同步运行、掉电恢复或三级级联 HIL 通过；缺口已记录给固件工程。
+                </p>
+              </article>
+            </aside>
+          </section>
+        </template>
+
         <template v-else>
           <div class="section-toolbar">
             <div>
@@ -498,7 +941,9 @@ onBeforeUnmount(() => coordinator.stopPolling())
               <h3>当前未验证边界</h3>
               <p>
                 未执行 F407/F427 实板、双 Radio 射频、EEPROM 掉电、LAN8742/TCP、同步 Flash
-                掉电恢复和三级级联 HIL。同步完整 JSON 读取及 Radio 网络名/功率观测需先扩展固件协议。
+                掉电恢复和三级级联 HIL。同步完整 JSON 已可读回核验，但 Radio 芯片实时观测仍需扩展协议；
+                EEPROM owner 中的网络名/功率只表示保存目标，不表示实际无线生效值。重启恢复只尝试写入前
+                已连接的精确串口路径；若系统重新枚举为新路径，工具不会扫描或向新路径自动发送命令。
               </p>
             </div>
           </section>
@@ -515,6 +960,26 @@ onBeforeUnmount(() => coordinator.stopPolling())
       :countdown-seconds="3"
       @confirm="confirmWrite"
       @cancel="pendingWrite = null"
+    />
+    <ConfirmModal
+      :visible="pendingCapabilityWrite"
+      title="写入终端 Capability 槽位"
+      :message="`${capabilityOwnerForSlot(selectedCapabilitySlot)} 会立即修改 EEPROM 中单个终端的下行/ACK 协议和无线地址适配。工具会在设备返回 OK 后重新读取同一槽位；不批量写入其他导入草稿。`"
+      danger-level="high"
+      confirm-text="确认写入并读回"
+      :countdown-seconds="3"
+      @confirm="confirmCapabilityWrite"
+      @cancel="pendingCapabilityWrite = false"
+    />
+    <ConfirmModal
+      :visible="pendingSyncUpload"
+      title="上传同步规则到内部 Flash"
+      :message="`将以 @SYNC BEGIN/${syncPreflight.prepared?.byteLength || 0} B/CRC32 ${syncPreflight.prepared?.crc32 || '—'} → payload → @SYNC COMMIT 单次提交。设备可能短暂复位双 Radio；工具随后读取 @STATUS 和 @SYNC GET，核验完整规范内容。`"
+      danger-level="high"
+      confirm-text="确认上传规则"
+      :countdown-seconds="3"
+      @confirm="confirmSyncUpload"
+      @cancel="pendingSyncUpload = false"
     />
   </div>
 </template>
@@ -873,6 +1338,137 @@ onBeforeUnmount(() => coordinator.stopPolling())
   margin-top: 3px;
   font-size: 0.72rem;
 }
+.status-history {
+  margin-top: 10px;
+  padding: 11px;
+}
+.status-history .panel-title {
+  align-items: flex-start;
+}
+.status-history .btn {
+  margin-left: auto;
+}
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--color-border-subtle);
+}
+.history-summary span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 8px;
+  background: var(--color-surface-2);
+}
+.history-summary small,
+.history-empty {
+  color: var(--color-text-tertiary);
+  font-size: 0.64rem;
+}
+.history-summary strong {
+  color: var(--color-text-primary);
+  font-size: 0.69rem;
+  font-weight: 600;
+}
+.history-empty {
+  padding: 10px 1px 1px;
+  line-height: 1.45;
+}
+.history-empty code,
+.difference-row code {
+  font-family: var(--font-mono);
+}
+.difference-list {
+  max-height: 208px;
+  margin-top: 9px;
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+}
+.difference-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(80px, 0.45fr) 16px minmax(80px, 0.45fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 29px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.66rem;
+}
+.difference-row:last-child {
+  border-bottom: 0;
+}
+.difference-row strong {
+  font-weight: 500;
+}
+.difference-row code {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.difference-row span {
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+.radio-config-compare {
+  margin-top: 10px;
+  padding: 11px;
+}
+.radio-config-compare .panel-title {
+  align-items: flex-start;
+}
+.radio-config-compare .panel-title .btn {
+  margin-left: auto;
+}
+.radio-config-compare code,
+.sync-boundary code,
+.preflight-card code {
+  font-family: var(--font-mono);
+}
+.radio-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 8px;
+}
+.radio-config-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 9px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xs);
+}
+.radio-config-card > strong,
+.radio-config-card > em {
+  grid-column: 1 / -1;
+}
+.radio-config-card > strong {
+  font-size: 0.73rem;
+}
+.radio-config-card span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.radio-config-card small {
+  color: var(--color-text-tertiary);
+  font-size: 0.61rem;
+}
+.radio-config-card code {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.radio-config-card em {
+  color: var(--color-warning);
+  font-size: 0.63rem;
+  font-style: normal;
+}
 .empty-state {
   min-height: 360px;
   display: grid;
@@ -936,6 +1532,143 @@ onBeforeUnmount(() => coordinator.stopPolling())
 .owner-actions span {
   color: var(--color-text-tertiary);
   font-size: 0.65rem;
+}
+.capability-layout,
+.sync-layout {
+  display: grid;
+  grid-template-columns: minmax(290px, 0.8fr) minmax(430px, 1.2fr);
+  gap: 10px;
+}
+.capability-list,
+.capability-editor,
+.sync-editor {
+  padding: 10px;
+}
+.capability-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 6px;
+}
+.capability-list-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 4px;
+}
+.capability-list-header strong {
+  font-size: 0.8rem;
+}
+.capability-list-header small {
+  color: var(--color-text-tertiary);
+  font-size: 0.64rem;
+}
+.capability-slot {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px;
+  min-height: 45px;
+  padding: 6px;
+  color: var(--color-text-primary);
+  text-align: left;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.capability-slot:hover,
+.capability-slot.active {
+  border-color: var(--color-accent);
+  background: #e7f1fa;
+}
+.capability-slot.enabled {
+  border-left: 3px solid var(--color-success);
+}
+.capability-slot.draft {
+  box-shadow: inset 0 0 0 1px var(--color-warning);
+}
+.capability-slot strong {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.capability-slot span {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.64rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+.capability-editor {
+  display: flex;
+  flex-direction: column;
+}
+.capability-editor textarea,
+.sync-editor textarea {
+  width: 100%;
+  min-height: 300px;
+  resize: vertical;
+  padding: 9px;
+  color: var(--color-text-primary);
+  background: #f7f9fb;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xs);
+  font: 0.7rem/1.5 var(--font-mono);
+  user-select: text;
+}
+.capability-editor textarea:focus,
+.sync-editor textarea:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -1px;
+}
+.capability-hint {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 8px;
+  color: var(--color-text-tertiary);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+.sync-layout {
+  grid-template-columns: minmax(480px, 1.35fr) minmax(280px, 0.65fr);
+}
+.sync-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preflight-card,
+.sync-boundary {
+  padding: 11px;
+}
+.preflight-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 3px solid var(--color-success);
+}
+.preflight-card.invalid {
+  border-left-color: var(--color-danger);
+  background: #fff8f8;
+}
+.preflight-card strong {
+  font-size: 0.78rem;
+}
+.preflight-card span,
+.preflight-card p,
+.sync-boundary p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.67rem;
+  line-height: 1.5;
+}
+.sync-boundary {
+  display: flex;
+  gap: 8px;
+  color: var(--color-warning);
+  background: #fff8e7;
+  border-color: #d8bd77;
 }
 .session-table {
   overflow: hidden;
@@ -1011,8 +1744,19 @@ onBeforeUnmount(() => coordinator.stopPolling())
     grid-template-columns: repeat(2, 1fr);
   }
   .status-grid,
-  .owner-grid {
+  .owner-grid,
+  .capability-layout,
+  .sync-layout {
     grid-template-columns: 1fr;
+  }
+  .radio-config-grid {
+    grid-template-columns: 1fr;
+  }
+  .history-summary {
+    grid-template-columns: 1fr;
+  }
+  .difference-row {
+    grid-template-columns: minmax(130px, 1fr) minmax(70px, 0.45fr) 16px minmax(70px, 0.45fr);
   }
   .header-actions .connection-chip {
     display: none;

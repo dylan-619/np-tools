@@ -31,6 +31,17 @@ const probeOptions = computed(() => {
   }))
 })
 
+const productProfileOptions = computed(() => {
+  return flash.productProfiles.map((profile) => ({
+    label: profile.label,
+    value: profile.id,
+  }))
+})
+
+const canUseSjzdSnPipeline = computed(
+  () => flash.selectedProfile?.supportsSjzdSnPipeline === true
+)
+
 function scrollToBottom() {
   if (logTerminalRef.value) {
     logTerminalRef.value.scrollTop = logTerminalRef.value.scrollHeight
@@ -49,15 +60,11 @@ async function chooseHexFile() {
     const selected = await open({
       multiple: false,
       directory: false,
-      title: '选择待烧录的固件文件 (.hex / .bin / .elf)',
+      title: '选择待烧录的带地址 Intel HEX 文件',
       filters: [
         {
-          name: 'STM32 固件 (*.hex, *.bin, *.elf)',
-          extensions: ['hex', 'bin', 'elf', 'HEX', 'BIN', 'ELF'],
-        },
-        {
-          name: '所有文件 (*.*)',
-          extensions: ['*'],
+          name: 'Intel HEX 固件 (*.hex)',
+          extensions: ['hex', 'HEX'],
         },
       ],
     })
@@ -80,6 +87,7 @@ async function handleStartFlash() {
   // Optional Production Pipeline: Flash -> Serial Connect -> Write SN
   if (
     autoBurnSnAfterFlash.value &&
+    canUseSjzdSnPipeline.value &&
     flash.progress.state === 'success' &&
     serial.selectedPort &&
     productionSn.value.length === 12
@@ -90,7 +98,10 @@ async function handleStartFlash() {
         await serial.connect(serial.selectedPort)
       }
       await sjzd.burnSn(productionSn.value)
-      flash.addLog(`[产线流水线] SN [${productionSn.value}] 自动烧录成功！`, 'success')
+      flash.addLog(
+        `[产线流水线] SN [${productionSn.value}] 写入指令已发送；请在设备概览页读回确认。`,
+        'warn'
+      )
     } catch (e: any) {
       flash.addLog(`[产线流水线] 自动写入 SN 失败: ${e}`, 'error')
     }
@@ -102,7 +113,14 @@ onMounted(() => {
   if (savedHex && !flash.selectedHexPath) {
     flash.selectedHexPath = savedHex
   }
-  flash.probeTool()
+  void flash.loadProductProfiles()
+  void flash.probeTool()
+})
+
+watch(canUseSjzdSnPipeline, (supported) => {
+  if (!supported) {
+    autoBurnSnAfterFlash.value = false
+  }
 })
 </script>
 
@@ -111,9 +129,9 @@ onMounted(() => {
     <!-- Header -->
     <header class="view-header">
       <div class="title-col">
-        <h2>STM32 ST-Link 固件烧录与产线流水线</h2>
+        <h2>STM32 ST-Link 安全烧录与产线工作台</h2>
         <p class="subtitle">
-          集成 STM32CubeProgrammer CLI 工具链，支持 SWD 接口硬件复位烧录、全自动擦除校验及产线一键烧录写入 SN。
+          产品档案、带地址 HEX、目标 MCU 身份三项预检全部通过后，才允许执行 SWD 写入与校验。
         </p>
       </div>
 
@@ -172,14 +190,28 @@ onMounted(() => {
       </div>
 
       <div class="card-body form-grid">
+        <!-- Product Profile -->
+        <div class="form-group span-2">
+          <label>产品烧录档案（由后端固定维护）</label>
+          <CustomSelect
+            v-model="flash.selectedProfileId"
+            :options="productProfileOptions"
+            :placeholder="flash.productProfiles.length === 0 ? '正在加载受支持的产品档案...' : '选择产品档案'"
+            :disabled="flash.isFlashing || flash.productProfiles.length === 0"
+          />
+          <p v-if="flash.selectedProfile" class="form-hint">
+            {{ flash.selectedProfile.imageKind }} · {{ flash.selectedProfile.mcu }}
+          </p>
+        </div>
+
         <!-- Target Hex File -->
         <div class="form-group span-2">
-          <label>目标固件文件 (.hex / .bin)</label>
+          <label>目标固件文件（仅带地址 Intel HEX）</label>
           <div class="input-with-button">
             <input
               v-model="flash.selectedHexPath"
               type="text"
-              placeholder="请选择或粘贴固件绝对路径..."
+              placeholder="请选择或粘贴已发布的 .hex 绝对路径..."
               class="form-input mono-text"
               :disabled="flash.isFlashing"
             />
@@ -190,6 +222,46 @@ onMounted(() => {
             >
               <FolderOpen :size="15" />
               <span>浏览选择文件</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>镜像安全审查</label>
+          <div class="preflight-control">
+            <span
+              class="preflight-state"
+              :class="{ ready: flash.isImageValidated, pending: !flash.isImageValidated }"
+            >
+              {{ flash.isImageValidated ? '已通过' : '待校验' }}
+            </span>
+            <button
+              class="btn btn-secondary"
+              :disabled="flash.isFlashing || flash.isInspectingImage || !flash.selectedHexPath || !flash.selectedProfileId"
+              @click="flash.inspectSelectedImage()"
+            >
+              <RefreshCw :size="14" :class="{ spin: flash.isInspectingImage }" />
+              <span>{{ flash.isInspectingImage ? '校验中' : '校验镜像' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>连接目标 MCU 核验</label>
+          <div class="preflight-control">
+            <span
+              class="preflight-state"
+              :class="{ ready: flash.targetInfo?.isCompatible, pending: !flash.targetInfo?.isCompatible }"
+            >
+              {{ flash.targetInfo?.isCompatible ? '已匹配' : '待核验' }}
+            </span>
+            <button
+              class="btn btn-secondary"
+              :disabled="flash.isFlashing || flash.isProbingTarget || !flash.toolInfo.isAvailable || !flash.selectedProfileId"
+              @click="flash.probeSelectedTarget()"
+            >
+              <Cpu :size="14" />
+              <span>{{ flash.isProbingTarget ? '核验中' : '核验 MCU' }}</span>
             </button>
           </div>
         </div>
@@ -216,8 +288,19 @@ onMounted(() => {
           </div>
         </div>
 
+        <div v-if="flash.selectedProfile" class="form-group span-2 safety-note-box">
+          <span class="safety-note-title">档案边界</span>
+          <span>{{ flash.selectedProfile.safetyNote }}</span>
+          <span v-if="flash.targetInfo" :class="flash.targetInfo.isCompatible ? 'check-detail ok' : 'check-detail fail'">
+            {{ flash.targetInfo.message }}
+          </span>
+          <span v-if="flash.imageInspection" class="check-detail ok">
+            {{ flash.imageInspection.message }}
+          </span>
+        </div>
+
         <!-- Pipeline Auto-SN Checkbox -->
-        <div class="form-group span-2 pipeline-box">
+        <div v-if="canUseSjzdSnPipeline" class="form-group span-2 pipeline-box">
           <label class="checkbox-label">
             <input
               v-model="autoBurnSnAfterFlash"
@@ -248,12 +331,12 @@ onMounted(() => {
         <button
           v-if="!flash.isFlashing"
           class="btn btn-flash-start"
-          :disabled="!flash.toolInfo.isAvailable || !flash.selectedHexPath"
+          :disabled="!flash.canStartFlashing || flash.isInspectingImage || flash.isProbingTarget"
           @click="handleStartFlash"
         >
           <Flame :size="16" />
-          <span v-if="flash.progress.state === 'success'">重新开始 SWD 硬件烧录 (Erase + Write + Verify)</span>
-          <span v-else>开始 SWD 硬件烧录 (Erase + Write + Verify)</span>
+          <span v-if="flash.progress.state === 'success'">重新执行安全 SWD 烧录 (Write + Verify)</span>
+          <span v-else>执行安全 SWD 烧录 (Write + Verify)</span>
         </button>
 
         <button
@@ -492,6 +575,12 @@ onMounted(() => {
   color: var(--text-main, #17212b);
 }
 
+.form-hint {
+  margin: -1px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted, #40515f);
+}
+
 .input-with-button {
   display: flex;
   gap: 8px;
@@ -527,6 +616,69 @@ onMounted(() => {
   border: 1px solid var(--border, #b9c5cf);
   font-size: 0.75rem;
   color: #1769aa;
+}
+
+.preflight-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--control-height, 32px);
+}
+
+.preflight-state {
+  min-width: 58px;
+  padding: 3px 7px;
+  border: 1px solid #c4ced6;
+  border-radius: 4px;
+  background: #f3f6f8;
+  color: #52636f;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.preflight-state.ready {
+  border-color: rgba(23, 107, 69, 0.4);
+  background: rgba(23, 107, 69, 0.1);
+  color: #176b45;
+}
+
+.preflight-state.pending {
+  border-color: rgba(138, 87, 0, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+  color: #7a4b00;
+}
+
+.safety-note-box {
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid #c6d2dc;
+  border-left: 4px solid #1769aa;
+  border-radius: 5px;
+  background: #f2f6f9;
+  color: #334b5c;
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+
+.safety-note-title {
+  color: #193e5a;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.check-detail {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+}
+
+.check-detail.ok {
+  color: #176b45;
+}
+
+.check-detail.fail {
+  color: #a12d34;
 }
 
 .pipeline-box {

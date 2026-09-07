@@ -1,6 +1,7 @@
 use app_types::{
-    AiSampleDto, DeviceInfoResult, FlashProgressEvent, FlashToolInfo, ModbusPointConfig,
-    SerialOpenConfig, SerialPortDescriptor, SleFieldComparison,
+    AiSampleDto, DeviceInfoResult, FlashImageInspection, FlashProductProfile, FlashProgressEvent,
+    FlashTargetInfo, FlashToolInfo, ModbusPointConfig, SerialOpenConfig, SerialPortDescriptor,
+    SleFieldComparison,
 };
 use device_protocol::*;
 use flash_service::FlashManager;
@@ -229,8 +230,31 @@ async fn flash_probe_tool(custom_cli: Option<String>) -> FlashToolInfo {
 }
 
 #[tauri::command]
+fn flash_list_product_profiles() -> Vec<FlashProductProfile> {
+    flash_service::list_product_profiles()
+}
+
+#[tauri::command]
+fn flash_inspect_image(
+    profile_id: String,
+    hex_path: String,
+) -> Result<FlashImageInspection, String> {
+    flash_service::inspect_flash_image(&profile_id, &hex_path)
+}
+
+#[tauri::command]
+async fn flash_probe_target(
+    cli_path: String,
+    profile_id: String,
+    probe_sn: Option<String>,
+) -> Result<FlashTargetInfo, String> {
+    flash_service::probe_flash_target(&cli_path, &profile_id, probe_sn).await
+}
+
+#[tauri::command]
 async fn flash_start(
     cli_path: String,
+    profile_id: String,
     hex_path: String,
     probe_sn: Option<String>,
     on_progress: Channel<FlashProgressEvent>,
@@ -245,14 +269,7 @@ async fn flash_start(
     });
 
     let cancel_flag = flash_mgr.get_cancel_flag();
-    flash_service::execute_flash(
-        &cli_path,
-        &hex_path,
-        probe_sn,
-        tx,
-        cancel_flag,
-    )
-    .await
+    flash_service::execute_flash(&cli_path, &profile_id, &hex_path, probe_sn, tx, cancel_flag).await
 }
 
 #[tauri::command]
@@ -348,6 +365,9 @@ pub fn run() {
             sjzd_parse_ai_sample,
             // Flashing Commands
             flash_probe_tool,
+            flash_list_product_profiles,
+            flash_inspect_image,
+            flash_probe_target,
             flash_start,
             flash_cancel,
             // KZ3 HTTP 在线调试

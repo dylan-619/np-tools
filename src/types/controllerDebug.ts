@@ -3,6 +3,10 @@ import type { NorthboundField } from './controllerIo'
 export type Kz3Scalar = boolean | number
 export type PointQuality = 0 | 1 | 2 | 3 | 4
 export type DebugTransportState = 'disconnected' | 'connecting' | 'online' | 'degraded'
+/**
+ * `matched` 仅表示本地工程 ID/版本和北向点表 manifest 与设备一致。
+ * 它不表示 configuration_hash、现场工艺、权限或物理效果已经验证。
+ */
 export type CompatibilityState = 'unverified' | 'partial' | 'matched' | 'mismatch'
 export type ObservationState = 'unknown' | 'passed' | 'failed'
 
@@ -99,6 +103,19 @@ export interface HealthDiagnostic {
   control_task_healthy: boolean
 }
 
+/** `GET /api/v1/project` 返回的活动工程与北向点表身份契约。 */
+export interface ProjectDiagnostic {
+  project_id: string
+  project_version: string
+  schema_version: number
+  firmware_build_id: string
+  configuration_hash: number
+  config_revision: number
+  point_manifest_algorithm: string
+  point_manifest_hash: string
+  point_count: number
+}
+
 export interface ControllerFaultDiagnostic {
   code: number
   source: number
@@ -133,6 +150,7 @@ export interface IoDiagnostic {
 export interface Kz3Diagnostics {
   device?: DiagnosticEnvelope<DeviceDiagnostic>
   hardware?: DiagnosticEnvelope<HardwareDiagnostic>
+  project?: DiagnosticEnvelope<ProjectDiagnostic>
   network?: DiagnosticEnvelope<NetworkDiagnostic>
   sle?: DiagnosticEnvelope<SleDiagnostic>
   io?: DiagnosticEnvelope<IoDiagnostic>
@@ -146,6 +164,8 @@ export interface PointDescriptor extends NorthboundField {
   unit?: string
   min?: number
   max?: number
+  /** parameter 是否由当前固件 owner 写入持久化参数存储。 */
+  persistent?: boolean
   source?: string
   category: 'input' | 'output' | 'parameter' | 'command' | 'state' | 'unknown'
   valueSemantic: string
@@ -201,7 +221,10 @@ export interface DeviceDebugSession {
   baseUrl: string
   expectedProjectId: string
   expectedProjectVersion: string
-  expectedConfigHash?: string
+  expectedManifestAlgorithm?: string
+  expectedManifestHash?: string
+  expectedPointCount?: number
+  observedProject?: ProjectDiagnostic
   compatibilityState: CompatibilityState
   operatorName?: string
   siteName?: string

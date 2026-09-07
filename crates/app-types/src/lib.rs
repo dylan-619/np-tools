@@ -116,6 +116,53 @@ pub struct FlashToolInfo {
     pub probes: Vec<StLinkProbe>,
 }
 
+/// 受支持的量产/维护烧录档案。
+///
+/// 档案由后端固定提供，前端只能选择 ID，不能自行提交地址或目标型号，
+/// 以避免把任意 HEX 当作可烧录产物。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashProductProfile {
+    pub id: String,
+    pub label: String,
+    pub mcu: String,
+    pub image_kind: String,
+    pub flash_start: u32,
+    pub flash_end_exclusive: u32,
+    pub expected_device_id: u32,
+    pub requires_xtq_manifest: bool,
+    pub supports_sjzd_sn_pipeline: bool,
+    pub safety_note: String,
+}
+
+/// 对带地址 Intel HEX 的离线审查结果。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashImageInspection {
+    pub profile_id: String,
+    pub file_path: String,
+    pub file_sha256: String,
+    pub address_start: u32,
+    pub address_end_inclusive: u32,
+    pub data_record_count: u32,
+    pub data_byte_count: u64,
+    pub manifest_target_id: Option<u32>,
+    pub manifest_image_size: Option<u32>,
+    pub validated: bool,
+    pub message: String,
+}
+
+/// 经 ST-Link 连接读取的 MCU 身份信息。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashTargetInfo {
+    pub profile_id: String,
+    pub device_id: Option<u32>,
+    pub device_name: Option<String>,
+    pub is_compatible: bool,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashProgressEvent {

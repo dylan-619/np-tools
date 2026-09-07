@@ -4,6 +4,7 @@ import type { Kz3HttpResponse, Kz3Scalar } from '../types/controllerDebug'
 export type DiagnosticResource =
   | 'device'
   | 'hardware'
+  | 'project'
   | 'network'
   | 'sle'
   | 'io'

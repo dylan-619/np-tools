@@ -132,7 +132,8 @@ const writePermitBlockReason = computed(() => {
   if (!debug.operatorName.trim()) return '请先填写工程师姓名或工号'
   if (debug.projectIdentityChanged) return '打开的工程身份已变化，请结束会话后重新连接'
   if (debug.compatibilityState === 'mismatch') return '设备与当前工程不兼容，请核对工程和设备'
-  if (debug.compatibilityState === 'unverified') return '设备预检尚未完成'
+  if (debug.compatibilityState === 'partial') return debug.compatibilityReason
+  if (debug.compatibilityState === 'unverified') return '设备工程身份与点表预检尚未完成'
   if (!debug.diagnostics.device) return '缺少设备身份诊断结果'
   if (!debug.diagnostics.health || !debug.diagnostics.io) return '健康或 IO 诊断结果尚未就绪'
   if (debug.controllerFaultActive) return '控制器存在 active fault，请先排除故障'
@@ -307,6 +308,7 @@ const writeValueValid = computed(() =>
 const canSubmitWrite = computed(
   () =>
     debug.writesEnabled &&
+    debug.canEnableWrites &&
     !debug.writeInFlight &&
     writeReason.value.trim().length > 0 &&
     writeAcknowledged.value &&
@@ -333,6 +335,15 @@ function formatDuration(seconds?: number): string {
 
 function formatIp(parts?: number[]): string {
   return parts?.length === 4 ? parts.join('.') : '—'
+}
+
+function formatHash(value?: string): string {
+  if (!value) return '—'
+  return value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-8)}` : value
+}
+
+function formatConfigHash(value?: number): string {
+  return value === undefined ? '—' : `0x${value.toString(16).padStart(8, '0').toUpperCase()}`
 }
 
 function formatValue(value: Kz3Scalar | undefined, descriptor?: PointDescriptor): string {
@@ -380,7 +391,11 @@ function qualityMeta(quality?: PointQuality) {
 async function handleConnect() {
   try {
     await debug.connect()
-    controller.showMessage('KZ3 HTTP 预检完成，已进入在线监视；北向写入保持锁定')
+    controller.showMessage(
+      debug.compatibilityState === 'matched'
+        ? 'KZ3 工程与北向点表已匹配，已进入在线监视；写入仍需单独解锁'
+        : 'KZ3 HTTP 预检完成，但工程或点表校验未完成；保持只读'
+    )
   } catch (error) {
     controller.showMessage(error instanceof Error ? error.message : String(error), false)
   }
@@ -627,7 +642,16 @@ onUnmounted(() => {
         <span>当前工程</span><strong>{{ controller.doc.project.id }}@{{ controller.doc.project.version }}</strong>
       </div>
       <div class="identity-item">
-        <span>兼容性</span><strong>{{ debug.compatibilityState.toUpperCase() }}</strong>
+        <span>设备工程</span><strong>{{
+          debug.diagnostics.project
+            ? debug.diagnostics.project.data.project_id + '@' + debug.diagnostics.project.data.project_version
+            : '尚无 /project 证据'
+        }}</strong>
+      </div>
+      <div class="identity-item compatibility">
+        <span>点表校验</span><strong>{{
+          debug.compatibilityState === 'matched' ? 'ID / 版本 / manifest 已匹配' : debug.compatibilityState.toUpperCase()
+        }}</strong>
       </div>
       <div class="identity-item safety">
         <span>北向权限</span><strong>{{
@@ -921,6 +945,55 @@ onUnmounted(() => {
             </dl>
           </article>
           <article class="diag-section">
+            <h3><Shield :size="13" />工程与北向点表</h3>
+            <dl>
+              <div>
+                <dt>设备工程</dt>
+                <dd>
+                  {{
+                    debug.diagnostics.project
+                      ? debug.diagnostics.project.data.project_id + '@' + debug.diagnostics.project.data.project_version
+                      : '—'
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Firmware build</dt>
+                <dd>{{ debug.diagnostics.project?.data.firmware_build_id || '—' }}</dd>
+              </div>
+              <div>
+                <dt>Schema</dt>
+                <dd>{{ debug.diagnostics.project?.data.schema_version ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>Config hash</dt>
+                <dd>{{ formatConfigHash(debug.diagnostics.project?.data.configuration_hash) }}</dd>
+              </div>
+              <div>
+                <dt>Config revision</dt>
+                <dd>{{ debug.diagnostics.project?.data.config_revision ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>点表数量</dt>
+                <dd>
+                  {{
+                    debug.diagnostics.project
+                      ? debug.diagnostics.project.data.point_count + ' / ' + debug.pointDescriptors.length
+                      : '—'
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>Manifest</dt>
+                <dd :title="debug.diagnostics.project?.data.point_manifest_hash">
+                  {{ formatHash(debug.diagnostics.project?.data.point_manifest_hash) }}
+                </dd>
+              </div>
+            </dl>
+            <small class="diag-foot">{{ debug.compatibilityReason }}</small>
+            <small class="diag-foot">configuration_hash 来自原始 YAML 字节；工具当前只记录设备值，不将其显示为本地已验证。</small>
+          </article>
+          <article class="diag-section">
             <h3><Network :size="13" />网络与服务</h3>
             <div class="network-address">
               <strong>{{ formatIp(debug.diagnostics.network?.data.ip) }}</strong><span>:{{ debug.diagnostics.network?.data.http_port ?? '—' }}</span>
@@ -1004,7 +1077,9 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="dock-actions">
-          <span class="verification-boundary">写入测试已开放 · 结论待记录</span><button @click="exportSessionReport"><Download :size="12" />导出会话</button><button v-if="bottomMode === 'logs'" @click="debug.clearLogs()">
+          <span class="verification-boundary">{{
+            debug.compatibilityState === 'matched' ? '受控写入可申请 · 结论待记录' : '工程校验未完成 · 仅观察'
+          }}</span><button @click="exportSessionReport"><Download :size="12" />导出会话</button><button v-if="bottomMode === 'logs'" @click="debug.clearLogs()">
             <Trash2 :size="12" />清空
           </button><button class="icon-action" @click="dockExpanded = !dockExpanded">
             <ChevronDown v-if="dockExpanded" :size="13" /><ChevronUp v-else :size="13" />
@@ -1080,8 +1155,10 @@ onUnmounted(() => {
         debug.writesEnabled ? '北向写入许可已启用' : '北向写入默认锁定'
       }}</strong><span>{{
         debug.writesEnabled
-          ? '剩余 ' + writePermitLabel + '；允许 BOOL/FLOAT/U32 parameter 与 BOOL 单次命令（含运行时间清零），写后自动读回。'
-          : '连接预检后由工程师显式解锁；离页、断线、工程变化、健康异常或 active fault 会自动上锁。'
+          ? '剩余 ' + writePermitLabel + '；仅允许 BOOL/FLOAT parameter 与 BOOL 单次 command，写前重新校验工程 manifest，写后自动读回。'
+          : debug.compatibilityState === 'matched'
+            ? '工程 ID、版本和北向 manifest 已匹配；仍须由工程师显式解锁。HTTP 无 CAS、request ID、认证或 TLS，超时不会重试。'
+            : '需先完成设备工程 ID、版本和北向 manifest 校验；校验失败或不完整时不会发送点位写入请求。'
       }}</span><button
         v-if="debug.writesEnabled"
         class="revoke"
@@ -1115,11 +1192,12 @@ onUnmounted(() => {
         <div class="write-modal-body">
           <div class="write-warning">
             <CircleAlert :size="18" />
-            <div><strong>这是有副作用的 PLC 在线操作</strong><span>HTTP 没有 TLS、登录、CAS 或 command request ID。成功响应只证明 RAM Owner 接受，不证明联锁允许或现场设备已经动作。</span></div>
+            <div><strong>这是有副作用的 PLC 在线操作</strong><span>HTTP 没有 TLS、登录、CAS 或 command request ID。成功响应只证明当前 owner 接受，不证明联锁允许或现场设备已经动作。</span></div>
           </div>
           <dl class="permit-evidence">
             <div><dt>目标设备</dt><dd>{{ debug.diagnostics.device?.data.serial_number || '无 SN 证据' }}</dd></div>
             <div><dt>当前工程</dt><dd>{{ controller.doc.project.id }}@{{ controller.doc.project.version }}</dd></div>
+            <div><dt>点表校验</dt><dd>{{ debug.compatibilityState === 'matched' ? 'ID / 版本 / manifest 已匹配' : '未通过' }}</dd></div>
             <div><dt>工程师</dt><dd>{{ debug.operatorName || '未填写' }}</dd></div>
             <div><dt>健康门禁</dt><dd>{{ debug.allHealthHealthy ? '四项正常' : '不满足' }}</dd></div>
           </dl>
@@ -1165,7 +1243,11 @@ onUnmounted(() => {
         <header>
           <div>
             <Send :size="18" /><strong id="write-title">{{
-              writeTarget.category === 'command' ? '触发一次命令' : '修改 RAM 参数'
+              writeTarget.category === 'command'
+                ? '触发一次命令'
+                : writeTarget.persistent
+                  ? '修改掉电保持参数'
+                  : '修改 RAM 参数'
             }}</strong>
           </div>
           <button aria-label="关闭" @click="writeDialogOpen = false"><X :size="16" /></button>
@@ -1176,6 +1258,10 @@ onUnmounted(() => {
             <code>{{ writeTarget.bind }} · {{ writeTarget.c_type.toUpperCase() }} · {{ writeTarget.reference }}</code>
           </div>
           <div class="write-before-row"><span>打开时读值</span><strong>{{ formatValue(writeBeforeValue, writeTarget) }}</strong><small>采样 {{ formatTime(writeBeforeReceivedAt) }} · 提交前会重新读取</small></div>
+          <div v-if="writeTarget.persistent" class="write-warning persistent-write-warning">
+            <CircleAlert :size="16" />
+            <div><strong>这是掉电保持参数</strong><span>当前 owner 会尝试提交参数存储；即使写后读回通过，仍须在受控重启后另行复核恢复值。</span></div>
+          </div>
           <div v-if="writeTarget.category === 'command'" class="command-value">
             <CircleAlert :size="16" /><span>将单次写入 <strong>TRUE</strong>。本次许可保持有效；工具不会保持、复位或自动重试，请通过关联 state/output 判断逻辑效果。</span>
           </div>
@@ -1440,13 +1526,16 @@ onUnmounted(() => {
   color: #bfced8;
   font: 8px var(--font-mono);
 }
-.identity-strip.partial .identity-item:nth-child(4) strong {
+.identity-strip.partial .identity-item.compatibility strong {
   color: #d7aa59;
+}
+.identity-strip.matched .identity-item.compatibility strong {
+  color: #70c58d;
 }
 .identity-strip.mismatch {
   border-color: #79383e;
 }
-.identity-strip.mismatch .identity-item:nth-child(4) strong {
+.identity-strip.mismatch .identity-item.compatibility strong {
   color: #ef8282;
 }
 .identity-item.safety strong {
@@ -2539,14 +2628,17 @@ onUnmounted(() => {
   color: var(--debug-text);
   font-size: 10px;
 }
-.identity-strip.partial .identity-item:nth-child(4) strong,
+.identity-strip.partial .identity-item.compatibility strong,
 .identity-item.safety strong {
   color: var(--debug-amber);
+}
+.identity-strip.matched .identity-item.compatibility strong {
+  color: #27814b;
 }
 .identity-strip.mismatch {
   border-color: #c97177;
 }
-.identity-strip.mismatch .identity-item:nth-child(4) strong {
+.identity-strip.mismatch .identity-item.compatibility strong {
   color: var(--debug-red);
 }
 .diagnostic-toggle {
