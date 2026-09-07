@@ -809,6 +809,14 @@ h1, h2, h3, p { margin: 0; }
 h1 { margin-top: 2px; font-size: 18px; line-height: 1.2; }
 .title-block p, .section-heading p { margin-top: 3px; color: #516675; font-size: 11px; }
 .header-actions, .heading-actions { gap: 7px; }
+.header-actions { flex: 0 0 auto; }
+.header-actions .shared-serial-status,
+.header-actions .button {
+  box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+}
+.header-actions .button.danger-outline { margin-top: 0; }
 .shared-serial-status { min-width: 190px; display: flex; align-items: center; gap: 8px; padding: 5px 9px; border: 1px solid #c8d2d9; border-radius: 4px; background: #f7f9fa; }
 .shared-serial-status > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .shared-serial-status strong { color: #40515f; font-size: 10px; }
