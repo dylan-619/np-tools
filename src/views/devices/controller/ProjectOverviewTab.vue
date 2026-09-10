@@ -120,9 +120,10 @@ const controller = useControllerStore()
                 v-model="controller.doc.project.id"
                 type="text"
                 class="form-input"
+                maxlength="48"
                 placeholder="例如：expansion_marquee_di01_north_command"
               />
-              <span class="form-hint">必须为全小写 ASCII 字母/数字/下划线，作为固件代码宏与导出命名</span>
+              <span class="form-hint">1~48 位 ASCII 字母、数字、点、下划线或中划线，用于工程配置与固件清单</span>
             </div>
           </div>
 
@@ -133,8 +134,10 @@ const controller = useControllerStore()
                 v-model="controller.doc.project.version"
                 type="text"
                 class="form-input"
+                maxlength="48"
                 placeholder="1.0.0"
               />
+              <span class="form-hint">1~48 位 ASCII 字母、数字、点、下划线或中划线；版本会进入固件清单，但设备交付按 SN 匹配</span>
             </div>
 
             <div class="form-group">

@@ -1,4 +1,4 @@
-schema: kz3-project-io/v2
+schema: kz3-project-io/v3
 
 project:
   name: 扩展DO北向启停跑马灯

@@ -311,13 +311,22 @@ export const useControllerStore = defineStore('controller', () => {
     const p = doc.value.project
 
     // 1. 项目身份
-    if (!p.id || !/^[a-zA-Z0-9_.-]{1,64}$/.test(p.id)) {
+    if (!p.id || !/^[a-zA-Z0-9_.-]{1,48}$/.test(p.id)) {
       issues.push({
         code: 'INVALID_PROJECT_ID',
         severity: 'error',
         tab: 'overview',
         entity: 'project.id',
-        message: `项目 ID '${p.id}' 不合规：必须由字母/数字/下划线/中划线/点组成 (最长 64 字符)`,
+        message: `项目 ID '${p.id}' 不合规：必须由字母/数字/下划线/中划线/点组成 (最长 48 字符)`,
+      })
+    }
+    if (!p.version || !/^[a-zA-Z0-9_.-]{1,48}$/.test(p.version)) {
+      issues.push({
+        code: 'INVALID_PROJECT_VERSION',
+        severity: 'error',
+        tab: 'overview',
+        entity: 'project.version',
+        message: `工程版本 '${p.version}' 不合规：必须为 1~48 位字母/数字/下划线/中划线/点`,
       })
     }
     if (!p.name.trim()) {
@@ -424,13 +433,13 @@ export const useControllerStore = defineStore('controller', () => {
     ]
 
     for (const pt of allPoints) {
-      if (!pt.name || !/^[a-zA-Z0-9_.-]{1,64}$/.test(pt.name)) {
+      if (!pt.name || !/^[a-z][a-z0-9_]{0,47}$/.test(pt.name)) {
         issues.push({
           code: 'INVALID_POINT_NAME',
           severity: 'error',
           tab: 'points',
           entity: `point:${pt.name}`,
-          message: `业务点名 '${pt.name}' 格式不合法：必须由字母/数字/下划线/中划线/点组成 (如 701_2_di01, pump_1_run)`,
+          message: `业务点名 '${pt.name}' 格式不合法：必须匹配 [a-z][a-z0-9_]{0,47}（如 pump_1_run）`,
         })
       } else if (pointNames.has(pt.name)) {
         issues.push({
