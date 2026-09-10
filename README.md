@@ -9,7 +9,7 @@
 - **SJZDV3 智能现场数据采集终端**：
   - **设备概览与出厂 SN 固化**：实时查询设备运行时间、开机次数、采样频率等，支持产线 12 位 SN 序列号手动敲入、复制粘贴、自动校验与批量流水号自动递增（`SN:4301xxxxxxxx` 严格定长 15 字节，重启即生效）。
   - **星闪 (NearLink / SLE) 无线网络配置**：按 `SLE_CONFIG:BEGIN/EEPROM/CHIP/END` 的同一事务 ID、payload 数量和 CRC32 校验 EEPROM/芯片快照；保存后校验 `SAVED` 回执与下一次 `revision`。`SLE_BRIDGE:ACK` 是唯一的实时透传状态依据，透传开启时工具会阻止 MCU 配置命令。
-  - **Modbus RTU 100 点位 Data Grid 维护**：RAW/INT16/UINT16/INT32/UINT32/FLOAT32/BOOL 数据类型、字节序（ABCD/CDAB/BADC/DCBA）、寄存器长度智能纠错、行业模版一键加载与 CSV/JSON 双向导入导出；`RS485_CONFIG:BEGIN/POINT/END` 通过 count/CRC32 后才更新点表，单点诊断仅接受同一 `MB_DEBUG` 事务的完整 `BEGIN/TX/RX/DATA/RESULT/END`。
+  - **Modbus RTU 100 点位 Data Grid 维护**：RAW/INT16/UINT16/INT32/UINT32/FLOAT32/BOOL 数据类型、字节序（ABCD/CDAB/BADC/DCBA）、寄存器长度智能纠错、行业模版一键加载与 CSV/JSON 双向导入导出；还可将已采录点位生成 `smart-edge-gateway` 固定 14 列全量导入 `.xlsx`，以 `从站地址_PLC地址` 精确匹配终端上报 JSON，点位名称保持稳定且采集间隔固定为订阅模式 `0`。`RAW_HEX` 因网关没有等价规范类型会在导出前明确拦截；`RS485_CONFIG:BEGIN/POINT/END` 通过 count/CRC32 后才更新点表，单点诊断仅接受同一 `MB_DEBUG` 事务的完整 `BEGIN/TX/RX/DATA/RESULT/END`。
   - **4G Cat.1 / MQTT 配置复核**：按完整 `4G_CONFIG` 事务读取，保存后比对 `SAVED` 和 `revision`；明确区分“读取完整但 `CONFIG_INCOMPLETE`”与“配置有效”，密码始终只按 `set/empty` 状态复核。
   - **2 路 4~20mA 模拟量输入诊断**：1Hz 动态平滑趋势图、断线/超量程/正常状态诊断、历史采样导出与硬件双色 LED 状态灯测试。
   - **系统维护与安全保护**：日志级别/上报周期修改、故障计数清零、系统软复位及 EEPROM 格式化双重二次防误触确认。
@@ -23,6 +23,7 @@
   - 支持密码（可留空以尝试空密码认证）或私钥认证、远端目录浏览、单文件/多文件上传、完整文件夹递归上传，以及选中的远端单文件下载。首次连接必须由操作员核对并明确确认 SHA-256 服务端主机密钥指纹；之后只接受该工具私有 `known_hosts` 中匹配的主机密钥，变更会拒绝继续连接。密码和私钥口令只存于当前页面内存，不写入本机配置或传输记录。为避免误操作，不提供远程 Shell、端口转发、目录下载或本机/远端静默覆盖；上传目录遇到无权限、符号链接、超出 10000 文件 / 4 GiB / 32 层限制时会停止并提示。单文件先写入远端临时名，成功后才提交为目标名；递归上传不是事务，失败前已完成的文件或目录不会自动回滚，需刷新远端目录核对。
 - **KZ3 工艺控制器**：
   - 提供工程组态与独立的 HTTP 在线调试工作模式；可按 `project_io.yaml` 还原双 RS-485 端口、标准扩展模块和 ET703 等第三方 Profile。大点表设备在 I/O 拓扑中以摘要卡展示，悬停或键盘聚焦可查看全部已配置点的中文含义、当前值和质量。在线模式支持固定诊断、`/api/v1/project` 工程身份与点表 manifest 核对、最多 12 点 PLC 风格周期监视、质量/时效判断、诊断侧栏和会话报告导出；参数调试期间可打开可拖动、缩放和收起的 I/O 拓扑伴随浮窗，共享同一调试会话并直接管理当前监测点，不额外建立连接或轮询器。
+  - 北向通信字段可继续导出工程审阅 CSV，也可生成 `smart-edge-gateway` 采集点全量导入格式的 `.xlsx`。网关 Excel 固定输出 14 列契约，按 KZ3 五位 Modicon 地址推导功能码，规范映射 `BOOLEAN/INT16/UINT16/INT32/UINT32/FLOAT`，保持 `00001` 等地址为文本，并使用 Modbus TCP Unit ID 1、1000 ms 采集间隔；导入前仍需在网关页面选中对应的 `MODBUS_TCP` 设备并备份原点表。
   - 提供独立的 UART1 设备初始化与维护工作台：固定 `115200 8N1`，结构化配置生产 SN、Ethernet、星闪 SLE、Cat.1/MQTT、Edge TCP 和调试日志；支持写前校验、写后查询、RUN/SAVED 对照、SLE 多层生效状态及会话记录导出。Ethernet 重启后只能由 `SAVED_*` 回读值生成单一 HTTP 复连候选，不扫描网络；Edge TCP 的 `ONLINE` 仅表示固件客户端状态，不等同于网关路由或现场业务验收。
   - 当前 `KZ3_F427_SLE_V1` 的 `TCP_NETTY` 固件分支不提供旧版 `@CFG,IO,*` 系统角色命令；工具已收敛为当前支持的 `@CFG,EDGE,*`。详见 [SJZDV3 与 KZ3 F427 调试兼容性核查](docs/SJZDV3与KZ3_F427_SLE_V1调试兼容性核查.md)。
   - 仅当工程 ID、版本、manifest 算法/hash、点数匹配，且健康、无 active fault、操作员信息和 10 分钟显式许可均满足时，才允许 BOOL/FLOAT/U32 parameter 与 BOOL 单次 command（含累计运行时间清零）受控写入。U16/I16/I32、`point.*`、`state.*` 和物理 I/O 保持禁用；HTTP 缺少 CAS、request ID、认证和 TLS，失败不重试。任何工具端接口都不代表 HIL 或现场验证通过。使用前阅读 [KZ3 在线调试工具交付与现场使用说明](docs/KZ3在线调试工具交付与现场使用说明.md)。

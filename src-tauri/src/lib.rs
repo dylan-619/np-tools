@@ -10,6 +10,7 @@ use serial_core::list_ports;
 use std::sync::Arc;
 use tauri::ipc::Channel;
 
+mod gateway_excel;
 mod kz3_http;
 mod modbus_tcp;
 mod mqtt;
@@ -389,6 +390,8 @@ pub fn run() {
             workspace::workspace_initialize,
             workspace::workspace_store_controller_config,
             workspace::workspace_load_controller_config,
+            // smart-edge-gateway 采集点导入兼容 Excel
+            gateway_excel::gateway_points_export_xlsx,
             // File Save & Open Dialogs
             app_save_file,
             app_open_file

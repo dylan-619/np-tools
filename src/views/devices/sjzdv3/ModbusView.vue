@@ -14,7 +14,7 @@ import {
   Terminal,
   FileSpreadsheet,
   Copy,
-  Check,
+  Check
 } from 'lucide-vue-next'
 import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
@@ -22,9 +22,14 @@ import {
   MODBUS_FUNC_OPTIONS,
   MODBUS_DATA_TYPE_OPTIONS,
   MODBUS_BYTE_ORDER_OPTIONS,
-  type ModbusPointConfig,
+  type ModbusPointConfig
 } from '../../../types/sjzd'
 import { appSaveFile, appOpenFile } from '../../../api/sjzdApi'
+import { exportGatewayPointsXlsx } from '../../../api/gatewayPointExcelApi'
+import {
+  buildSjzdGatewayAcquisitionPointRows,
+  buildSjzdGatewayPointExcelFileName
+} from '../../../utils/sjzdGatewayPointExcel'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
 
@@ -40,9 +45,10 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedPreset = ref('')
 const copiedAll = ref(false)
 const copiedLineIndex = ref<number | null>(null)
+const exportingGatewayExcel = ref(false)
 const debugLogsRef = ref<HTMLElement | null>(null)
-const mcuConsoleReady = computed(
-  () => Boolean(sjzd.wlanBridgeStatus && !sjzd.wlanBridgeStatus.active)
+const mcuConsoleReady = computed(() =>
+  Boolean(sjzd.wlanBridgeStatus && !sjzd.wlanBridgeStatus.active)
 )
 
 watch(
@@ -59,7 +65,7 @@ watch(
 const presetOptions = [
   { label: '⚡ 三相智能电表模版 (电压/电流/功率/电能)', value: 'meter' },
   { label: '🌡️ 4路工业温湿度变送器模版', value: 'sensor' },
-  { label: '⚙️ 变频器常用运行参数模版', value: 'vfd' },
+  { label: '⚙️ 变频器常用运行参数模版', value: 'vfd' }
 ]
 
 function onPresetChange(val: string) {
@@ -87,7 +93,7 @@ function addPoint() {
     regAddr: 40001,
     length: 1,
     dataType: 2, // UINT16
-    byteOrder: 0, // ABCD
+    byteOrder: 0 // ABCD
   })
 }
 
@@ -133,7 +139,7 @@ function debugStatusLabel(status: string) {
     invalid: '参数无效',
     parse_error: '命令解析失败',
     io_error: '串口 I/O 错误',
-    protocol_error: '诊断协议不完整',
+    protocol_error: '诊断协议不完整'
   }
   return labels[status] || status
 }
@@ -157,9 +163,7 @@ async function exportModbusDebugReport() {
 async function copyAllDebugLogs() {
   if (sjzd.modbusDebugLogs.length === 0) return
   try {
-    const textToCopy = sjzd.modbusDebugLogs
-      .map((l) => `[${l.timestamp}] ${l.text}`)
-      .join('\n')
+    const textToCopy = sjzd.modbusDebugLogs.map((l) => `[${l.timestamp}] ${l.text}`).join('\n')
     await navigator.clipboard.writeText(textToCopy)
     copiedAll.value = true
     sjzd.showMessage('已复制全部调试报文到剪贴板')
@@ -199,7 +203,7 @@ function clonePoint(index: number) {
   const source = sjzd.modbusPoints[index]
   sjzd.modbusPoints.splice(index + 1, 0, {
     ...source,
-    regAddr: source.regAddr + source.length,
+    regAddr: source.regAddr + source.length
   })
 }
 
@@ -210,7 +214,7 @@ function loadPreset(presetName: 'meter' | 'sensor' | 'vfd') {
       { slaveAddr: 1, funcCode: 3, regAddr: 40003, length: 2, dataType: 5, byteOrder: 1 },
       { slaveAddr: 1, funcCode: 3, regAddr: 40005, length: 2, dataType: 5, byteOrder: 1 },
       { slaveAddr: 1, funcCode: 3, regAddr: 40007, length: 2, dataType: 5, byteOrder: 1 },
-      { slaveAddr: 1, funcCode: 3, regAddr: 40009, length: 2, dataType: 5, byteOrder: 1 },
+      { slaveAddr: 1, funcCode: 3, regAddr: 40009, length: 2, dataType: 5, byteOrder: 1 }
     ]
     sjzd.showMessage('已载入【三相智能电表】标准点位预设')
   } else if (presetName === 'sensor') {
@@ -218,7 +222,7 @@ function loadPreset(presetName: 'meter' | 'sensor' | 'vfd') {
       { slaveAddr: 2, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0 },
       { slaveAddr: 2, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 },
       { slaveAddr: 3, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0 },
-      { slaveAddr: 3, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 },
+      { slaveAddr: 3, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 }
     ]
     sjzd.showMessage('已载入【温湿度变送器】标准点位预设')
   } else if (presetName === 'vfd') {
@@ -226,7 +230,7 @@ function loadPreset(presetName: 'meter' | 'sensor' | 'vfd') {
       { slaveAddr: 1, funcCode: 3, regAddr: 40001, length: 1, dataType: 2, byteOrder: 0 },
       { slaveAddr: 1, funcCode: 3, regAddr: 40002, length: 1, dataType: 2, byteOrder: 0 },
       { slaveAddr: 1, funcCode: 3, regAddr: 40003, length: 1, dataType: 2, byteOrder: 0 },
-      { slaveAddr: 1, funcCode: 1, regAddr: 10001, length: 1, dataType: 6, byteOrder: 0 },
+      { slaveAddr: 1, funcCode: 1, regAddr: 10001, length: 1, dataType: 6, byteOrder: 0 }
     ]
     sjzd.showMessage('已载入【变频器运行监测】标准点位预设')
   }
@@ -242,7 +246,7 @@ function parsePointsContent(fileName: string, content: string) {
         regAddr: Number(p.regAddr) || 40001,
         length: Number(p.length) || 1,
         dataType: Number(p.dataType) || 0,
-        byteOrder: Number(p.byteOrder) || 0,
+        byteOrder: Number(p.byteOrder) || 0
       }))
       sjzd.showMessage(
         parsed.length > MAX_MODBUS_POINTS
@@ -251,7 +255,10 @@ function parsePointsContent(fileName: string, content: string) {
       )
     }
   } else if (fileName.endsWith('.csv')) {
-    const lines = content.split('\n').map((l) => l.trim()).filter(Boolean)
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
     const newPoints: ModbusPointConfig[] = []
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',')
@@ -262,7 +269,7 @@ function parsePointsContent(fileName: string, content: string) {
           regAddr: Number(parts[2]) || 40001,
           length: Number(parts[3]) || 1,
           dataType: Number(parts[4]) || 0,
-          byteOrder: Number(parts[5]) || 0,
+          byteOrder: Number(parts[5]) || 0
         })
       }
     }
@@ -287,7 +294,7 @@ async function exportJson() {
     regAddr: p.regAddr,
     length: p.length,
     dataType: p.dataType,
-    byteOrder: p.byteOrder,
+    byteOrder: p.byteOrder
   }))
   const content = JSON.stringify(dataToExport, null, 2)
   const defaultName = `SJZDV3_Modbus_Points_${Date.now()}.json`
@@ -317,8 +324,7 @@ async function exportCsv() {
   const headers = '从站地址,功能码,PLC寄存器地址,读取长度,数据类型(0-6),字节序(0-3)\n'
   const rows = sjzd.modbusPoints
     .map(
-      (p) =>
-        `${p.slaveAddr},${p.funcCode},${p.regAddr},${p.length},${p.dataType},${p.byteOrder}`
+      (p) => `${p.slaveAddr},${p.funcCode},${p.regAddr},${p.length},${p.dataType},${p.byteOrder}`
     )
     .join('\n')
   const content = '\uFEFF' + headers + rows
@@ -341,6 +347,31 @@ async function exportCsv() {
   a.remove()
   URL.revokeObjectURL(url)
   sjzd.showMessage('已导出点位 CSV 模板文件 (含 Excel UTF-8 BOM)')
+}
+
+async function exportGatewayExcel() {
+  if (sjzd.modbusPoints.length === 0) {
+    sjzd.showMessage('当前点位表为空，无法导出网关采集点', false)
+    return
+  }
+
+  exportingGatewayExcel.value = true
+  try {
+    const deviceSn = sjzd.deviceInfo?.sn
+    const rows = buildSjzdGatewayAcquisitionPointRows(sjzd.modbusPoints, deviceSn)
+    const savedPath = await exportGatewayPointsXlsx(
+      buildSjzdGatewayPointExcelFileName(deviceSn),
+      rows,
+      'sjzdPush'
+    )
+    if (savedPath) {
+      sjzd.showMessage(`已导出 smart-edge-gateway 兼容采集点 Excel：${savedPath}`)
+    }
+  } catch (error) {
+    sjzd.showMessage(`网关采集点 Excel 导出失败：${String(error)}`, false)
+  } finally {
+    exportingGatewayExcel.value = false
+  }
 }
 
 // Import template
@@ -400,7 +431,8 @@ onMounted(() => {
       <div class="title-col">
         <h2>Modbus RTU 扩展从站轮询点位管理</h2>
         <p class="subtitle">
-          直观表格化维护最多 100 个下挂仪表与从站点位，具备 32 位类型自动纠错、保存回执与完整快照 revision 复核、模板导入导出和结构化单点调试功能。
+          直观表格化维护最多 100 个下挂仪表与从站点位，具备 32 位类型自动纠错、保存回执与完整快照
+          revision 复核、模板导入导出和结构化单点调试功能。
         </p>
       </div>
 
@@ -440,14 +472,34 @@ onMounted(() => {
             <Upload :size="14" />
             <span>导入</span>
           </button>
-          <input ref="fileInputRef" type="file" accept=".json,.csv" style="display: none" @change="handleFileImport" />
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".json,.csv"
+            style="display: none"
+            @change="handleFileImport"
+          />
 
           <button class="btn btn-secondary" @click="exportCsv" title="导出当前点位为 CSV 表格">
             <FileSpreadsheet :size="14" />
             <span>CSV</span>
           </button>
 
-          <button class="btn btn-secondary" @click="exportJson" title="导出当前点位为 JSON 配置文件">
+          <button
+            class="btn btn-secondary"
+            :disabled="exportingGatewayExcel || sjzd.modbusPoints.length === 0"
+            title="按 smart-edge-gateway 固定 14 列格式导出；适用于 MQTT、Netty 等推送型终端设备"
+            @click="exportGatewayExcel"
+          >
+            <FileSpreadsheet :size="14" />
+            <span>{{ exportingGatewayExcel ? '生成中…' : '网关 Excel' }}</span>
+          </button>
+
+          <button
+            class="btn btn-secondary"
+            @click="exportJson"
+            title="导出当前点位为 JSON 配置文件"
+          >
             <Download :size="14" />
             <span>JSON</span>
           </button>
@@ -456,7 +508,12 @@ onMounted(() => {
         <div class="toolbar-group toolbar-group-primary">
           <button
             class="btn btn-primary"
-            :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.modbusPoints.length === 0 || sjzd.isBusy"
+            :disabled="
+              !serial.connectedPort ||
+              !mcuConsoleReady ||
+              sjzd.modbusPoints.length === 0 ||
+              sjzd.isBusy
+            "
             @click="sjzd.saveModbusPoints"
           >
             <Send :size="14" />
@@ -480,10 +537,14 @@ onMounted(() => {
     <div class="table-card">
       <div class="table-top-bar">
         <div class="bar-left">
-          <span class="count-badge">当前已配置: {{ sjzd.modbusPoints.length }} / {{ MAX_MODBUS_POINTS }}</span>
+          <span class="count-badge"
+            >当前已配置: {{ sjzd.modbusPoints.length }} / {{ MAX_MODBUS_POINTS }}</span
+          >
           <span v-if="sjzd.modbusConfigSnapshot" class="instruction-hint mono-text">
             <Info :size="13" />
-            完整快照 id={{ sjzd.modbusConfigSnapshot.transactionId }} · {{ sjzd.modbusConfigSnapshot.revisionHex }} · CRC32 {{ sjzd.modbusConfigSnapshot.crc32 }}
+            完整快照 id={{ sjzd.modbusConfigSnapshot.transactionId }} ·
+            {{ sjzd.modbusConfigSnapshot.revisionHex }} · CRC32
+            {{ sjzd.modbusConfigSnapshot.crc32 }}
           </span>
           <span class="instruction-hint">
             <Info :size="13" />
@@ -532,11 +593,7 @@ onMounted(() => {
 
               <!-- Function Code -->
               <td>
-                <CustomSelect
-                  v-model="pt.funcCode"
-                  :options="MODBUS_FUNC_OPTIONS"
-                  size="sm"
-                />
+                <CustomSelect v-model="pt.funcCode" :options="MODBUS_FUNC_OPTIONS" size="sm" />
               </td>
 
               <!-- PLC Register Address -->
@@ -618,11 +675,7 @@ onMounted(() => {
                   >
                     <ArrowDown :size="13" />
                   </button>
-                  <button
-                    class="action-btn delete"
-                    title="删除"
-                    @click="removePoint(idx)"
-                  >
+                  <button class="action-btn delete" title="删除" @click="removePoint(idx)">
                     <Trash2 :size="13" />
                   </button>
                 </div>
@@ -631,7 +684,8 @@ onMounted(() => {
 
             <tr v-if="sjzd.modbusPoints.length === 0">
               <td colspan="8" class="empty-table">
-                设备当前完整快照为空，可点击上方【添加点位】、【导入模板】或连接串口后点击【获取完整快照】；只有 <code>RS485_CONFIG:END</code> 的 count 与 CRC32 通过后，空表才表示设备无点位配置。
+                设备当前完整快照为空，可点击上方【添加点位】、【导入模板】或连接串口后点击【获取完整快照】；只有
+                <code>RS485_CONFIG:END</code> 的 count 与 CRC32 通过后，空表才表示设备无点位配置。
               </td>
             </tr>
           </tbody>
@@ -696,19 +750,29 @@ onMounted(() => {
           </div>
           <p>{{ sjzd.lastModbusDebugReport.message }}</p>
           <div class="report-facts">
-            <span><small>请求</small><code>{{ sjzd.lastModbusDebugReport.request.txHex || '固件未回报' }}</code></span>
-            <span><small>数据区</small><code>{{ sjzd.lastModbusDebugReport.response.dataHex || '—' }}</code></span>
-            <span><small>解析值</small><code>{{ sjzd.lastModbusDebugReport.decodedValue || '—' }}</code></span>
+            <span
+              ><small>请求</small
+              ><code>{{ sjzd.lastModbusDebugReport.request.txHex || '固件未回报' }}</code></span
+            >
+            <span
+              ><small>数据区</small
+              ><code>{{ sjzd.lastModbusDebugReport.response.dataHex || '—' }}</code></span
+            >
+            <span
+              ><small>解析值</small
+              ><code>{{ sjzd.lastModbusDebugReport.decodedValue || '—' }}</code></span
+            >
           </div>
-          <small v-if="sjzd.lastModbusDebugReport.decodeWarning" class="report-warning">{{ sjzd.lastModbusDebugReport.decodeWarning }}</small>
-          <small class="report-boundary">报告仅接受同一事务 ID 的 <code>MB_DEBUG:RESULT/END</code>；成功还要求 <code>BEGIN/TX/RX/DATA</code> 齐全。不等同于持续轮询、物理层或仪表量程 HIL 通过。</small>
+          <small v-if="sjzd.lastModbusDebugReport.decodeWarning" class="report-warning">{{
+            sjzd.lastModbusDebugReport.decodeWarning
+          }}</small>
+          <small class="report-boundary"
+            >报告仅接受同一事务 ID 的 <code>MB_DEBUG:RESULT/END</code>；成功还要求
+            <code>BEGIN/TX/RX/DATA</code> 齐全。不等同于持续轮询、物理层或仪表量程 HIL 通过。</small
+          >
         </section>
         <div ref="debugLogsRef" class="debug-logs">
-          <div
-            v-for="(log, i) in sjzd.modbusDebugLogs"
-            :key="i"
-            class="debug-log-line"
-          >
+          <div v-for="(log, i) in sjzd.modbusDebugLogs" :key="i" class="debug-log-line">
             <div class="log-content">
               <span class="log-time">[{{ log.timestamp }}]</span>
               <span class="log-text">{{ log.text }}</span>

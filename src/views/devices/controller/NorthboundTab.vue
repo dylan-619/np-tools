@@ -9,14 +9,21 @@ import {
   CheckCircle2,
   ArrowRightLeft,
   Download,
+  FileSpreadsheet,
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
 import { appSaveFile } from '../../../api/sjzdApi'
+import { exportGatewayPointsXlsx } from '../../../api/gatewayPointExcelApi'
+import {
+  buildGatewayAcquisitionPointRows,
+  buildGatewayPointExcelFileName,
+} from '../../../utils/gatewayPointExcel'
 import { buildNorthboundCsv, buildNorthboundCsvFileName } from '../../../utils/northboundCsv'
 
 const controller = useControllerStore()
 const exportingCsv = ref(false)
+const exportingGatewayExcel = ref(false)
 
 // 紧凑数据类型选项
 const cTypeCompactOptions = [
@@ -130,6 +137,33 @@ async function exportNorthboundCsv() {
     exportingCsv.value = false
   }
 }
+
+async function exportGatewayExcel() {
+  const project = controller.doc.project
+  if (project.northbound.fields.length === 0) {
+    controller.showMessage('当前北向点位表为空，无法导出网关采集点', false)
+    return
+  }
+
+  exportingGatewayExcel.value = true
+  try {
+    const now = new Date()
+    const rows = buildGatewayAcquisitionPointRows(project)
+    const savedPath = await exportGatewayPointsXlsx(
+      buildGatewayPointExcelFileName(project, now),
+      rows,
+    )
+    if (savedPath) {
+      controller.showMessage(
+        `已导出 smart-edge-gateway 兼容采集点 Excel（Modbus TCP / Unit ID 1）：${savedPath}`,
+      )
+    }
+  } catch (error) {
+    controller.showMessage(`网关采集点 Excel 导出失败：${String(error)}`, false)
+  } finally {
+    exportingGatewayExcel.value = false
+  }
+}
 </script>
 
 <template>
@@ -178,7 +212,7 @@ async function exportNorthboundCsv() {
 
       <div class="spec-footer-guidance">
         <span class="guidance-label">💡 现场说明：</span>
-        <span>北向 5 位 Modbus 地址为外部 SCADA/云端访问控制器的标准 Base 1 协议地址；南向 RTU 扩展设备中的 PDU 地址为内部从站轮询偏移（Base 0），两者独立互不干扰。32 位字段（U32/I32/Float）自动连续占用 2 个寄存器。</span>
+        <span>北向 5 位 Modbus 地址为外部 SCADA/云端访问控制器的标准 Base 1 协议地址；南向 RTU 扩展设备中的 PDU 地址为内部从站轮询偏移（Base 0），两者独立互不干扰。32 位字段（U32/I32/Float）自动连续占用 2 个寄存器。网关 Excel 按 Modbus TCP、Unit ID 1、采集间隔 1000 ms 生成，可在网关采集点页面直接执行全量导入。</span>
       </div>
     </div>
 
@@ -194,6 +228,16 @@ async function exportNorthboundCsv() {
         </div>
 
         <div class="header-actions">
+          <button
+            class="btn btn-gateway-export"
+            :disabled="exportingGatewayExcel || controller.doc.project.northbound.fields.length === 0"
+            title="生成 smart-edge-gateway 采集点全量导入格式（.xlsx）"
+            @click="exportGatewayExcel"
+          >
+            <FileSpreadsheet :size="14" />
+            <span>{{ exportingGatewayExcel ? '正在生成…' : '导出网关 Excel' }}</span>
+          </button>
+
           <button
             class="btn btn-export"
             :disabled="exportingCsv || controller.doc.project.northbound.fields.length === 0"
@@ -633,6 +677,8 @@ async function exportNorthboundCsv() {
 .btn-outline:hover { background: #eef3f7; color: #0f5f9e; }
 .btn-export { background: #176b45; border-color: #176b45; color: #fff; }
 .btn-export:hover:not(:disabled) { background: #115c3a; }
+.btn-gateway-export { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.btn-gateway-export:hover:not(:disabled) { background: #1e40af; }
 .btn:disabled { cursor: not-allowed; opacity: 0.5; }
 /* Compact engineering workspace pass */
 .northbound-tab-wrapper { gap: 10px; }
