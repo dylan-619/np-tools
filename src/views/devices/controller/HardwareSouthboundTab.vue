@@ -8,9 +8,15 @@ import {
   Trash2,
   ShieldCheck,
   Link,
+  Info,
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
-import { KZ3_BOARD_DEF, PROFILE_CATALOG } from '../../../utils/controllerIoCatalog'
+import {
+  KZ3_BOARD_DEF,
+  PROFILE_CATALOG,
+  resolveDeviceProfile,
+} from '../../../utils/controllerIoCatalog'
+import type { DeviceInstanceConfig } from '../../../types/controllerIo'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const controller = useControllerStore()
@@ -53,8 +59,12 @@ const currentDevice = computed(() => {
 
 const currentProfile = computed(() => {
   if (!currentDevice.value) return null
-  return PROFILE_CATALOG[currentDevice.value.profile] || null
+  return resolveDeviceProfile(controller.doc, currentDevice.value)
 })
+
+function profileForDevice(device: DeviceInstanceConfig) {
+  return resolveDeviceProfile(controller.doc, device)
+}
 
 // 计算每个物理通道是否已在点表中绑定了业务点
 const channelBindingMap = computed(() => {
@@ -178,7 +188,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
             :class="{ active: selectedNodeId === dev.id }"
             @click="selectedNodeId = dev.id"
           >
-            <div class="node-icon-box bg-purple">
+            <div class="node-icon-box" :class="profileForDevice(dev).deviceClass === 'third_party' ? 'bg-amber' : 'bg-purple'">
               <Network :size="18" />
             </div>
             <div class="node-meta">
@@ -190,6 +200,9 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
                 <span class="profile-name">{{ dev.profile }}</span>
                 <span class="port-name">{{ dev.port }}</span>
               </div>
+              <span v-if="profileForDevice(dev).deviceClass === 'third_party'" class="third-party-term">
+                第三方产品 · {{ profileForDevice(dev).name }}
+              </span>
               <!-- Channel Active Summary -->
               <div class="channels-summary-bar">
                 <span v-if="dev.use.inputs?.length" class="use-count in">
@@ -245,36 +258,49 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
           </div>
 
           <!-- RS485 Ports Settings Quick Drawer -->
-          <div class="board-ports-quick">
+          <div
+            v-for="(portConfig, portName) in controller.doc.project.rs485_ports"
+            :key="portName"
+            class="board-ports-quick"
+          >
             <div class="ports-title">
               <Network :size="14" class="text-blue" />
-              <span>RS485_1 端口物理总线参数</span>
+              <span>{{ portName.toUpperCase() }} 端口物理总线参数</span>
             </div>
-            <div
-              v-if="controller.doc.project.rs485_ports.rs485_1"
-              class="port-params-row"
-            >
+            <div class="port-params-row">
               <div class="param-cell">
                 <label>波特率</label>
                 <CustomSelect
-                  v-model="controller.doc.project.rs485_ports.rs485_1.baud"
+                  v-model="portConfig.baud"
                   :options="baudOptions"
                 />
               </div>
               <div class="param-cell">
                 <label>校验位</label>
                 <CustomSelect
-                  v-model="controller.doc.project.rs485_ports.rs485_1.parity"
+                  v-model="portConfig.parity"
                   :options="parityOptions"
                 />
               </div>
               <div class="param-cell">
                 <label>超时 (ms)</label>
                 <input
-                  v-model.number="controller.doc.project.rs485_ports.rs485_1.response_timeout_ms"
+                  v-model.number="portConfig.response_timeout_ms"
                   type="number"
                   class="compact-input"
                 />
+              </div>
+              <div class="param-cell">
+                <label>停止位</label>
+                <input v-model.number="portConfig.stop_bits" type="number" min="1" max="2" class="compact-input" />
+              </div>
+              <div class="param-cell">
+                <label>重试次数</label>
+                <input v-model.number="portConfig.retry_count" type="number" min="0" max="255" class="compact-input" />
+              </div>
+              <div class="param-cell">
+                <label>离线退避 (ms)</label>
+                <input v-model.number="portConfig.offline_backoff_ms" type="number" min="1" class="compact-input" />
               </div>
             </div>
           </div>
@@ -482,6 +508,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
                   />
                   <span class="profile-code-badge">{{ currentDevice.profile }}</span>
                   <span class="profile-desc-badge">{{ currentProfile.name }}</span>
+                  <span v-if="currentProfile.deviceClass === 'third_party'" class="third-party-header-badge">第三方自定义产品</span>
                 </div>
                 <p class="dev-desc-text">{{ currentProfile.description }}</p>
               </div>
@@ -495,6 +522,24 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
               <Trash2 :size="14" />
               <span>删除模块</span>
             </button>
+          </div>
+
+          <div v-if="currentProfile.deviceClass === 'third_party'" class="third-party-explainer">
+            <Info :size="18" />
+            <div>
+              <strong>{{ currentProfile.name }} 在工程中的含义</strong>
+              <p>
+                <code>profile</code> 是产品/协议术语，<code>name</code> 是本项目的设备实例；
+                <code>port + slave_address</code> 确定 RS-485 路由，<code>use</code> 决定进入过程映像的信号，
+                <code>points</code> 赋予业务名和中文含义，<code>northbound.fields</code> 决定哪些值可在线监测。
+              </p>
+              <p v-if="currentProfile.definitionSource === 'project'" class="derived-warning">
+                工具未内置该 Profile 的完整寄存器字典；下方仅是从当前 project_io.yaml 派生的已声明点位，不代表设备全量能力。
+              </p>
+              <p v-else>
+                ET703 按第三方数据集展示；大点表在拓扑中只给出摘要，鼠标悬停设备卡可查看全部点位、当前值和质量。
+              </p>
+            </div>
           </div>
 
           <!-- Device Bus Properties Form -->
@@ -575,7 +620,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
                     />
                     <span class="pin-terminal-no">{{ sig.code.toUpperCase() }}</span>
                   </label>
-                  <span class="pin-type-tag">{{ sig.type }}</span>
+                  <span class="pin-type-tag">{{ sig.type }}<template v-if="sig.unit"> · {{ sig.unit }}</template></span>
                 </div>
 
                 <div class="pin-signal-name">{{ sig.name }}</div>
@@ -634,7 +679,7 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
                     />
                     <span class="pin-terminal-no text-green">{{ sig.code.toUpperCase() }}</span>
                   </label>
-                  <span class="pin-type-tag">{{ sig.type }}</span>
+                  <span class="pin-type-tag">{{ sig.type }}<template v-if="sig.unit"> · {{ sig.unit }}</template></span>
                 </div>
 
                 <div class="pin-signal-name">{{ sig.name }}</div>
@@ -1088,6 +1133,44 @@ function quickCreatePoint(sourceStr: string, defaultName: string, isOutput: bool
   font-size: 0.72rem;
   color: var(--text-muted, #40515f);
 }
+
+.third-party-term {
+  max-width: 100%;
+  overflow: hidden;
+  color: #7a4b00;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.third-party-header-badge {
+  padding: 2px 7px;
+  border: 1px solid #d5aa69;
+  border-radius: 999px;
+  color: #7a4b00;
+  background: #fff5df;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.third-party-explainer {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid #d5aa69;
+  border-left: 4px solid #a5660d;
+  border-radius: 6px;
+  color: #4f4435;
+  background: linear-gradient(105deg, #fff7e7, #fffdf8);
+}
+
+.third-party-explainer > svg { color: #a5660d; }
+.third-party-explainer strong { color: #5d3c0c; font-size: 0.8rem; }
+.third-party-explainer p { margin: 4px 0 0; font-size: 0.72rem; line-height: 1.55; }
+.third-party-explainer code { color: #0f5f9e; font-family: var(--font-mono, monospace); }
+.third-party-explainer .derived-warning { color: #8f4f13; }
 
 .dev-properties-grid {
   display: grid;

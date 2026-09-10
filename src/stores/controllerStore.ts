@@ -7,7 +7,7 @@ import type {
   PointConfig,
   NorthboundField,
 } from '../types/controllerIo'
-import { KZ3_BOARD_DEF, PROFILE_CATALOG } from '../utils/controllerIoCatalog'
+import { KZ3_BOARD_DEF, PROFILE_CATALOG, resolveDeviceProfile } from '../utils/controllerIoCatalog'
 import { serializeProjectIoYaml, deserializeProjectIoYaml } from '../utils/yamlHelper'
 import { appSaveFile, appOpenFile } from '../api/sjzdApi'
 
@@ -139,8 +139,7 @@ export const useControllerStore = defineStore('controller', () => {
     }
     // 2. 扩展设备已使能输入
     for (const dev of doc.value.project.devices) {
-      const profile = PROFILE_CATALOG[dev.profile]
-      if (!profile) continue
+      const profile = resolveDeviceProfile(doc.value, dev)
       for (const inCode of dev.use.inputs || []) {
         const sig = profile.inputs.find((s) => s.code === inCode)
         const sigName = sig ? sig.name : inCode
@@ -168,8 +167,7 @@ export const useControllerStore = defineStore('controller', () => {
     }
     // 2. 扩展设备已使能输出
     for (const dev of doc.value.project.devices) {
-      const profile = PROFILE_CATALOG[dev.profile]
-      if (!profile) continue
+      const profile = resolveDeviceProfile(doc.value, dev)
       for (const outCode of Object.keys(dev.use.outputs || {})) {
         const sig = profile.outputs.find((s) => s.code === outCode)
         const sigName = sig ? sig.name : outCode
@@ -204,11 +202,9 @@ export const useControllerStore = defineStore('controller', () => {
         const sigCode = parts[2]
         const dev = doc.value.project.devices.find((d) => d.name === devName)
         if (dev) {
-          const profile = PROFILE_CATALOG[dev.profile]
-          if (profile) {
-            const sig = [...profile.inputs, ...profile.outputs].find((s) => s.code === sigCode)
-            if (sig) return sig.type as 'bool' | 'u16' | 'float'
-          }
+          const profile = resolveDeviceProfile(doc.value, dev)
+          const sig = [...profile.inputs, ...profile.outputs].find((s) => s.code === sigCode)
+          if (sig) return sig.type as 'bool' | 'u16' | 'float'
         }
         if (sigCode.startsWith('ai') || sigCode.startsWith('ao')) return 'u16'
         if (sigCode.startsWith('di') || sigCode.startsWith('do')) return 'bool'

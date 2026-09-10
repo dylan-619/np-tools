@@ -21,6 +21,13 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
       board: doc.project.board || 'kz3_f427_standard',
       required_profiles: usedProfiles,
       scan_period_ms: Number(doc.project.scan_period_ms) || 10,
+      ...(doc.project.startup
+        ? {
+            startup: {
+              ao_deferred_activation: doc.project.startup.ao_deferred_activation === true,
+            },
+          }
+        : {}),
       features: {
         pid: hasPid,
         counter: hasCounter,
@@ -68,6 +75,7 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
         commands: (doc.project.application_variables?.commands || []).map((c) => ({
           name: c.name,
           c_type: c.c_type || 'bool',
+          ...(c.effect ? { effect: c.effect } : {}),
           ...(c.description ? { description: c.description } : {}),
         })),
         states: (doc.project.application_variables?.states || []).map((s) => ({
@@ -194,6 +202,7 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
     id: `cmd_${Date.now()}_${idx}`,
     name: cmd.name || `cmd_${idx + 1}`,
     c_type: cmd.c_type || 'bool',
+    effect: cmd.effect === 'protective' ? ('protective' as const) : undefined,
     description: cmd.description,
   }))
 
@@ -254,6 +263,10 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
       board: p.board || 'kz3_f427_standard',
       required_profiles: Array.isArray(p.required_profiles) ? p.required_profiles : [],
       scan_period_ms: Number(p.scan_period_ms) || 10,
+      startup:
+        p.startup && typeof p.startup === 'object'
+          ? { ao_deferred_activation: Boolean(p.startup.ao_deferred_activation) }
+          : undefined,
       features: {
         pid: Boolean(p.features?.pid),
         counter: Boolean(p.features?.counter),

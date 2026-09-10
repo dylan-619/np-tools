@@ -7,7 +7,7 @@ import {
   type DiagnosticResource
 } from '../api/controllerDebugApi'
 import { useControllerStore } from './controllerStore'
-import { PROFILE_CATALOG } from '../utils/controllerIoCatalog'
+import { resolveDeviceProfile } from '../utils/controllerIoCatalog'
 import {
   buildKz3PointManifest,
   KZ3_POINT_MANIFEST_ALGORITHM
@@ -274,7 +274,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
           const [, deviceName, signalCode] = source.split('.')
           const device = project.devices.find((item) => item.name === deviceName)
           const signal = device
-            ? PROFILE_CATALOG[device.profile]?.outputs.find((item) => item.code === signalCode)
+            ? resolveDeviceProfile(controller.doc, device).outputs.find(
+                (item) => item.code === signalCode,
+              )
             : undefined
           valueSemantic = signal?.hasFeedbackShadow
             ? 'Southbound 寄存器回读影子，不等同于真实物理反馈'

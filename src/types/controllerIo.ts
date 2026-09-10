@@ -32,6 +32,8 @@ export interface ProfileSignalDef {
   direction: 'input' | 'output'
   wireType?: string
   engineeringRange?: string
+  unit?: string
+  description?: string
   hasFeedbackShadow?: boolean // 702/703 DO 与 705 AO 支持同地址回读影子
 }
 
@@ -40,6 +42,9 @@ export interface ProfileDef {
   name: string          // '16路数字量输入模块 (701)'
   description: string
   qualification: 'software_qualified' | 'range_confirmed' | 'pending'
+  deviceClass?: 'standard_extension' | 'third_party'
+  presentation?: 'channels' | 'dataset'
+  definitionSource?: 'builtin' | 'project'
   inputs: ProfileSignalDef[]
   outputs: ProfileSignalDef[]
 }
@@ -101,6 +106,7 @@ export interface CommandConfig {
   id: string
   name: string
   c_type: 'bool'
+  effect?: 'protective'
   description?: string
 }
 
@@ -158,6 +164,9 @@ export interface ProjectIoDocument {
     board: string       // 'kz3_f427_standard'
     required_profiles: string[]
     scan_period_ms: number
+    startup?: {
+      ao_deferred_activation?: boolean
+    }
     features: {
       pid: boolean
       counter: boolean

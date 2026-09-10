@@ -148,12 +148,12 @@ function groupIsCollapsed(group: ProductGroup) {
           <button
             class="nav-item"
             :class="{ active: isMaintenanceRoute }"
-            aria-label="KZ3 UART1 设备维护"
-            title="KZ3 UART1 设备维护 (生产 SN / Ethernet / SLE / Cat.1 / Edge TCP / DEBUG)"
+            aria-label="KZ3 UART 设备维护"
+            title="KZ3 UART 设备维护 (生产 SN / Ethernet / SLE / Cat.1 / Edge TCP / DEBUG)"
             @click="navigateTo('/devices/controller/maintenance')"
           >
             <Wrench :size="16" class="nav-icon" />
-            <span v-if="!isCompact" class="nav-text">UART1 设备维护</span>
+            <span v-if="!isCompact" class="nav-text">UART 设备维护</span>
           </button>
           <button
             class="nav-item"

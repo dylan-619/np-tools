@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Cpu,
@@ -15,6 +15,7 @@ import {
   Activity,
   ArrowLeft,
   LayoutDashboard,
+  PanelsTopLeft,
   Wrench
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
@@ -25,11 +26,13 @@ import VariablesLogicTab from './VariablesLogicTab.vue'
 import NorthboundTab from './NorthboundTab.vue'
 import YamlDiagnosisTab from './YamlDiagnosisTab.vue'
 import OnlineDebugTab from './OnlineDebugTab.vue'
+import FloatingTopologyMonitor from './FloatingTopologyMonitor.vue'
 
 const controller = useControllerStore()
 const route = useRoute()
 const router = useRouter()
 const isDebugMode = computed(() => route.name === 'ControllerDebug')
+const topologyFloatOpen = ref(false)
 
 watch(
   isDebugMode,
@@ -53,6 +56,7 @@ function enterMaintenanceMode() {
 }
 
 function leaveDebugMode() {
+  topologyFloatOpen.value = false
   router.push({ name: 'ControllerProduct' })
 }
 </script>
@@ -68,11 +72,20 @@ function leaveDebugMode() {
           <strong :title="controller.doc.project.name || '未命名工程'">{{ controller.doc.project.name || '未命名工程' }}</strong>
           <code :title="`${controller.doc.project.id}@${controller.doc.project.version}`">{{ controller.doc.project.id }}@{{ controller.doc.project.version }}</code>
         </div>
+        <button
+          class="floating-monitor-btn"
+          :class="{ active: topologyFloatOpen }"
+          :aria-pressed="topologyFloatOpen"
+          @click="topologyFloatOpen = !topologyFloatOpen"
+        >
+          <PanelsTopLeft :size="13" />{{ topologyFloatOpen ? '关闭拓扑浮窗' : '打开拓扑浮窗' }}
+        </button>
         <span class="mode-safety-badge"><Activity :size="13" /> 在线调试 · 写入需解锁</span>
       </header>
       <main class="tab-viewport debug-viewport">
         <OnlineDebugTab />
       </main>
+      <FloatingTopologyMonitor v-if="topologyFloatOpen" @close="topologyFloatOpen = false" />
     </template>
 
     <template v-else>
@@ -332,13 +345,35 @@ function leaveDebugMode() {
 }
 
 .mode-safety-badge {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   color: #126b45;
   font-size: 10px;
   font-weight: 700;
+}
+
+.floating-monitor-btn {
+  margin-left: auto;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid #8aaabc;
+  border-radius: 3px;
+  background: #edf5f8;
+  color: #1b6389;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.floating-monitor-btn:hover,
+.floating-monitor-btn.active {
+  border-color: #2f7da6;
+  background: #dbeef7;
+  color: #145676;
 }
 
 .debug-viewport {

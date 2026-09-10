@@ -89,7 +89,7 @@ const router = createRouter({
       path: '/devices/controller/maintenance',
       name: 'ControllerMaintenance',
       component: () => import('../views/devices/controller/Kz3MaintenanceView.vue'),
-      meta: { title: 'KZ3 UART1 设备维护' }
+      meta: { title: 'KZ3 UART 设备维护' }
     },
     {
       path: '/devices/controller/monitor',

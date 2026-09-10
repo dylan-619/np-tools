@@ -22,7 +22,7 @@ import {
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import { useControllerDebugStore } from '../../../stores/controllerDebugStore'
-import { KZ3_BOARD_DEF, PROFILE_CATALOG } from '../../../utils/controllerIoCatalog'
+import { KZ3_BOARD_DEF, resolveDeviceProfile } from '../../../utils/controllerIoCatalog'
 import type { BoardChannelDef, DeviceInstanceConfig, ProfileSignalDef } from '../../../types/controllerIo'
 import type { Kz3Scalar, PointQuality } from '../../../types/controllerDebug'
 
@@ -32,6 +32,7 @@ interface SignalView {
   key: string
   code: string
   name: string
+  description?: string
   kind: SignalKind
   enabled: boolean
   pointName?: string
@@ -39,23 +40,30 @@ interface SignalView {
   value: Kz3Scalar | null
   quality?: PointQuality
   range?: string
+  unit?: string
   monitored: boolean
   localStale: boolean
 }
 
 const MAX_MONITORED_POINTS = 12
+const MODULE_PREVIEW_LIMIT = 8
 const controller = useControllerStore()
 const debug = useControllerDebugStore()
 const router = useRouter()
 const connectError = ref('')
 
 const pointBySource = computed(() => {
-  const map = new Map<string, { name: string }>()
+  const map = new Map<string, { name: string; description?: string }>()
   for (const point of [
     ...controller.doc.project.points.inputs,
     ...controller.doc.project.points.outputs,
   ]) {
-    if (point.source) map.set(point.source, point)
+    if (point.source) {
+      map.set(point.source, {
+        name: point.name,
+        description: point.description?.trim() || undefined,
+      })
+    }
   }
   return map
 })
@@ -70,8 +78,15 @@ const descriptorByPoint = computed(() => {
   return map
 })
 
-function signalKind(code: string): SignalKind {
-  return code.slice(0, 2).toUpperCase() as SignalKind
+function signalKind(
+  code: string,
+  type?: ProfileSignalDef['type'],
+  direction?: ProfileSignalDef['direction'],
+): SignalKind {
+  const prefix = code.slice(0, 2).toUpperCase()
+  if (prefix === 'DI' || prefix === 'DO' || prefix === 'AI' || prefix === 'AO') return prefix
+  if (type === 'bool') return direction === 'output' ? 'DO' : 'DI'
+  return direction === 'output' ? 'AO' : 'AI'
 }
 
 function channelIndex(code: string): number {
@@ -97,7 +112,7 @@ function boardChannelValue(channel: BoardChannelDef): Kz3Scalar | null {
 function bindingForSource(source: string) {
   const point = pointBySource.value.get(source)
   const descriptorName = point ? descriptorByPoint.value.get(point.name) : undefined
-  return { pointName: point?.name, descriptorName }
+  return { pointName: point?.name, pointDescription: point?.description, descriptorName }
 }
 
 const boardSignals = computed<SignalView[]>(() =>
@@ -108,6 +123,7 @@ const boardSignals = computed<SignalView[]>(() =>
       key: source,
       code: channel.code,
       name: channel.name,
+      description: binding.pointDescription,
       kind: signalKind(channel.code),
       enabled: true,
       pointName: binding.pointName,
@@ -127,8 +143,7 @@ function isSignalEnabled(device: DeviceInstanceConfig, signal: ProfileSignalDef)
 }
 
 function expansionSignals(device: DeviceInstanceConfig): SignalView[] {
-  const profile = PROFILE_CATALOG[device.profile]
-  if (!profile) return []
+  const profile = resolveDeviceProfile(controller.doc, device)
   return [...profile.inputs, ...profile.outputs].map((signal) => {
     const source = `rtu.${device.name}.${signal.code}`
     const binding = bindingForSource(source)
@@ -137,19 +152,38 @@ function expansionSignals(device: DeviceInstanceConfig): SignalView[] {
       key: source,
       code: signal.code,
       name: signal.name,
-      kind: signalKind(signal.code),
+      description: binding.pointDescription,
+      kind: signalKind(signal.code, signal.type, signal.direction),
       enabled: isSignalEnabled(device, signal),
       pointName: binding.pointName,
       descriptorName: binding.descriptorName,
       value: sample?.value ?? null,
       quality: sample?.quality,
       range: signal.engineeringRange,
+      unit: signal.unit,
       monitored: Boolean(
         binding.descriptorName && debug.selectedPointNames.includes(binding.descriptorName),
       ),
       localStale: sample?.localStale ?? false,
     }
   })
+}
+
+function profileForDevice(device: DeviceInstanceConfig) {
+  return resolveDeviceProfile(controller.doc, device)
+}
+
+function previewSignals(device: DeviceInstanceConfig): SignalView[] {
+  const signals = expansionSignals(device)
+  const enabled = signals.filter((signal) => signal.enabled)
+  return (enabled.length ? enabled : signals).slice(0, MODULE_PREVIEW_LIMIT)
+}
+
+function hiddenSignalCount(device: DeviceInstanceConfig): number {
+  return Math.max(
+    0,
+    expansionSignals(device).filter((signal) => signal.enabled).length - MODULE_PREVIEW_LIMIT,
+  )
 }
 
 const busGroups = computed(() => {
@@ -281,7 +315,8 @@ function formatValue(signal: SignalView): string {
     if (signal.range?.includes('µA') || signal.key.startsWith('board.')) {
       return `${(signal.value / 1000).toFixed(3)} mA`
     }
-    return Number.isInteger(signal.value) ? String(signal.value) : signal.value.toFixed(3)
+    const value = Number.isInteger(signal.value) ? String(signal.value) : signal.value.toFixed(3)
+    return signal.unit ? `${value} ${signal.unit}` : value
   }
   return String(signal.value)
 }
@@ -388,11 +423,14 @@ onUnmounted(() => debug.suspend())
                 :key="signal.key"
                 class="signal-cell"
                 :class="{ on: signal.value === true, stale: signal.localStale }"
-                :title="signal.pointName ? `point.${signal.pointName}` : `${signal.name} · 未绑定业务点`"
+                :title="signal.pointName ? `point.${signal.pointName}\n${signal.description || '未填写中文描述'}` : `${signal.name} · 未绑定业务点`"
               >
                 <span v-if="kind === 'DI' || kind === 'DO'" class="signal-lamp" />
                 <div class="signal-copy"><strong>{{ signal.code.toUpperCase() }}</strong><small>{{ signal.pointName || '未绑定' }}</small></div>
                 <b>{{ formatValue(signal) }}</b>
+                <p class="signal-description" :class="{ placeholder: !signal.description }">
+                  {{ signal.description || signal.name }}
+                </p>
               </article>
             </div>
           </section>
@@ -413,17 +451,29 @@ onUnmounted(() => debug.suspend())
             <div class="bus-origin"><span class="port-socket"><CircleDot :size="17" /></span><small>A / B</small></div>
             <div class="bus-wire" />
             <div v-if="group.devices.length" class="module-row">
-              <article v-for="device in group.devices" :key="device.id" class="module-card">
+              <article
+                v-for="device in group.devices"
+                :key="device.id"
+                class="module-card"
+                :class="{ 'third-party': profileForDevice(device).deviceClass === 'third_party' }"
+                tabindex="0"
+              >
                 <div class="drop-line"><span /></div>
                 <header class="module-header">
                   <span class="address-badge">ADDR <b>{{ device.slave_address }}</b></span>
                   <div class="module-title"><strong>{{ device.name }}</strong><code>{{ device.profile }}</code></div>
+                  <span v-if="profileForDevice(device).deviceClass === 'third_party'" class="third-party-badge">第三方</span>
                   <span class="module-state" :class="debug.isConnected ? 'online' : 'unknown'"><i />{{ debug.isConnected ? 'POLL' : 'IDLE' }}</span>
                 </header>
-                <p class="profile-description">{{ PROFILE_CATALOG[device.profile]?.description || '未知扩展模块 Profile' }}</p>
+                <p class="profile-description">
+                  {{ profileForDevice(device).description }}
+                  <span v-if="expansionSignals(device).filter((signal) => signal.enabled).length > MODULE_PREVIEW_LIMIT" class="hover-hint">
+                    悬停查看全部 {{ expansionSignals(device).filter((signal) => signal.enabled).length }} 点
+                  </span>
+                </p>
                 <div class="module-signals">
                   <button
-                    v-for="signal in expansionSignals(device)"
+                    v-for="signal in previewSignals(device)"
                     :key="signal.key"
                     class="module-signal"
                     :class="[
@@ -431,21 +481,49 @@ onUnmounted(() => debug.suspend())
                       { enabled: signal.enabled, on: signal.value === true, monitored: signal.monitored, stale: signal.localStale },
                     ]"
                     :disabled="!signal.descriptorName"
-                    :title="signal.descriptorName ? `${signal.name} · 点击${signal.monitored ? '移出' : '加入'}周期监测` : `${signal.name} · 未绑定北向点位`"
+                    :title="signal.descriptorName ? `${signal.description || signal.name}\n点击${signal.monitored ? '移出' : '加入'}周期监测` : `${signal.description || signal.name} · 未绑定北向点位`"
                     @click="toggleSignalMonitor(signal)"
                   >
                     <span v-if="signal.kind === 'DI' || signal.kind === 'DO'" class="mini-lamp" />
                     <span class="signal-id">{{ signal.code.toUpperCase() }}</span>
-                    <span class="signal-point">{{ signal.pointName || (signal.enabled ? '未映射' : '未启用') }}</span>
+                    <span class="module-signal-copy">
+                      <span class="signal-point">{{ signal.pointName || (signal.enabled ? '未映射' : '未启用') }}</span>
+                      <span class="module-description" :class="{ placeholder: !signal.description }">{{ signal.description || signal.name }}</span>
+                    </span>
                     <strong>{{ formatValue(signal) }}</strong>
                     <Eye v-if="signal.monitored" :size="11" class="watch-icon" /><EyeOff v-else-if="signal.descriptorName" :size="11" class="watch-icon" />
                   </button>
+                  <div v-if="hiddenSignalCount(device)" class="more-signals">还有 {{ hiddenSignalCount(device) }} 个已配置点位</div>
                 </div>
                 <footer class="module-footer">
                   <span>{{ expansionSignals(device).filter((signal) => signal.enabled).length }} 通道已配置</span>
                   <span>{{ expansionSignals(device).filter((signal) => signal.monitored).length }} 周期监测</span>
                   <span :class="{ warning: expansionSignals(device).some((signal) => signal.enabled && !signal.descriptorName) }">{{ expansionSignals(device).filter((signal) => signal.enabled && !signal.descriptorName).length }} 未映射</span>
                 </footer>
+                <section class="module-inspector" aria-label="模块点位完整说明">
+                  <header>
+                    <div><small>DEVICE DATASET</small><strong>{{ profileForDevice(device).name }}</strong></div>
+                    <span>{{ expansionSignals(device).filter((signal) => signal.enabled).length }} 点</span>
+                  </header>
+                  <p>
+                    <code>{{ device.port }}</code> / 站号 {{ device.slave_address }} / 轮询 {{ device.poll_period_ms }} ms /
+                    stale {{ device.stale_after_ms }} ms。值来自北向点位；未加入周期监测的点显示“—”，不等于 0。
+                  </p>
+                  <div class="inspector-point-list">
+                    <button
+                      v-for="signal in expansionSignals(device).filter((item) => item.enabled)"
+                      :key="`detail-${signal.key}`"
+                      :disabled="!signal.descriptorName"
+                      :class="{ monitored: signal.monitored, stale: signal.localStale }"
+                      @click="toggleSignalMonitor(signal)"
+                    >
+                      <span><code>{{ signal.code }}</code><small>{{ signal.description || signal.name }}</small></span>
+                      <b>{{ formatValue(signal) }}</b>
+                      <em>{{ qualityLabel(signal.quality) }}</em>
+                    </button>
+                  </div>
+                  <footer>鼠标悬停或键盘聚焦保持详情；点击点位可切换最多 {{ MAX_MONITORED_POINTS }} 个 HTTP 周期监测名额。</footer>
+                </section>
               </article>
             </div>
             <div v-else class="empty-bus">该端口尚未配置从站模块</div>
@@ -542,9 +620,10 @@ onUnmounted(() => debug.suspend())
 .signal-group { overflow: hidden; border: 1px solid var(--color-border-subtle, #d5dde4); border-radius: 5px; background: #ffffff; }
 .signal-group > header { height: 24px; padding: 0 7px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); background: var(--color-surface-3, #eef3f7); }
 .signal-group > header strong { font: 800 10px var(--font-mono); color: var(--color-info, #0f5f9e); }.signal-group.do > header strong, .signal-group.ao > header strong { color: #8a5a12; }.signal-group > header span { margin-left: auto; color: var(--color-text-tertiary, #5f6f7d); font: 9px var(--font-mono); }
-.signal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--color-border-subtle, #d5dde4); }.signal-grid.analog { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.signal-cell { min-width: 0; min-height: 42px; padding: 5px 6px; display: grid; grid-template-columns: 10px minmax(0,1fr) auto; align-items: center; gap: 4px; background: #ffffff; }
+.signal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--color-border-subtle, #d5dde4); }.signal-grid.analog { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.signal-cell { min-width: 0; min-height: 62px; padding: 5px 6px; display: grid; grid-template-columns: 10px minmax(0,1fr) auto; grid-template-rows: auto minmax(24px, auto); align-items: center; gap: 3px 4px; background: #ffffff; }
 .signal-copy { min-width: 0; display: grid; }.signal-copy strong { color: var(--ink); font: 700 10px var(--font-mono); }.signal-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-tertiary, #5f6f7d); font-size: 8px; }.signal-cell b { color: var(--muted); font: 700 10px var(--font-mono); white-space: nowrap; }.signal-cell.on b { color: var(--green); }
+.signal-description { grid-column: 1 / -1; min-width: 0; margin: 0; padding-top: 3px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border-top: 1px solid var(--color-border-subtle, #d5dde4); color: var(--muted); font-size: 10px; line-height: 1.3; }.signal-description.placeholder, .module-description.placeholder { color: var(--color-text-tertiary, #5f6f7d); }
 .signal-group.ai .signal-cell,
 .signal-group.ao .signal-cell { grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }
 .signal-group.ai .signal-cell b,
@@ -560,18 +639,31 @@ onUnmounted(() => debug.suspend())
 .bus-origin { position: absolute; left: 12px; top: 25px; z-index: 2; display: grid; justify-items: center; gap: 1px; color: var(--cyan); }.bus-origin small { color: var(--color-text-tertiary, #5f6f7d); font: 8px var(--font-mono); }.port-socket { width: 29px; height: 29px; display: grid; place-items: center; border: 1px solid #79aacf; border-radius: 50%; background: #e7f1fa; }
 .bus-wire { position: absolute; left: 39px; right: 10px; top: 39px; height: 3px; border-top: 1px solid #4b91c5; border-bottom: 1px solid #0f5f9e; background: #1769aa; box-shadow: 0 0 6px rgba(23,105,170,.22); }
 .module-row { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 8px; min-width: max-content; }
-.module-card { position: relative; width: 292px; margin-top: 20px; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; background: #ffffff; box-shadow: 0 6px 16px rgba(35,56,71,.12); }
+.module-card { position: relative; width: 332px; margin-top: 20px; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; outline: none; background: #ffffff; box-shadow: 0 6px 16px rgba(35,56,71,.12); }
+.module-card.third-party { border-top: 3px solid #a5660d; }
+.module-card:focus-visible { box-shadow: 0 0 0 3px rgba(23,105,170,.2), 0 6px 16px rgba(35,56,71,.12); }
 .drop-line { position: absolute; top: -22px; left: 22px; width: 2px; height: 22px; background: #1769aa; }.drop-line span { position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; border: 2px solid #1769aa; border-radius: 50%; background: #ffffff; }
 .module-header { height: 42px; padding: 5px 7px; gap: 7px; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); background: linear-gradient(100deg, #e7f1fa, #f7f9fb); }
 .address-badge { width: 42px; height: 30px; display: grid; place-items: center; border: 1px solid #79aacf; border-radius: 4px; color: var(--color-text-tertiary, #5f6f7d); background: #ffffff; font: 7px var(--font-mono); line-height: .9; }.address-badge b { color: var(--cyan); font-size: 14px; }
 .module-title { min-width: 0; display: grid; flex: 1; }.module-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 11px; }.module-title code { color: var(--color-text-tertiary, #5f6f7d); font-size: 8px; }
+.third-party-badge { padding: 2px 4px; border: 1px solid #d5aa69; border-radius: 3px; color: #7a4b00; background: #fff5df; font: 700 7px var(--font-mono); white-space: nowrap; }
 .module-state { display: flex; align-items: center; gap: 4px; color: var(--color-text-tertiary, #5f6f7d); font: 8px var(--font-mono); }.module-state.online { color: var(--green); }
 .profile-description { min-height: 28px; margin: 0; padding: 5px 7px; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); color: var(--color-text-secondary, #40515f); background: var(--panel-2); font-size: 8px; line-height: 1.35; }
+.hover-hint { display: inline-block; margin-left: 4px; color: #7a4b00; font-weight: 700; }
 .module-signals { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; background: var(--color-border-subtle, #d5dde4); }
-.module-signal { position: relative; min-width: 0; height: 30px; padding: 3px 5px; display: grid; grid-template-columns: 8px 29px minmax(0,1fr) auto 11px; align-items: center; gap: 3px; border: 0; color: var(--color-text-disabled, #667784); background: #f1f4f6; text-align: left; cursor: default; }
+.module-signal { position: relative; min-width: 0; height: 47px; padding: 4px 5px; display: grid; grid-template-columns: 8px 29px minmax(0,1fr) auto 11px; align-items: center; gap: 3px; border: 0; color: var(--color-text-disabled, #667784); background: #f1f4f6; text-align: left; cursor: default; }
 .module-signal.enabled { color: var(--ink); background: #ffffff; }.module-signal.enabled:not(:disabled) { cursor: pointer; }.module-signal.enabled:not(:disabled):hover { background: #eef6fb; }.module-signal.monitored { box-shadow: inset 2px 0 var(--cyan); background: #f4f9fc; }.module-signal.stale { opacity: .55; }
-.signal-id { font: 700 9px var(--font-mono); }.signal-point { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-tertiary, #5f6f7d); font-size: 7px; }.module-signal strong { color: var(--muted); font: 700 9px var(--font-mono); white-space: nowrap; }.module-signal.on strong { color: var(--green); }.watch-icon { color: #78909c; }.module-signal.monitored .watch-icon { color: var(--cyan); }
+.more-signals { grid-column: 1 / -1; padding: 6px 8px; color: #7a4b00; background: #fff8e9; font: 700 8px var(--font-mono); text-align: center; }
+.signal-id { font: 700 9px var(--font-mono); }.module-signal-copy { min-width: 0; display: grid; gap: 2px; }.signal-point, .module-description { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.signal-point { color: var(--color-text-tertiary, #5f6f7d); font-size: 7px; }.module-description { color: var(--muted); font-size: 10px; line-height: 1.2; }.module-signal strong { color: var(--muted); font: 700 9px var(--font-mono); white-space: nowrap; }.module-signal.on strong { color: var(--green); }.watch-icon { color: #78909c; }.module-signal.monitored .watch-icon { color: var(--cyan); }
 .module-footer { height: 23px; padding: 0 7px; gap: 8px; color: var(--color-text-tertiary, #5f6f7d); background: var(--panel-2); font-size: 7px; }.module-footer span:last-child { margin-left: auto; }.module-footer .warning { color: var(--amber); }
+.module-inspector { position: absolute; inset: 42px 0 0; z-index: 5; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border-top: 1px solid #d5aa69; opacity: 0; pointer-events: none; transform: translateY(7px); transition: opacity .14s ease, transform .14s ease; background: rgba(255,255,255,.985); }
+.module-card:hover .module-inspector, .module-card:focus-within .module-inspector { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.module-inspector > header { min-height: 38px; padding: 6px 8px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #ead9bc; background: linear-gradient(90deg, #fff5df, #fff); }
+.module-inspector > header div { min-width: 0; display: grid; }.module-inspector > header small { color: #8a641f; font: 700 7px var(--font-mono); letter-spacing: .12em; }.module-inspector > header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 10px; }.module-inspector > header > span { margin-left: auto; padding: 2px 5px; border-radius: 3px; color: #7a4b00; background: #f4dfb8; font: 700 8px var(--font-mono); }
+.module-inspector > p { margin: 0; padding: 6px 8px; border-bottom: 1px solid #e6e0d6; color: var(--muted); background: #fffdf8; font-size: 8px; line-height: 1.45; }.module-inspector > p code { color: var(--cyan); }
+.inspector-point-list { min-height: 0; overflow-y: auto; display: grid; align-content: start; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; background: #dce3e7; }
+.inspector-point-list button { min-width: 0; min-height: 40px; padding: 4px 6px; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto auto; gap: 2px 6px; border: 0; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }.inspector-point-list button:disabled { cursor: default; }.inspector-point-list button.monitored { box-shadow: inset 3px 0 var(--cyan); background: #f3f8fc; }.inspector-point-list button.stale { opacity: .58; }.inspector-point-list button > span { min-width: 0; display: grid; }.inspector-point-list code, .inspector-point-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.inspector-point-list code { color: var(--cyan); font-size: 7px; }.inspector-point-list small { color: var(--muted); font-size: 8px; }.inspector-point-list b { align-self: center; color: var(--ink); font: 700 9px var(--font-mono); white-space: nowrap; }.inspector-point-list em { grid-column: 2; color: var(--color-text-tertiary, #5f6f7d); font: 700 7px var(--font-mono); font-style: normal; text-align: right; }
+.module-inspector > footer { padding: 5px 7px; border-top: 1px solid #e6e0d6; color: var(--color-text-tertiary, #5f6f7d); background: #faf7f0; font-size: 7px; line-height: 1.35; }
 .empty-bus, .empty-topology { min-height: 100px; display: grid; place-items: center; align-content: center; gap: 5px; color: var(--color-text-tertiary, #5f6f7d); font-size: 10px; }.empty-topology { min-height: 180px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel); }.empty-topology strong { color: var(--muted); font-size: 12px; }.empty-topology span { max-width: 320px; text-align: center; }
 
 .monitor-legend { min-height: 30px; padding: 5px 9px; gap: 13px; border-radius: 6px; color: var(--color-text-tertiary, #5f6f7d); font-size: 9px; }
@@ -588,5 +680,10 @@ onUnmounted(() => debug.suspend())
 @media (max-width: 900px) {
   .monitor-header { align-items: flex-start; flex-direction: column; }.connection-controls { width: 100%; margin: 0; }.address-field { flex: 1; }.address-field input { width: 100%; }
   .overview-strip { overflow-x: auto; }.topology-canvas { display: flex; flex-direction: column; }.controller-node { width: 100%; }.bus-stack { width: 100%; }.signal-grid { grid-template-columns: repeat(6, minmax(0,1fr)); }
+}
+
+@media (max-width: 720px) {
+  .signal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .signal-grid.analog { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
