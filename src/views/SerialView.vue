@@ -43,7 +43,7 @@ const BUILTIN_COMMANDS: SerialCommandPreset[] = [
   { name: '查身份', cmd: '@CFG,SYS,SHOW', desc: '查询生产 SN、型号、设备地址及有效性', category: 'kz3' },
   { name: '查以太网', cmd: '@CFG,ETH,SHOW', desc: '查询以太网 IP、掩码、网关、端口及 Link 状态', category: 'kz3' },
   { name: '查星闪', cmd: '@CFG,SLE,SHOW', desc: '查询 SLE 地址、网络名、发射功率及模组状态', category: 'kz3' },
-  { name: '查角色', cmd: '@CFG,IO,SHOW', desc: '查询活动角色与下次启动保存角色 (Controller/RTU)', category: 'kz3' },
+  { name: '查 Edge TCP', cmd: '@CFG,EDGE,SHOW', desc: '查询 Edge TCP 的 RUN/SAVED、客户端状态与重启需求', category: 'kz3' },
   { name: '查日志', cmd: '@DEBUG', desc: '查询 UART1 调试日志开关状态', category: 'kz3' },
   { name: '开日志', cmd: '@DEBUG=1', desc: '开启持久化调试日志输出', category: 'kz3' },
   { name: '关日志', cmd: '@DEBUG=0', desc: '关闭普通调试日志，保留 OK/ERR', category: 'kz3' },
@@ -52,7 +52,6 @@ const BUILTIN_COMMANDS: SerialCommandPreset[] = [
   { name: '关灯', cmd: 'OFF', desc: '关闭面板状态指示灯', category: 'kz3' },
   { name: '安全重启', cmd: '@RST', desc: '确认安全输出后执行软件复位；使保存配置生效', category: 'kz3', danger: true },
   { name: '批量设网络', cmd: '@CFG,ETH,INIT,192.168.30.66,255.255.255.0,192.168.30.1,8080', desc: '一次提交完整以太网参数 (需重启)', category: 'kz3' },
-  { name: '设控制器角色', cmd: '@CFG,IO,INIT,CONTROLLER', desc: '保存 CONTROLLER 双主站角色 (需重启)', category: 'kz3' },
 
   // SJZDV3 智能采集终端
   { name: '终端信息', cmd: 'DEVINFO', desc: '查询终端运行时间、开机次数与状态', category: 'sjzd' },

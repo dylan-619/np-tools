@@ -170,8 +170,11 @@ export const useMqttStore = defineStore('mqtt', () => {
 
   function persistConfig() {
     if (typeof localStorage === 'undefined') return
-    const { password: _password, ...persisted } = config.value
-    localStorage.setItem(MQTT_CONFIG_STORAGE_KEY, JSON.stringify(persisted))
+    // JSON.stringify 会忽略 undefined，明确覆盖后可避免把会话密码落盘。
+    localStorage.setItem(
+      MQTT_CONFIG_STORAGE_KEY,
+      JSON.stringify({ ...config.value, password: undefined })
+    )
   }
 
   async function connect() {

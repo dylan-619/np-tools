@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -8,6 +8,7 @@ import {
   Radio,
   Wifi,
   TableProperties,
+  FolderInput,
   Activity,
   Wrench,
   Flame,
@@ -23,25 +24,18 @@ import GlobalSerialBar from './GlobalSerialBar.vue'
 const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
-type ProductGroup = 'controller' | 'xtq' | 'sjzdv3' | 'common'
-const PRODUCT_GROUP_STORAGE_KEY = 'np_tools_sidebar_product_groups'
+type ProductGroup = 'controller' | 'xtq' | 'sjzdv3' | 'common' | 'delivery'
 
-function loadCollapsedGroups(): Record<ProductGroup, boolean> {
-  const defaults: Record<ProductGroup, boolean> = {
-    controller: false,
-    xtq: false,
-    sjzdv3: false,
-    common: false
-  }
-  if (typeof localStorage === 'undefined') return defaults
-  try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(PRODUCT_GROUP_STORAGE_KEY) || '{}') }
-  } catch {
-    return defaults
-  }
+function productGroupForPath(path: string): ProductGroup | null {
+  if (path.startsWith('/devices/controller')) return 'controller'
+  if (path.startsWith('/devices/xtq-coordinator')) return 'xtq'
+  if (path.startsWith('/devices/sjzdv3')) return 'sjzdv3'
+  if (['/serial', '/modbus', '/mqtt', '/ssh-sftp'].includes(path)) return 'common'
+  if (['/flashing', '/settings'].includes(path)) return 'delivery'
+  return null
 }
 
-const collapsedGroups = reactive(loadCollapsedGroups())
+const openGroup = ref<ProductGroup | null>(productGroupForPath(route.path))
 const { width } = useWindowSize()
 const isDebugRoute = computed(() => route.name === 'ControllerDebug')
 const isMonitorRoute = computed(() => route.name === 'ControllerMonitor')
@@ -58,6 +52,13 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => route.path,
+  (path) => {
+    openGroup.value = productGroupForPath(path)
+  }
+)
+
 function navigateTo(path: string) {
   router.push(path)
 }
@@ -67,12 +68,16 @@ function toggleSidebar() {
 }
 
 function toggleGroup(group: ProductGroup) {
-  collapsedGroups[group] = !collapsedGroups[group]
-  localStorage.setItem(PRODUCT_GROUP_STORAGE_KEY, JSON.stringify(collapsedGroups))
+  if (isCompact.value) {
+    collapsed.value = false
+    openGroup.value = group
+    return
+  }
+  openGroup.value = openGroup.value === group ? null : group
 }
 
 function groupIsCollapsed(group: ProductGroup) {
-  return !isCompact.value && collapsedGroups[group]
+  return isCompact.value || openGroup.value !== group
 }
 </script>
 
@@ -94,21 +99,32 @@ function groupIsCollapsed(group: ProductGroup) {
 
     <!-- Navigation Scroll Area -->
     <div class="nav-scroll-area">
-      <!-- Section 1: Smart Controller I/O Tool -->
+      <button
+        class="nav-item navigation-home"
+        :class="{ active: route.name === 'DebugCenter' }"
+        aria-label="设备调试导航"
+        title="设备调试导航：按固件产品线选择正确入口"
+        @click="navigateTo('/debug-center')"
+      >
+        <LayoutDashboard :size="16" class="nav-icon" />
+        <span v-if="!isCompact" class="nav-text">调试工作台首页</span>
+        <span v-if="!isCompact" class="home-badge">总览</span>
+      </button>
+
+      <!-- Section 1: KZ3 controller -->
       <div class="nav-group" :class="{ folded: groupIsCollapsed('controller') }">
         <button
-          v-if="!isCompact"
+          type="button"
           class="group-label"
           :aria-expanded="!groupIsCollapsed('controller')"
+          title="KZ3 F427 控制器"
           @click="toggleGroup('controller')"
         >
-          <span>智能控制器 (KZ3)</span>
-          <span class="group-meta">
-            <span class="tag-badge">主线产品</span>
-            <ChevronDown :size="14" class="group-chevron" />
-          </span>
+          <span class="group-title"><Cpu :size="16" /><span v-if="!isCompact">KZ3 F427 控制器</span></span>
+          <ChevronDown v-if="!isCompact" :size="14" class="group-chevron" />
         </button>
         <nav v-show="!groupIsCollapsed('controller')" class="nav-list">
+          <span class="nav-section-label">工程与调试</span>
           <button
             class="nav-item"
             :class="{ active: route.name === 'ControllerProduct' }"
@@ -133,7 +149,7 @@ function groupIsCollapsed(group: ProductGroup) {
             class="nav-item"
             :class="{ active: isMaintenanceRoute }"
             aria-label="KZ3 UART1 设备维护"
-            title="KZ3 UART1 设备维护 (生产SN/以太网/SLE/角色)"
+            title="KZ3 UART1 设备维护 (生产 SN / Ethernet / SLE / Cat.1 / Edge TCP / DEBUG)"
             @click="navigateTo('/devices/controller/maintenance')"
           >
             <Wrench :size="16" class="nav-icon" />
@@ -155,16 +171,14 @@ function groupIsCollapsed(group: ProductGroup) {
       <!-- Section 2: Dual NearLink Coordinator -->
       <div class="nav-group" :class="{ folded: groupIsCollapsed('xtq') }">
         <button
-          v-if="!isCompact"
+          type="button"
           class="group-label"
           :aria-expanded="!groupIsCollapsed('xtq')"
+          title="双星闪协调器"
           @click="toggleGroup('xtq')"
         >
-          <span>双星闪协调器</span>
-          <span class="group-meta">
-            <span class="tag-badge">F407 / F427</span>
-            <ChevronDown :size="14" class="group-chevron" />
-          </span>
+          <span class="group-title"><Radio :size="16" /><span v-if="!isCompact">双星闪协调器</span></span>
+          <ChevronDown v-if="!isCompact" :size="14" class="group-chevron" />
         </button>
         <nav v-show="!groupIsCollapsed('xtq')" class="nav-list">
           <button
@@ -180,22 +194,21 @@ function groupIsCollapsed(group: ProductGroup) {
         </nav>
       </div>
 
-      <!-- Section 3: Smart Data Terminal -->
+      <!-- Section 3: SJZDV3 terminal -->
       <div class="nav-group" :class="{ folded: groupIsCollapsed('sjzdv3') }">
         <button
-          v-if="!isCompact"
+          type="button"
           class="group-label"
           :aria-expanded="!groupIsCollapsed('sjzdv3')"
+          title="SJZDV3 采集终端"
           @click="toggleGroup('sjzdv3')"
         >
-          <span>智能采集终端</span>
-          <span class="group-meta">
-            <span class="tag-badge">主线产品</span>
-            <ChevronDown :size="14" class="group-chevron" />
-          </span>
+          <span class="group-title"><Activity :size="16" /><span v-if="!isCompact">SJZDV3 采集终端</span></span>
+          <ChevronDown v-if="!isCompact" :size="14" class="group-chevron" />
         </button>
 
         <nav v-show="!groupIsCollapsed('sjzdv3')" class="nav-list">
+          <span class="nav-section-label">设备与通信配置</span>
           <button
             class="nav-item"
             :class="{ active: route.path === '/devices/sjzdv3' }"
@@ -229,6 +242,7 @@ function groupIsCollapsed(group: ProductGroup) {
             <span v-if="!isCompact" class="nav-text">4G Cat.1 / MQTT 配置</span>
           </button>
 
+          <span class="nav-section-label">点位与运行监测</span>
           <button
             class="nav-item"
             :class="{ active: route.path === '/devices/sjzdv3/modbus' }"
@@ -251,6 +265,7 @@ function groupIsCollapsed(group: ProductGroup) {
             <span v-if="!isCompact" class="nav-text">实时数据与硬件监测</span>
           </button>
 
+          <span class="nav-section-label">设备维护</span>
           <button
             class="nav-item"
             :class="{ active: route.path === '/devices/sjzdv3/maintenance' }"
@@ -264,16 +279,17 @@ function groupIsCollapsed(group: ProductGroup) {
         </nav>
       </div>
 
-      <!-- Section 4: Universal Tools -->
+      <!-- Section 4: Universal tools -->
       <div class="nav-group" :class="{ folded: groupIsCollapsed('common') }">
         <button
-          v-if="!isCompact"
+          type="button"
           class="group-label"
           :aria-expanded="!groupIsCollapsed('common')"
+          title="通用调试工具"
           @click="toggleGroup('common')"
         >
-          <span>公共工具</span>
-          <ChevronDown :size="14" class="group-chevron" />
+          <span class="group-title"><TerminalSquare :size="16" /><span v-if="!isCompact">通用调试工具</span></span>
+          <ChevronDown v-if="!isCompact" :size="14" class="group-chevron" />
         </button>
         <nav v-show="!groupIsCollapsed('common')" class="nav-list">
           <button
@@ -289,6 +305,17 @@ function groupIsCollapsed(group: ProductGroup) {
 
           <button
             class="nav-item"
+            :class="{ active: route.path === '/modbus' }"
+            aria-label="通用 Modbus RTU / TCP 调试"
+            title="通用 Modbus RTU / TCP 调试（多点只读轮询）"
+            @click="navigateTo('/modbus')"
+          >
+            <TableProperties :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">Modbus RTU / TCP 调试</span>
+          </button>
+
+          <button
+            class="nav-item"
             :class="{ active: route.path === '/mqtt' }"
             aria-label="通用 MQTT 调试"
             title="通用 MQTT 调试 (Broker 订阅与消息发布)"
@@ -298,6 +325,32 @@ function groupIsCollapsed(group: ProductGroup) {
             <span v-if="!isCompact" class="nav-text">通用 MQTT 调试</span>
           </button>
 
+          <button
+            class="nav-item"
+            :class="{ active: route.path === '/ssh-sftp' }"
+            aria-label="SSH / SFTP 文件传输"
+            title="SSH / SFTP 文件传输（远端目录浏览、文件/目录上传、单文件下载）"
+            @click="navigateTo('/ssh-sftp')"
+          >
+            <FolderInput :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">SSH / SFTP 文件传输</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Section 5: Delivery and settings -->
+      <div class="nav-group" :class="{ folded: groupIsCollapsed('delivery') }">
+        <button
+          type="button"
+          class="group-label"
+          :aria-expanded="!groupIsCollapsed('delivery')"
+          title="交付与设置"
+          @click="toggleGroup('delivery')"
+        >
+          <span class="group-title"><Settings :size="16" /><span v-if="!isCompact">交付与设置</span></span>
+          <ChevronDown v-if="!isCompact" :size="14" class="group-chevron" />
+        </button>
+        <nav v-show="!groupIsCollapsed('delivery')" class="nav-list">
           <button
             class="nav-item"
             :class="{ active: route.path === '/flashing' }"
@@ -332,7 +385,7 @@ function groupIsCollapsed(group: ProductGroup) {
 
 <style scoped>
 .app-sidebar {
-  width: 220px;
+  width: 244px;
   background-color: var(--bg-panel, #ffffff);
   border-right: 1px solid var(--border, #b9c5cf);
   display: flex;
@@ -343,12 +396,12 @@ function groupIsCollapsed(group: ProductGroup) {
 }
 
 .app-sidebar.collapsed {
-  width: 52px;
+  width: 56px;
 }
 
 .sidebar-header {
-  min-height: 38px;
-  padding: 7px 10px;
+  min-height: 44px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border, #b9c5cf);
   user-select: none;
   display: flex;
@@ -358,15 +411,15 @@ function groupIsCollapsed(group: ProductGroup) {
 
 .workspace-label {
   color: var(--color-text-tertiary, #5f6f7d);
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.76rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .sidebar-collapse-btn {
-  width: 28px;
-  height: 24px;
+  width: 30px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -387,34 +440,46 @@ function groupIsCollapsed(group: ProductGroup) {
 .nav-scroll-area {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 8px;
+  padding: 10px 9px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 7px;
 }
 
 .nav-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .group-label {
   width: 100%;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  min-height: 38px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
   color: var(--text-muted, #40515f);
-  padding: 4px 8px;
+  padding: 7px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-xs, 3px);
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
+}
+
+.group-title {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-title svg {
+  flex: 0 0 auto;
+  color: #5c7380;
 }
 
 .group-label:hover {
@@ -423,10 +488,14 @@ function groupIsCollapsed(group: ProductGroup) {
   border-color: var(--color-border-subtle, #d5dde4);
 }
 
-.group-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.nav-group:not(.folded) > .group-label {
+  color: #174d6b;
+  border-color: #c1d2dc;
+  background: #edf4f7;
+}
+
+.nav-group:not(.folded) > .group-label .group-title svg {
+  color: #1769aa;
 }
 
 .group-chevron {
@@ -438,33 +507,54 @@ function groupIsCollapsed(group: ProductGroup) {
   transform: rotate(-90deg);
 }
 
-.tag-badge {
-  font-size: 0.64rem;
-  background: #e7f1fa;
-  color: #0f5f9e;
-  padding: 1px 4px;
-  border-radius: 4px;
-  font-weight: normal;
-}
-
 .nav-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin: 1px 0 2px 15px;
+  padding-left: 8px;
+  border-left: 2px solid #d6e1e7;
+}
+
+.navigation-home {
+  border-color: #b7ccd9;
+  background: #f3f8fb;
+  color: #174d6b;
+}
+
+.navigation-home .nav-icon { color: #1769aa; }
+
+.home-badge {
+  margin-left: auto;
+  padding: 2px 5px;
+  color: #2f6988;
+  border: 1px solid #bdd2de;
+  border-radius: 8px;
+  background: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.nav-section-label {
+  margin: 8px 7px 2px;
+  color: #657b87;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .04em;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 34px;
-  padding: 7px 8px;
+  min-height: 37px;
+  padding: 8px 7px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-main, #17212b);
   border-radius: 6px;
-  font-size: 0.82rem;
-  font-weight: 500;
+  font-size: 0.84rem;
+  font-weight: 550;
   cursor: pointer;
   text-align: left;
   transition: all 0.15s ease;
@@ -509,17 +599,19 @@ function groupIsCollapsed(group: ProductGroup) {
 }
 
 .sidebar-footer {
-  padding: 8px;
+  padding: 9px;
   border-top: 1px solid var(--border, #b9c5cf);
   background: var(--color-canvas, #edf1f4);
 }
 
 .app-sidebar.collapsed .sidebar-header,
-.app-sidebar.collapsed .nav-item {
+.app-sidebar.collapsed .nav-item,
+.app-sidebar.collapsed .group-label {
   justify-content: center;
 }
 
-.app-sidebar.collapsed .nav-item {
+.app-sidebar.collapsed .nav-item,
+.app-sidebar.collapsed .group-label {
   padding-inline: 0;
 }
 
@@ -530,6 +622,10 @@ function groupIsCollapsed(group: ProductGroup) {
 
 .app-sidebar.collapsed .nav-group {
   gap: 2px;
+}
+
+.app-sidebar.collapsed .group-label {
+  min-height: 38px;
 }
 
 </style>

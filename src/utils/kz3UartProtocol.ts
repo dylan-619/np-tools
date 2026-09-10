@@ -1,10 +1,10 @@
 import type {
   Kz3ConfigGroup,
   Kz3Cat1Candidate,
+  Kz3EdgeTcpCandidate,
   Kz3EthernetCandidate,
   Kz3ProtocolEnvelope,
   Kz3SleCandidate,
-  Kz3SystemRole,
   Kz3WirelessCandidate,
 } from '../types/kz3Maintenance'
 
@@ -26,7 +26,7 @@ export const KZ3_QUERY_COMMANDS: Record<Kz3ConfigGroup, string> = {
   sle: '@CFG,SLE,SHOW',
   wireless: '@CFG,WIRELESS,SHOW',
   cat1: '@CFG,4G,SHOW',
-  io: '@CFG,IO,SHOW',
+  edge: '@CFG,EDGE,SHOW',
   debug: '@DEBUG',
 }
 
@@ -102,6 +102,25 @@ function isAllowedCat1Command(command: string): boolean {
     : isOptionalText(parts[3])
 }
 
+/**
+ * 与 KZ3 `EdgeTcpConfig_IpIsUnicast()` 对齐：只允许固件可保存的
+ * 单播首字节范围。UART1 当前 SET 入口要求端口非零，即便保存为 disabled
+ * 也必须携带一个可复用的服务端地址与端口。
+ */
+function isAllowedEdgeTcpCommand(command: string): boolean {
+  const parts = command.split(',')
+  if (parts.length !== 6 || parts[0] !== '@CFG' || parts[1] !== 'EDGE' || parts[2] !== 'SET') {
+    return false
+  }
+  try {
+    normalizeEdgeTcpServerIp(parts[3])
+    normalizeUint(parts[4], 1, 65535, 'Edge TCP 服务端端口')
+    return parts[5] === '0' || parts[5] === '1'
+  } catch {
+    return false
+  }
+}
+
 function isAllowedCommand(command: string): boolean {
   return (
     Object.values(KZ3_QUERY_COMMANDS).includes(command) ||
@@ -121,8 +140,7 @@ function isAllowedCommand(command: string): boolean {
     /^@CFG,WIRELESS,MODE,(SLE|CAT1|1|2)$/.test(command) ||
     /^@CFG,WIRELESS,REPORT,(?:0|[1-9]\d{0,2})$/.test(command) && Number(command.split(',')[3]) <= 255 ||
     isAllowedCat1Command(command) ||
-    command === '@CFG,IO,INIT,CONTROLLER' ||
-    /^@CFG,IO,INIT,RTU_SLAVE,\d+$/.test(command) ||
+    isAllowedEdgeTcpCommand(command) ||
     command === '@DEBUG=0' ||
     command === '@DEBUG=1'
   )
@@ -152,6 +170,15 @@ function normalizeIpv4(value: string, fieldName: string): string {
   const octets = parseIpv4(value, fieldName)
   if (octets.every((octet) => octet === 0) || octets.every((octet) => octet === 255)) {
     throw new Error(`${fieldName} 不能是全 0 或全 255 地址`)
+  }
+  return octets.join('.')
+}
+
+/** 与 KZ3 EdgeTcpConfig_IpIsUnicast() 的首字节判定保持一致。 */
+function normalizeEdgeTcpServerIp(value: string): string {
+  const octets = parseIpv4(value, 'Edge TCP 服务端 IPv4')
+  if (octets[0] === 0 || octets[0] === 127 || octets[0] > 223) {
+    throw new Error('Edge TCP 服务端 IPv4 必须是固件允许的单播地址')
   }
   return octets.join('.')
 }
@@ -221,6 +248,16 @@ export function buildEthernetCommands(candidate: Kz3EthernetCandidate): string[]
     validateKz3Command(`@CFG,ETH,GW,${gateway}`),
     validateKz3Command(`@CFG,ETH,PORT,${port}`),
   ]
+}
+
+/**
+ * 构造当前 KZ3 F427 固件的 Edge TCP 保存命令。保存后必须查询 RUN/SAVED，
+ * 并在安全重启后才可判断客户端是否按新配置运行。
+ */
+export function buildEdgeTcpCommand(candidate: Kz3EdgeTcpCandidate): string {
+  const serverIp = normalizeEdgeTcpServerIp(candidate.serverIp)
+  const port = normalizeUint(candidate.port, 1, 65535, 'Edge TCP 服务端端口')
+  return validateKz3Command(`@CFG,EDGE,SET,${serverIp},${port},${candidate.enabled ? '1' : '0'}`)
 }
 
 /**
@@ -317,13 +354,6 @@ export function buildCat1ReconnectCommand(): string {
   return validateKz3Command('@CFG,4G,RECONNECT')
 }
 
-export function buildRoleCommand(role: Kz3SystemRole, address: string): string {
-  if (role === 'CONTROLLER') return '@CFG,IO,INIT,CONTROLLER'
-  return validateKz3Command(
-    `@CFG,IO,INIT,RTU_SLAVE,${normalizeUint(address, 1, 247, 'RTU 从站地址')}`
-  )
-}
-
 export function buildDebugCommand(enabled: boolean): string {
   return enabled ? '@DEBUG=1' : '@DEBUG=0'
 }
@@ -382,9 +412,9 @@ export const KZ3_PRESET_COMMANDS: PresetCommandItem[] = [
     danger: 'none',
   },
   {
-    name: '查询系统角色',
-    cmd: '@CFG,IO,SHOW',
-    description: '查询本次活动角色 (CONTROLLER / RTU_SLAVE) 与 EEPROM 下次启动保存角色',
+    name: '查询 Edge TCP 状态',
+    cmd: '@CFG,EDGE,SHOW',
+    description: '查询 Edge TCP 的 RUN / SAVED 地址、客户端状态、错误码与重启需求',
     category: 'query',
     danger: 'none',
   },
@@ -435,7 +465,7 @@ export const KZ3_PRESET_COMMANDS: PresetCommandItem[] = [
   {
     name: '安全软件重启 (@RST)',
     cmd: '@RST',
-    description: '通知核心任务确认安全输出后执行软件复位；使保存的以太网和系统角色生效',
+    description: '通知核心任务确认安全输出后执行软件复位；使保存的 Ethernet、无线与 Edge TCP 配置生效',
     category: 'action',
     danger: 'high',
     confirmPrompt: '危险操作：控制器即将安全关断输出并执行软件复位！现场设备将短暂离线，是否继续？',
@@ -448,7 +478,7 @@ export function getCommandGroup(command: string): Kz3ConfigGroup {
   if (command.startsWith('@CFG,SLE,')) return 'sle'
   if (command.startsWith('@CFG,WIRELESS,')) return 'wireless'
   if (command.startsWith('@CFG,4G,')) return 'cat1'
-  if (command.startsWith('@CFG,IO,')) return 'io'
+  if (command.startsWith('@CFG,EDGE,')) return 'edge'
   return 'debug'
 }
 

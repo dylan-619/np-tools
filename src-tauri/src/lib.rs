@@ -11,7 +11,9 @@ use std::sync::Arc;
 use tauri::ipc::Channel;
 
 mod kz3_http;
+mod modbus_tcp;
 mod mqtt;
+mod ssh_sftp;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -332,6 +334,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(ConnectionManager::new())
         .manage(kz3_http::Kz3HttpClient::new())
+        .manage(modbus_tcp::ModbusTcpClient::new())
         .manage(Arc::new(mqtt::MqttManager::new()))
         .manage(flash_mgr)
         .invoke_handler(tauri::generate_handler![
@@ -349,6 +352,13 @@ pub fn run() {
             mqtt::mqtt_disconnect,
             mqtt::mqtt_subscribe,
             mqtt::mqtt_publish,
+            // 通用 Modbus TCP 只读调试
+            modbus_tcp::modbus_tcp_read,
+            // 通用 SSH / SFTP 文件传输
+            ssh_sftp::ssh_sftp_probe,
+            ssh_sftp::ssh_sftp_list_dir,
+            ssh_sftp::ssh_sftp_upload,
+            ssh_sftp::ssh_sftp_download,
             // SJZDV3 Commands
             sjzd_send_sn,
             sjzd_send_modbus_points,

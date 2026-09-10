@@ -87,7 +87,7 @@ onMounted(() => {
           :options="portOptions"
           :placeholder="serial.ports.length === 0 ? '无可用串口' : '选择串口'"
           :disabled="!!serial.connectedPort"
-          size="sm"
+          size="md"
           mono
         />
       </div>
@@ -112,7 +112,7 @@ onMounted(() => {
           v-model="serial.config.baudRate"
           :options="baudRates"
           :disabled="!!serial.connectedPort"
-          size="sm"
+          size="md"
           mono
         />
       </div>
@@ -123,7 +123,7 @@ onMounted(() => {
             v-model="serial.config.dataBits"
             :options="dataBitOptions"
             :disabled="!!serial.connectedPort"
-            size="sm"
+            size="md"
           />
         </div>
         <div class="config-item">
@@ -132,7 +132,7 @@ onMounted(() => {
             v-model="serial.config.parity"
             :options="parityOptions"
             :disabled="!!serial.connectedPort"
-            size="sm"
+            size="md"
           />
         </div>
         <div class="config-item">
@@ -141,7 +141,7 @@ onMounted(() => {
             v-model="serial.config.stopBits"
             :options="stopBitOptions"
             :disabled="!!serial.connectedPort"
-            size="sm"
+            size="md"
           />
         </div>
         <div class="config-item">
@@ -150,7 +150,7 @@ onMounted(() => {
             v-model="serial.config.flowControl"
             :options="flowControlOptions"
             :disabled="!!serial.connectedPort"
-            size="sm"
+            size="md"
           />
         </div>
       </div>
@@ -244,14 +244,14 @@ onMounted(() => {
 }
 
 .status-copy strong {
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   font-weight: 650;
   color: var(--text-main, #17212b);
 }
 
 .status-copy small {
   color: var(--color-text-tertiary, #5f6f7d);
-  font: 0.62rem var(--font-mono, monospace);
+  font: 0.7rem var(--font-mono, monospace);
 }
 
 .header-actions {
@@ -302,13 +302,13 @@ onMounted(() => {
 }
 
 .connect-action-btn {
-  min-height: var(--control-height-dense, 28px);
+  min-height: 36px;
   padding: 4px 9px;
   background-color: var(--accent, #1769aa);
   color: #fff;
   border: none;
   border-radius: 5px;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -351,11 +351,11 @@ onMounted(() => {
   gap: 2px;
 }
 .config-item label {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   color: var(--text-muted, #40515f);
 }
 .config-item select {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   padding: 4px 6px;
   background-color: var(--bg-panel, #ffffff);
   border: 1px solid var(--border, #b9c5cf);
@@ -375,7 +375,7 @@ onMounted(() => {
   justify-content: space-between;
   padding-top: 4px;
   border-top: 1px dashed var(--border, #b9c5cf);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-family: var(--font-mono, monospace);
   color: var(--text-muted, #40515f);
 }
@@ -399,7 +399,7 @@ onMounted(() => {
 
 .pin-btn {
   padding: 1px 5px;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   background: var(--bg-app, #edf1f4);
   border: 1px solid var(--border, #b9c5cf);
   color: var(--text-muted, #40515f);
@@ -414,7 +414,8 @@ onMounted(() => {
 }
 
 .serial-error-hint {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
   color: #8f2028;
   word-break: break-all;
   padding: 4px;

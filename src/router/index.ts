@@ -5,7 +5,13 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/devices/sjzdv3'
+      redirect: '/debug-center'
+    },
+    {
+      path: '/debug-center',
+      name: 'DebugCenter',
+      component: () => import('../views/DebugCenterView.vue'),
+      meta: { title: '设备调试导航' }
     },
     {
       path: '/serial',
@@ -14,10 +20,22 @@ const router = createRouter({
       meta: { title: '通用串口调试' }
     },
     {
+      path: '/modbus',
+      name: 'ModbusDebugger',
+      component: () => import('../views/ModbusDebuggerView.vue'),
+      meta: { title: '通用 Modbus RTU / TCP 调试' }
+    },
+    {
       path: '/mqtt',
       name: 'MqttDebugger',
       component: () => import('../views/MqttView.vue'),
       meta: { title: '通用 MQTT 调试' }
+    },
+    {
+      path: '/ssh-sftp',
+      name: 'SshSftp',
+      component: () => import('../views/SshSftpView.vue'),
+      meta: { title: 'SSH / SFTP 文件传输' }
     },
     {
       path: '/devices/sjzdv3',

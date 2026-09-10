@@ -186,34 +186,34 @@ function logClass(line: MqttLogLine): string[] {
       <div class="connection-grid">
         <label class="field host-field">
           <span>Broker 主机</span>
-          <input v-model.trim="mqtt.config.host" placeholder="例如：broker.example.com 或 192.168.1.10" :disabled="mqtt.connectionState !== 'disconnected'" />
+          <input v-model.trim="mqtt.config.host" placeholder="例如：broker.example.com 或 192.168.1.10" :disabled="mqtt.connectionState !== 'disconnected'">
         </label>
-        <label class="field compact-field">
+        <label class="field port-field">
           <span>端口</span>
-          <input v-model.number="mqtt.config.port" type="number" min="1" max="65535" :disabled="mqtt.connectionState !== 'disconnected'" />
+          <input v-model.number="mqtt.config.port" type="number" min="1" max="65535" :disabled="mqtt.connectionState !== 'disconnected'">
         </label>
         <label class="field client-id-field">
           <span>Client ID</span>
-          <input v-model.trim="mqtt.config.clientId" class="mono" :disabled="mqtt.connectionState !== 'disconnected'" />
+          <input v-model.trim="mqtt.config.clientId" class="mono" :disabled="mqtt.connectionState !== 'disconnected'">
         </label>
-        <label class="field compact-field">
+        <label class="field keepalive-field">
           <span>Keep Alive (s)</span>
-          <input v-model.number="mqtt.config.keepAliveSec" type="number" min="1" max="65535" :disabled="mqtt.connectionState !== 'disconnected'" />
+          <input v-model.number="mqtt.config.keepAliveSec" type="number" min="1" max="65535" :disabled="mqtt.connectionState !== 'disconnected'">
         </label>
-        <label class="field">
+        <label class="field username-field">
           <span>用户名 <em>可选</em></span>
-          <input v-model="mqtt.config.username" autocomplete="username" :disabled="mqtt.connectionState !== 'disconnected'" />
+          <input v-model="mqtt.config.username" autocomplete="username" :disabled="mqtt.connectionState !== 'disconnected'">
         </label>
-        <label class="field">
+        <label class="field password-field">
           <span>密码 <em>仅本次会话内存保存</em></span>
-          <input v-model="mqtt.config.password" type="password" autocomplete="current-password" :disabled="mqtt.connectionState !== 'disconnected'" />
+          <input v-model="mqtt.config.password" type="password" autocomplete="current-password" :disabled="mqtt.connectionState !== 'disconnected'">
         </label>
       </div>
 
       <div class="subscription-row">
         <label class="field topic-field">
           <span>订阅 Topic</span>
-          <input v-model.trim="mqtt.config.subscribeTopic" class="mono" placeholder="例如：devices/+/up" />
+          <input v-model.trim="mqtt.config.subscribeTopic" class="mono" placeholder="例如：devices/+/up">
         </label>
         <label class="field qos-field">
           <span>QoS</span>
@@ -259,7 +259,7 @@ function logClass(line: MqttLogLine): string[] {
             <button :class="{ active: activeFilter === 'system' }" @click="activeFilter = 'system'">系统</button>
             <button :class="{ active: activeFilter === 'error' }" @click="activeFilter = 'error'">错误</button>
           </div>
-          <label class="auto-scroll"><input v-model="autoScroll" type="checkbox" /> 自动滚屏</label>
+          <label class="auto-scroll"><input v-model="autoScroll" type="checkbox"> 自动滚屏</label>
           <button class="tool-button" :disabled="!filteredLogs.length" @click="copyCurrentLogs">
             <Check v-if="copied" :size="14" />
             <Copy v-else :size="14" />
@@ -299,7 +299,7 @@ function logClass(line: MqttLogLine): string[] {
       <div class="publish-options">
         <label class="field publish-topic-field">
           <span>发布 Topic</span>
-          <input v-model.trim="publishTopic" class="mono" placeholder="例如：devices/020325090118/down" :disabled="!mqtt.connected || mqtt.publishing" />
+          <input v-model.trim="publishTopic" class="mono" placeholder="例如：devices/020325090118/down" :disabled="!mqtt.connected || mqtt.publishing">
         </label>
         <label class="field qos-field">
           <span>QoS</span>
@@ -381,11 +381,11 @@ function logClass(line: MqttLogLine): string[] {
   align-items: center;
 }
 .panel-heading { justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-.panel-heading h1 { margin: 0; color: var(--text-main); font-size: 1.05rem; }
+.panel-heading h1 { margin: 0; color: var(--text-main); font-size: 1.1rem; }
 .panel-heading p,
 .connection-note,
-.publish-footer { margin: 4px 0 0; color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; }
-.connection-status { gap: 6px; color: var(--text-muted); font-size: 0.78rem; white-space: nowrap; }
+.publish-footer { margin: 4px 0 0; color: var(--text-muted); font-size: 0.82rem; line-height: 1.5; }
+.connection-status { gap: 6px; color: var(--text-muted); font-size: 0.84rem; white-space: nowrap; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #8696a3; }
 .connection-status.connected { color: var(--success); }
 .connection-status.connected .status-dot { background: var(--success); }
@@ -393,38 +393,42 @@ function logClass(line: MqttLogLine): string[] {
 .connection-status.connecting .status-dot { background: var(--color-warning); animation: pulse 1.1s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 
-.connection-grid { display: grid; grid-template-columns: minmax(200px, 1.25fr) 100px minmax(180px, 1.1fr) 120px minmax(160px, .8fr) minmax(160px, .8fr); gap: 8px; }
-.field { min-width: 0; display: grid; gap: 4px; color: var(--text-muted); font-size: .72rem; }
+.connection-grid { display: grid; grid-template-columns: minmax(220px, 1.3fr) 104px minmax(180px, 1fr) 120px; grid-template-areas: "host port client keepalive" "username username password password"; gap: 10px 12px; align-items: end; }
+.host-field { grid-area: host; }.port-field { grid-area: port; }.client-id-field { grid-area: client; }.keepalive-field { grid-area: keepalive; }.username-field { grid-area: username; }.password-field { grid-area: password; }
+.field { min-width: 0; display: grid; gap: 5px; color: var(--text-muted); font-size: .8rem; }
 .field span { display: flex; justify-content: space-between; gap: 4px; }
 .field em { color: var(--color-text-tertiary); font-style: normal; }
 .field input,
 .field select,
 .publish-body textarea {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 5px);
   background: var(--bg-input);
   color: var(--text-main);
   min-height: var(--control-height, 32px);
   padding: 6px 8px;
-  font-size: .8rem;
+  font-size: .84rem;
 }
 .field input:focus,
 .field select:focus,
 .publish-body textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(23, 105, 170, .12); }
 .mono { font-family: var(--font-mono, monospace); font-variant-numeric: tabular-nums; }
-.subscription-row { gap: 8px; margin-top: 10px; }
+.subscription-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px auto auto; align-items: end; gap: 10px; margin-top: 12px; }
 .topic-field { flex: 1; }
 .qos-field { width: 72px; flex: 0 0 72px; }
-.connection-button { margin-left: auto; }
-.connection-note { margin-top: 8px; }
-.error-message { margin: 8px 0 0; color: var(--danger); font-size: .78rem; }
+.subscription-row .qos-field { width: auto; flex: auto; }
+.connection-button { margin-left: 0; }
+.connection-note { margin-top: 9px; }
+.error-message { margin: 8px 0 0; color: var(--danger); font-size: .84rem; }
 
 .button,
 .tool-button,
 .filter-group button,
-.hex-toggle { border: 1px solid var(--border); border-radius: var(--radius-sm, 5px); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: .78rem; }
-.button { min-height: var(--control-height, 32px); padding: 0 12px; white-space: nowrap; }
+.hex-toggle { border: 1px solid var(--border); border-radius: var(--radius-sm, 5px); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: .82rem; }
+.button { min-height: 34px; padding: 0 12px; white-space: nowrap; }
 .button.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
 .button.primary:hover:not(:disabled) { background: var(--accent-hover); }
 .button.secondary,
@@ -434,18 +438,18 @@ function logClass(line: MqttLogLine): string[] {
 button:disabled { opacity: .48; cursor: not-allowed; }
 
 .terminal-panel { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.terminal-toolbar { min-height: 42px; padding: 6px 10px; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); background: var(--color-surface-2); }
-.terminal-stats { gap: 7px; color: var(--text-muted); font-size: .76rem; white-space: nowrap; }
+.terminal-toolbar { min-height: 42px; padding: 7px 10px; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border); background: var(--color-surface-2); }
+.terminal-stats { gap: 7px; color: var(--text-muted); font-size: .82rem; white-space: nowrap; }
 .terminal-stats svg { color: var(--accent); }
 .stat-divider { width: 1px; height: 14px; background: var(--border); }
-.toolbar-actions { gap: 8px; min-width: 0; }
+.toolbar-actions { flex-wrap: wrap; justify-content: flex-end; gap: 8px; min-width: 0; }
 .filter-group { gap: 3px; }
-.filter-group button { min-height: 25px; padding: 0 7px; color: var(--text-muted); background: transparent; font-size: .7rem; }
+.filter-group button { min-height: 27px; padding: 0 8px; color: var(--text-muted); background: transparent; font-size: .76rem; }
 .filter-group button.active { border-color: var(--accent); color: var(--accent); background: #e4f1fa; font-weight: 600; }
-.auto-scroll { color: var(--text-muted); font-size: .73rem; white-space: nowrap; }
+.auto-scroll { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
 .terminal-log { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; font-family: var(--font-mono, monospace); background: #fbfcfd; user-select: text; -webkit-user-select: text; }
 .terminal-empty { padding: 28px 0; text-align: center; color: var(--color-text-tertiary); font: .8rem var(--font-sans); }
-.log-line { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: start; column-gap: 7px; padding: 2px 0; color: var(--text-main); font-size: .75rem; line-height: 1.45; border-bottom: 1px dashed rgba(185, 197, 207, .45); }
+.log-line { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: start; column-gap: 7px; padding: 3px 0; color: var(--text-main); font-size: .8rem; line-height: 1.5; border-bottom: 1px dashed rgba(185, 197, 207, .45); }
 .log-line time { color: #687a89; white-space: nowrap; }
 .log-line .direction { font-weight: 700; white-space: nowrap; }
 .log-line.rx .direction { color: var(--success); }
@@ -453,7 +457,7 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .log-line.system .direction { color: var(--color-warning); }
 .log-line.error { color: var(--danger); }
 .log-line pre { min-width: 0; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; }
-.hex-toggle { min-height: 22px; padding: 0 5px; color: var(--text-muted); background: var(--bg-input); font-size: .68rem; }
+.hex-toggle { min-height: 24px; padding: 0 6px; color: var(--text-muted); background: var(--bg-input); font-size: .74rem; }
 .hex-toggle svg { transition: transform .15s; }
 .hex-toggle svg.flipped { transform: rotate(180deg); }
 .hex-payload { grid-column: 3 / -1; padding: 4px 6px; color: #455665; background: #eef3f7; border-radius: 3px; }
@@ -461,28 +465,30 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .publish-panel { padding: 10px 12px; }
 .publish-panel.disabled { opacity: .72; }
 .kz3-shortcuts { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; min-width: 0; }
-.shortcut-label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .75rem; font-weight: 600; white-space: nowrap; }
+.shortcut-label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
 .shortcut-label svg { color: var(--color-warning); }
-.shortcut-button { min-height: 26px; padding: 0 8px; color: var(--text-muted); background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm, 5px); cursor: pointer; font-size: .72rem; white-space: nowrap; }
+.shortcut-button { min-height: 28px; padding: 0 9px; color: var(--text-muted); background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm, 5px); cursor: pointer; font-size: .78rem; white-space: nowrap; }
 .shortcut-button:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .shortcut-button.start:hover:not(:disabled) { color: var(--success); border-color: var(--success); }
 .shortcut-button.stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
-.boot-hint { overflow: hidden; text-overflow: ellipsis; margin-left: auto; color: var(--color-text-tertiary); font: .72rem var(--font-mono, monospace); white-space: nowrap; }
+.boot-hint { overflow: hidden; text-overflow: ellipsis; margin-left: auto; color: var(--color-text-tertiary); font: .78rem var(--font-mono, monospace); white-space: nowrap; }
 .boot-hint.ready { color: var(--success); }
-.publish-options { gap: 8px; }
+.publish-options { align-items: end; flex-wrap: wrap; gap: 10px; }
 .publish-topic-field { flex: 1; }
-.retain-note { color: var(--text-muted); font-size: .76rem; white-space: nowrap; }
+.retain-note { display: flex; align-items: center; min-height: 34px; color: var(--text-muted); font-size: .82rem; white-space: nowrap; }
 .publish-body { margin-top: 8px; gap: 8px; }
 .publish-body textarea { min-height: 140px; resize: vertical; line-height: 1.4; }
 .publish-button { min-width: 118px; align-self: stretch; }
 .publish-footer { display: flex; justify-content: space-between; gap: 16px; }
 
-@media (max-width: 1200px) { .connection-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); } }
+@media (max-width: 1100px) { .connection-grid { grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr); grid-template-areas: "host host port" "client client keepalive" "username username password"; } }
 @media (max-width: 850px) {
   .mqtt-view { display: block; overflow: auto; }
   .connection-panel, .terminal-panel, .publish-panel { margin-bottom: 10px; }
-  .connection-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
-  .terminal-toolbar, .subscription-row, .publish-options { align-items: flex-start; flex-wrap: wrap; }
+  .connection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "host host" "port client" "keepalive username" "password password"; }
+  .subscription-row { grid-template-columns: minmax(0, 1fr) 72px; }
+  .subscription-row .button { min-width: 0; }
+  .terminal-toolbar, .publish-options { align-items: flex-start; }
   .kz3-shortcuts { flex-wrap: wrap; }
   .toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
   .terminal-log { height: 360px; }

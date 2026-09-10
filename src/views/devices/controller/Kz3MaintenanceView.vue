@@ -7,7 +7,6 @@ import {
   ChevronRight,
   CircleDot,
   Cpu,
-  Database,
   Download,
   EthernetPort,
   FileClock,
@@ -31,9 +30,9 @@ import { useKz3MaintenanceStore } from '../../../stores/kz3MaintenanceStore'
 import type {
   Kz3ConfigGroup,
   Kz3Cat1Candidate,
+  Kz3EdgeTcpCandidate,
   Kz3EthernetCandidate,
   Kz3SleCandidate,
-  Kz3SystemRole,
   Kz3WirelessCandidate,
 } from '../../../types/kz3Maintenance'
 import {
@@ -41,10 +40,10 @@ import {
   buildCat1ReconnectCommand,
   buildCat1UpdateCommands,
   buildDebugCommand,
+  buildEdgeTcpCommand,
   buildEthernetCommands,
   buildKz3HttpBaseUrl,
   buildIdentityCommand,
-  buildRoleCommand,
   buildSleInitCommand,
   buildWirelessModeCommand,
   buildWirelessReportCommand,
@@ -92,8 +91,11 @@ const cat1 = ref<Kz3Cat1Candidate>({
   keepalive: '60',
   qos: '1',
 })
-const role = ref<Kz3SystemRole>('CONTROLLER')
-const roleAddress = ref('1')
+const edge = ref<Kz3EdgeTcpCandidate>({
+  serverIp: '',
+  port: '',
+  enabled: false,
+})
 const confirmAction = ref<{ title: string; message: string; commands: string[] } | null>(null)
 
 const sections: Array<{
@@ -108,7 +110,7 @@ const sections: Array<{
   { id: 'sle', label: '星闪 SLE', caption: 'EEPROM / 模组确认', icon: Radio },
   { id: 'wireless', label: '无线承载', caption: 'SLE / Cat.1 模式', icon: Activity },
   { id: 'cat1', label: 'Cat.1 / MQTT', caption: '首配 / 差异 / 重连', icon: Settings2 },
-  { id: 'io', label: '系统角色', caption: 'Controller / RTU', icon: Database },
+  { id: 'edge', label: 'Edge TCP', caption: 'RUN / SAVED / 客户端', icon: EthernetPort },
   { id: 'debug', label: '调试日志', caption: '持久化 DEBUG 开关', icon: TerminalSquare },
   { id: 'session', label: '会话记录', caption: '原始回包与审计', icon: FileClock },
 ]
@@ -388,11 +390,14 @@ watch(
 )
 
 watch(
-  () => maintenance.snapshots.io,
+  () => maintenance.snapshots.edge,
   (snapshot) => {
     if (!snapshot) return
-    role.value = snapshot.fields.SAVED_ROLE === 'RTU_SLAVE' ? 'RTU_SLAVE' : 'CONTROLLER'
-    roleAddress.value = snapshot.fields.SAVED_ADDR || '1'
+    edge.value = {
+      serverIp: snapshot.fields.SAVED_IP ?? edge.value.serverIp,
+      port: snapshot.fields.SAVED_PORT ?? edge.value.port,
+      enabled: snapshot.fields.SAVED_ENABLE === '1',
+    }
   }
 )
 
@@ -409,7 +414,7 @@ onMounted(() => {
         <div>
           <div class="eyebrow">KZ3 · UART1 DEVICE MAINTENANCE</div>
           <h1>设备初始化与维护工作台</h1>
-          <p>结构化配置 SN、Ethernet、SLE、Cat.1/MQTT、系统角色与调试日志；不修改工程 YAML</p>
+          <p>结构化配置 SN、Ethernet、SLE、Cat.1/MQTT、Edge TCP 与调试日志；不修改工程 YAML</p>
         </div>
       </div>
       <div class="header-actions">
@@ -544,9 +549,9 @@ onMounted(() => {
                 <button
                   class="toolbar-chip"
                   :disabled="!maintenanceReady || maintenance.isBusy"
-                  @click="sendDirectCommand('@CFG,IO,SHOW')"
+                  @click="sendDirectCommand('@CFG,EDGE,SHOW')"
                 >
-                  @IO
+                  @EDGE
                 </button>
                 <button
                   class="toolbar-chip"
@@ -612,11 +617,11 @@ onMounted(() => {
                 {{ isOne('cat1', 'VALID') ? '配置有效；凭证未回显' : '未配置 / 未确认' }}
               </small>
             </button>
-            <button class="summary-card" @click="activeSection = 'io'">
-              <div class="card-top"><Database :size="18" /><span>系统角色</span></div>
-              <strong>{{ field('io', 'ACTIVE_ROLE') }}</strong>
-              <small :class="hasSnapshot('io') && !isOne('io', 'REBOOT_REQUIRED') ? 'good' : 'warn'">
-                {{ !hasSnapshot('io') ? '尚未查询' : isOne('io', 'REBOOT_REQUIRED') ? 'SAVED 尚未成为 ACTIVE' : field('io', 'ACTIVE_RECORD') }}
+            <button class="summary-card" @click="activeSection = 'edge'">
+              <div class="card-top"><EthernetPort :size="18" /><span>Edge TCP</span></div>
+              <strong class="mono">{{ field('edge', 'SAVED_IP') }}:{{ field('edge', 'SAVED_PORT') }}</strong>
+              <small :class="hasSnapshot('edge') && !isOne('edge', 'REBOOT_REQUIRED') ? 'good' : 'warn'">
+                {{ !hasSnapshot('edge') ? '尚未查询' : isOne('edge', 'REBOOT_REQUIRED') ? '保存值待重启' : isOne('edge', 'ONLINE') ? '客户端 ONLINE' : '客户端未上线' }}
               </small>
             </button>
           </div>
@@ -629,7 +634,7 @@ onMounted(() => {
             <div class="matrix-row"><strong>SLE</strong><span>{{ field('sle', 'VALID') === '1' ? 'VALID' : 'INVALID/未知' }}</span><span>{{ field('sle', 'READY') === '1' ? 'READY' : 'NOT READY' }}</span><span>{{ field('sle', 'CFG_APPLIED') === '1' ? 'AT ACK' : '待 AT 确认' }}</span></div>
             <div class="matrix-row"><strong>WIRELESS</strong><span>{{ field('wireless', 'SAVED') }}</span><span>{{ field('wireless', 'RUN') }}</span><span>{{ field('wireless', 'REBOOT_REQUIRED') === '1' ? '待断电复核' : '链路另验' }}</span></div>
             <div class="matrix-row"><strong>CAT1</strong><span>{{ field('cat1', 'VALID') === '1' ? 'VALID' : 'INVALID/未知' }}</span><span>PORT {{ field('cat1', 'PORT') }}</span><span>{{ field('wireless', 'CAT1_ONLINE') === '1' ? 'ONLINE' : '未确认' }}</span></div>
-            <div class="matrix-row"><strong>IO</strong><span>{{ field('io', 'SAVED_ROLE') }}</span><span>{{ field('io', 'ACTIVE_ROLE') }}</span><span>RS485 HIL 另验</span></div>
+            <div class="matrix-row"><strong>EDGE</strong><span>{{ field('edge', 'SAVED_ENABLE') === '1' ? 'ENABLED' : 'DISABLED/未知' }}</span><span>{{ field('edge', 'RUN_ENABLE') === '1' ? 'RUN ENABLED' : 'RUN DISABLED/未知' }}</span><span>{{ isOne('edge', 'ONLINE') ? 'TCP ONLINE' : '未确认 / 离线' }}</span></div>
           </div>
         </section>
 
@@ -742,22 +747,23 @@ onMounted(() => {
           </div>
         </section>
 
-        <section v-else-if="activeSection === 'io'" class="panel-section two-column">
+        <section v-else-if="activeSection === 'edge'" class="panel-section two-column">
           <div class="editor-card">
-            <div class="section-heading compact"><div><span class="section-kicker">SYSTEM ROLE · EEPROM 528..543</span><h2>系统角色与 RS485 职责</h2></div><button class="button small" :disabled="!maintenanceReady || maintenance.isBusy" @click="query('io')"><RefreshCw :size="13" /> 查询</button></div>
-            <div class="role-selector">
-              <label :class="{ selected: role === 'CONTROLLER' }"><input v-model="role" type="radio" value="CONTROLLER"><Cpu :size="20" /><span><strong>CONTROLLER</strong><small>UART3/4 双 RTU 主站；运行 application 逻辑</small></span></label>
-              <label :class="{ selected: role === 'RTU_SLAVE' }"><input v-model="role" type="radio" value="RTU_SLAVE"><Database :size="20" /><span><strong>RTU_SLAVE</strong><small>UART3 只读采集；UART4 本机从站；停用 application</small></span></label>
+            <div class="section-heading compact"><div><span class="section-kicker">EDGE TCP OWNER · EEPROM 384..399</span><h2>Edge TCP 客户端</h2></div><button class="button small" :disabled="!maintenanceReady || maintenance.isBusy" @click="query('edge')"><RefreshCw :size="13" /> 查询</button></div>
+            <div class="form-grid">
+              <label class="form-field"><span>服务端 IPv4</span><input v-model="edge.serverIp" class="mono" placeholder="192.168.30.100"><small>固件仅接受首段 1..223、且不是 127 的单播地址</small></label>
+              <label class="form-field"><span>服务端端口</span><input v-model="edge.port" class="mono" inputmode="numeric" placeholder="9000"><small>1..65535</small></label>
             </div>
-            <label v-if="role === 'RTU_SLAVE'" class="form-field compact-input"><span>Modbus RTU 从站地址</span><input v-model="roleAddress" class="mono" inputmode="numeric"><small>1..247；不是上层项目 YAML 的自动写入项</small></label>
-            <p class="warning-box">角色保存不会在线切换 UART owner。必须物理复位、重新连接并确认 ACTIVE=SAVED、两份记录 VALID、REBOOT_REQUIRED=0。</p>
-            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认修改系统角色', role === 'RTU_SLAVE' ? '切换后 application/PID/下行写入不运行，UART4 成为本机 RTU 从站。' : '切换后 UART3/UART4 恢复双主站并运行 application。', () => buildRoleCommand(role, roleAddress))"><Save :size="14" /> 保存下次启动角色</button>
+            <label class="toggle-field"><input v-model="edge.enabled" type="checkbox"><span><strong>启动时启用 Edge TCP 客户端</strong><small>关闭时仍保留可复用的服务端地址与端口。</small></span></label>
+            <p class="info-box">当前 UART1 使用单条 <code>@CFG,EDGE,SET</code> 原子保存 IP、端口与开关。固件即使保存为 disabled，也要求提供非零端口和可用单播地址；保存后须重启才能成为 RUN 配置。</p>
+            <p class="warning-box">ONLINE=1 只表示固件 TCP 客户端已上线；不代表网关已路由、下行已执行或现场业务验收通过。</p>
+            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认保存 Edge TCP 配置', '将原子写入服务端地址、端口与启动开关。写入完成后需要安全重启并再次 SHOW 复核 RUN / SAVED。', () => buildEdgeTcpCommand(edge))"><Save :size="14" /> 保存 Edge TCP 配置</button>
           </div>
           <div class="snapshot-card">
-            <h3>ACTIVE / SAVED</h3>
-            <div class="role-compare"><div><small>本次启动</small><strong>{{ field('io', 'ACTIVE_ROLE') }}</strong><code>ADDR {{ field('io', 'ACTIVE_ADDR') }}</code><span :class="field('io', 'ACTIVE_RECORD') === 'VALID' ? 'good' : 'warn'">{{ field('io', 'ACTIVE_RECORD') }}</span></div><ChevronRight :size="22" /><div><small>EEPROM 保存</small><strong>{{ field('io', 'SAVED_ROLE') }}</strong><code>ADDR {{ field('io', 'SAVED_ADDR') }}</code><span :class="field('io', 'RECORD') === 'VALID' ? 'good' : 'warn'">{{ field('io', 'RECORD') }}</span></div></div>
-            <div class="state-banner" :class="isOne('io', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('io', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('io', 'REBOOT_REQUIRED') ? '需要物理复位并重新 SHOW' : '活动角色与保存角色一致' }}</div>
-            <p v-if="['INVALID', 'IO_ERROR'].includes(field('io', 'ACTIVE_RECORD'))" class="critical-box">设备处于维护安全态。IO_ERROR 不得自动写入或静默回退。</p>
+            <h3>RUN / SAVED 与客户端状态</h3>
+            <div class="compare-table"><div class="compare-head"><span>字段</span><span>RUN</span><span>SAVED</span></div><div><strong>IP</strong><code>{{ field('edge', 'RUN_IP') }}</code><code>{{ field('edge', 'SAVED_IP') }}</code></div><div><strong>PORT</strong><code>{{ field('edge', 'RUN_PORT') }}</code><code>{{ field('edge', 'SAVED_PORT') }}</code></div><div><strong>ENABLE</strong><code>{{ field('edge', 'RUN_ENABLE') }}</code><code>{{ field('edge', 'SAVED_ENABLE') }}</code></div></div>
+            <div class="state-banner" :class="isOne('edge', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('edge', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('edge', 'REBOOT_REQUIRED') ? '已保存，尚未成为 RUN 配置' : 'RUN 与 SAVED 已读取；仍需看客户端状态' }}</div>
+            <dl class="edge-state-grid"><div><dt>VALID</dt><dd :class="isOne('edge', 'VALID') ? 'good' : 'warn'">{{ field('edge', 'VALID') }}</dd></div><div><dt>STATE</dt><dd>{{ field('edge', 'STATE') }}</dd></div><div><dt>ONLINE</dt><dd :class="isOne('edge', 'ONLINE') ? 'good' : 'warn'">{{ field('edge', 'ONLINE') }}</dd></div><div><dt>LAST_ERROR</dt><dd class="mono">{{ field('edge', 'LAST_ERROR') }}</dd></div><div><dt>RECONNECTS</dt><dd class="mono">{{ field('edge', 'RECONNECTS') }}</dd></div></dl>
           </div>
         </section>
 
@@ -913,17 +919,13 @@ dd { margin: 0; font-size: 11px; font-weight: 700; }
 .confirmation-ladder small { font-size: 9px; }
 .sle-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px; }
 .sle-facts span { padding: 6px; background: #fff; border: 1px solid #d3dce2; border-radius: 3px; font-size: 9px; }
-.role-selector { display: grid; gap: 7px; }
-.role-selector label { min-height: 58px; display: grid; grid-template-columns: 14px 24px 1fr; align-items: center; gap: 8px; padding: 8px; border: 1px solid #c6d0d8; border-radius: 4px; cursor: pointer; }
-.role-selector label.selected { color: #0f5f9e; background: #eef6fb; border-color: #80afd0; box-shadow: inset 3px 0 #1769aa; }
-.role-selector label span { display: flex; flex-direction: column; gap: 3px; }
-.role-selector small { color: #617582; font-size: 9px; }
-.compact-input { max-width: 260px; margin-top: 10px; }
-.role-compare { display: grid; grid-template-columns: 1fr 24px 1fr; align-items: center; gap: 6px; }
-.role-compare > div { min-height: 118px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; background: #fff; border: 1px solid #d3dce2; border-radius: 4px; }
-.role-compare small { color: #6b7e89; font-size: 9px; }
-.role-compare strong { font-size: 12px; }
-.role-compare code { font-size: 9px; }
+.toggle-field { min-height: 48px; display: flex; align-items: center; gap: 9px; margin: 8px 0; padding: 8px 9px; border: 1px solid #c6d0d8; border-left: 3px solid #2879a8; border-radius: 4px; background: #f6fafc; cursor: pointer; }
+.toggle-field input { min-height: 0; width: 15px; height: 15px; margin: 0; accent-color: #1769aa; }
+.toggle-field span { display: flex; flex-direction: column; gap: 3px; }
+.toggle-field strong { color: #294b5e; font-size: 10px; }
+.toggle-field small { color: #617582; font-size: 9px; }
+.edge-state-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+.edge-state-grid div { min-width: 0; }
 .debug-actions { display: flex; gap: 8px; margin-top: 13px; }
 .debug-actions.wrap-actions { flex-wrap: wrap; }
 .debug-current { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -952,7 +954,7 @@ dd { margin: 0; font-size: 11px; font-weight: 700; }
 .spin { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1250px) { .workspace { grid-template-columns: 164px minmax(0,1fr); } .live-rail { display: none; } .summary-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 900px) { .shared-serial-status { min-width: 0; } .shared-serial-status small { display: none; } .workspace { grid-template-columns: 52px minmax(0,1fr); } .section-item { grid-template-columns: 24px; justify-content: center; } .section-item span, .section-item > :last-child, .boundary-card { display: none; } .two-column { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .maintenance-page { padding: 6px; } .page-header { align-items: stretch; flex-direction: column; gap: 9px; } .header-actions { flex-wrap: wrap; } .shared-serial-status { min-width: 0; flex: 1 1 150px; } .shared-serial-status small { display: none; } .workspace { grid-template-columns: 52px minmax(0,1fr); } .section-item { grid-template-columns: 24px; justify-content: center; } .section-item span, .section-item > :last-child, .boundary-card { display: none; } .two-column { grid-template-columns: 1fr; } }
 
 /* Field Quick Toolbar & LED Self-Check */
 .field-toolbar-card {

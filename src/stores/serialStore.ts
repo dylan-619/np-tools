@@ -53,6 +53,14 @@ interface SerialConnectOptions {
   preserveSession?: boolean
 }
 
+interface SerialChunkListenerOptions {
+  /**
+   * 二进制协议（如 Modbus RTU）接管本段数据时不送入文本解码器，
+   * 避免原始字节污染公共串口终端的行缓冲与日志。
+   */
+  suppressText?: boolean
+}
+
 function loadPersistedSerialConfig(): SerialOpenConfig {
   if (typeof localStorage === 'undefined') return { ...DEFAULT_SERIAL_CONFIG }
   try {
@@ -84,6 +92,8 @@ export const useSerialStore = defineStore('serial', () => {
   const decoder = new TextDecoder()
   let lineBuffer = ''
   const lineListeners = new Map<string, (line: string) => void>()
+  const chunkListeners = new Map<string, (payload: Uint8Array, chunk: IoChunk) => void>()
+  const chunkListenerOptions = new Map<string, SerialChunkListenerOptions>()
 
   function registerLineListener(id: string, listener: (line: string) => void) {
     lineListeners.set(id, listener)
@@ -91,6 +101,20 @@ export const useSerialStore = defineStore('serial', () => {
 
   function unregisterLineListener(id: string) {
     lineListeners.delete(id)
+  }
+
+  function registerChunkListener(
+    id: string,
+    listener: (payload: Uint8Array, chunk: IoChunk) => void,
+    options: SerialChunkListenerOptions = {}
+  ) {
+    chunkListeners.set(id, listener)
+    chunkListenerOptions.set(id, options)
+  }
+
+  function unregisterChunkListener(id: string) {
+    chunkListeners.delete(id)
+    chunkListenerOptions.delete(id)
   }
 
   function getTimeString(): string {
@@ -221,6 +245,19 @@ export const useSerialStore = defineStore('serial', () => {
           let chunkText = ''
           for (const chunk of chunks) {
             rxBytes.value += chunk.payload.length
+            const rawPayload = new Uint8Array(chunk.payload)
+            // 在文本解码前分发原始帧；协议消费者可以处理分片到达的数据。
+            const suppressText = Array.from(chunkListenerOptions.values()).some(
+              (options) => options.suppressText
+            )
+            for (const listener of chunkListeners.values()) {
+              try {
+                listener(rawPayload, chunk)
+              } catch (e) {
+                console.error('Chunk listener error:', e)
+              }
+            }
+            if (suppressText) continue
             const text = decoder.decode(new Uint8Array(chunk.payload), { stream: true })
             if (text) {
               chunkText += text
@@ -420,5 +457,7 @@ export const useSerialStore = defineStore('serial', () => {
     persistConfig,
     registerLineListener,
     unregisterLineListener,
+    registerChunkListener,
+    unregisterChunkListener,
   }
 })

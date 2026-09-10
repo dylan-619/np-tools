@@ -1,7 +1,7 @@
 {
   "name": "np-tools",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "packageManager": "pnpm@10.33.0",
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "tauri:build": "tauri build",
     "tauri:build:macos-local": "APPLE_SIGNING_IDENTITY=- tauri build",
     "lint": "eslint .",
-    "test:protocol": "node --test tests/controllerDebug.test.mjs && node --test tests/sjzdProtocol.test.mjs && node --test tests/mqttProtocol.test.mjs",
+    "test:protocol": "node --test tests/controllerDebug.test.mjs && node --test tests/sjzdProtocol.test.mjs && node --test tests/mqttProtocol.test.mjs && node --test tests/modbusProtocol.test.mjs && node --test tests/sshSftpPaths.test.mjs",
     "test:kz3-debug": "pnpm test:protocol"
   },
   "dependencies": {

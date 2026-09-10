@@ -1076,6 +1076,31 @@ test('Cat.1 SHOW 多行字段可解码，白名单拒绝任意注入', () => {
   assert.throws(() => protocol.validateKz3Command('@CFG,WIRELESS,REPORT,256'), /白名单/)
 })
 
+test('KZ3 Edge TCP 命令与当前 UART1 SET/SHOW 契约一致', () => {
+  const command = protocol.buildEdgeTcpCommand({
+    serverIp: '192.168.30.100',
+    port: '9000',
+    enabled: true,
+  })
+  assert.equal(command, '@CFG,EDGE,SET,192.168.30.100,9000,1')
+  assert.equal(protocol.KZ3_QUERY_COMMANDS.edge, '@CFG,EDGE,SHOW')
+  assert.equal(protocol.getCommandGroup(command), 'edge')
+  assert.equal(protocol.getFollowUpQuery(command), '@CFG,EDGE,SHOW')
+  assert.equal(
+    protocol.parseKz3ProtocolLine('OK,EDGE,RUN_ENABLE=1,SAVED_ENABLE=1,ONLINE=1,STATE=ONLINE')?.fields.ONLINE,
+    '1'
+  )
+  assert.throws(
+    () => protocol.buildEdgeTcpCommand({ serverIp: '127.0.0.1', port: '9000', enabled: false }),
+    /单播地址/
+  )
+  assert.throws(
+    () => protocol.buildEdgeTcpCommand({ serverIp: '192.168.30.100', port: '0', enabled: false }),
+    /1~65535/
+  )
+  assert.throws(() => protocol.validateKz3Command('@CFG,IO,SHOW'), /白名单/)
+})
+
 test('KZ3 Ethernet 复连只从已校验的单一 SAVED 候选生成 HTTP 地址', () => {
   const candidate = {
     ip: '192.168.30.66',

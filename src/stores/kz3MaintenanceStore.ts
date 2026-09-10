@@ -173,7 +173,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
       sle: 'SLE',
       wireless: 'WIRELESS',
       cat1: '4G',
-      io: 'IO',
+      edge: 'EDGE',
       debug: 'DEBUG',
     }
     if (result.group === 'debug') {
@@ -254,7 +254,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
   }
 
   async function queryAll() {
-    for (const group of ['system', 'ethernet', 'sle', 'wireless', 'cat1', 'io', 'debug'] as Kz3ConfigGroup[]) {
+    for (const group of ['system', 'ethernet', 'sle', 'wireless', 'cat1', 'edge', 'debug'] as Kz3ConfigGroup[]) {
       const result = await runQuery(group)
       if (result.status === 'communication_error') break
     }

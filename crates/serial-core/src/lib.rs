@@ -1,5 +1,5 @@
-pub mod connection;
 pub mod actor;
+pub mod connection;
 
 use app_types::SerialPortDescriptor;
 use tokio_serial::SerialPortType;
@@ -15,7 +15,9 @@ pub fn list_ports() -> Result<Vec<SerialPortDescriptor>, String> {
             if port.port_name.starts_with("/dev/tty.") && !port.port_name.contains("usb") {
                 continue;
             }
-            if port.port_name.starts_with("/dev/tty.Bluetooth") || port.port_name.starts_with("/dev/cu.Bluetooth") {
+            if port.port_name.starts_with("/dev/tty.Bluetooth")
+                || port.port_name.starts_with("/dev/cu.Bluetooth")
+            {
                 continue;
             }
         }

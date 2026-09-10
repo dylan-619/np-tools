@@ -4,7 +4,7 @@ export type Kz3ConfigGroup =
   | 'sle'
   | 'wireless'
   | 'cat1'
-  | 'io'
+  | 'edge'
   | 'debug'
 
 export type Kz3MaintenanceStatus =
@@ -98,4 +98,9 @@ export interface Kz3Cat1Candidate {
   qos: string
 }
 
-export type Kz3SystemRole = 'CONTROLLER' | 'RTU_SLAVE'
+/** Edge TCP 配置由当前 KZ3 UART1 的单条 SET 命令原子保存。 */
+export interface Kz3EdgeTcpCandidate {
+  serverIp: string
+  port: string
+  enabled: boolean
+}
