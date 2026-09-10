@@ -397,16 +397,16 @@ test('KZ3 点表 manifest 字节序列与固件生成器一致', async () => {
 test('KZ3 descriptor 只开放当前 HTTP owner 实际可处理的北向写入', (t) => {
   const { controller, debug } = setup(t)
   controller.doc.project.northbound.fields = [
-    field({ name: 'parameter.enabled', bind: 'parameter.enabled', c_type: 'bool' }),
+    field({ name: 'parameter.enabled', bind: 'parameter.enabled', c_type: 'bool', description: '运行使能参数' }),
     field({ name: 'parameter.gain', bind: 'parameter.gain', c_type: 'float' }),
     field({ name: 'parameter.count16', bind: 'parameter.count16', c_type: 'u16' }),
     field({ name: 'parameter.count32', bind: 'parameter.count32', c_type: 'u32' }),
     field({ name: 'parameter.offset16', bind: 'parameter.offset16', c_type: 'i16' }),
     field({ name: 'parameter.offset32', bind: 'parameter.offset32', c_type: 'i32' }),
-    field({ name: 'command.start', bind: 'command.start', c_type: 'bool' }),
+    field({ name: 'command.start', bind: 'command.start', c_type: 'bool', description: '启动一次控制流程' }),
     field({ bind: 'runtime.grating_01.clear', c_type: 'bool', description: '累计时间清零' }),
-    field({ name: 'point.output', bind: 'point.output', c_type: 'bool' }),
-    field({ name: 'state.running', bind: 'state.running', c_type: 'bool' }),
+    field({ name: 'point.output', bind: 'point.output', c_type: 'bool', description: '过程输出反馈' }),
+    field({ name: 'state.running', bind: 'state.running', c_type: 'bool', description: '设备运行状态' }),
     field({ name: 'parameter.read_only', bind: 'parameter.read_only', c_type: 'bool', access: 'read' })
   ]
   assert.deepEqual(debug.pointDescriptors.map((item) => item.writeSupported), [
@@ -422,9 +422,13 @@ test('KZ3 descriptor 只开放当前 HTTP owner 实际可处理的北向写入',
     false,
     false
   ])
+  assert.equal(debug.pointDescriptors[0].description, '运行使能参数')
+  assert.equal(debug.pointDescriptors[6].description, '启动一次控制流程')
   assert.match(debug.pointDescriptors[2].writeDisabledReason, /BOOL\/FLOAT parameter/)
   assert.equal(debug.pointDescriptors[7].category, 'command')
   assert.equal(debug.pointDescriptors[7].description, '累计时间清零')
+  assert.equal(debug.pointDescriptors[8].description, '过程输出反馈')
+  assert.equal(debug.pointDescriptors[9].description, '设备运行状态')
   assert.match(debug.pointDescriptors[8].writeDisabledReason, /禁止|仅允许/)
   assert.match(debug.pointDescriptors[10].writeDisabledReason, /只读/)
 })

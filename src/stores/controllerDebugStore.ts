@@ -215,7 +215,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   const pointDescriptors = computed<PointDescriptor[]>(() => {
     const project = controller.doc.project
     return project.northbound.fields.map((field) => {
-      let description = ''
+      const fieldDescription = field.description?.trim()
+      let description = fieldDescription || ''
       let unit: string | undefined
       let min: number | undefined
       let max: number | undefined
@@ -232,7 +233,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         )
         persistent = parameter?.persistent === true
         description =
-          parameter?.description ||
+          parameter?.description?.trim() ||
+          fieldDescription ||
           (persistent
             ? '掉电保持参数；当前 owner 成功后会提交参数存储，重启后仍需单独复核'
             : 'RAM 参数；设备复位后恢复工程默认值')
@@ -244,19 +246,22 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
           : 'RAM 参数当前值（非持久化配置）'
       } else if (isRuntimeClearBinding(field.bind)) {
         category = 'command'
-        description = field.description || '累计运行时间清零；单次触发后需核对秒数与清零状态'
+        description = fieldDescription || '累计运行时间清零；单次触发后需核对秒数与清零状态'
         valueSemantic = '运行时间清零 one-shot 命令，不代表累计值已完成清零'
       } else if (field.bind.startsWith('command.')) {
         category = 'command'
         const name = field.bind.slice('command.'.length)
         const command = project.application_variables.commands.find((item) => item.name === name)
-        description = command?.description || '一次性命令；由下一次逻辑扫描消费'
+        description =
+          command?.description?.trim() ||
+          fieldDescription ||
+          '一次性命令；由下一次逻辑扫描消费'
         valueSemantic = 'one-shot 命令槽，不代表逻辑或物理动作已完成'
       } else if (field.bind.startsWith('state.')) {
         category = 'state'
         const name = field.bind.slice('state.'.length)
         const state = project.application_variables.states.find((item) => item.name === name)
-        description = state?.description || '应用逻辑可观测状态'
+        description = state?.description?.trim() || fieldDescription || '应用逻辑可观测状态'
         valueSemantic = '应用逻辑状态'
       } else if (field.bind.startsWith('point.')) {
         const name = field.bind.slice('point.'.length)
@@ -264,7 +269,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         const output = project.points.outputs.find((item) => item.name === name)
         const point = input || output
         source = point?.source
-        description = point?.description || point?.source || '业务 I/O 点'
+        description = point?.description?.trim() || fieldDescription || point?.source || '业务 I/O 点'
         category = input ? 'input' : output ? 'output' : 'unknown'
         if (input) {
           valueSemantic = '业务输入采样值；质量码来自设备采样链路'
