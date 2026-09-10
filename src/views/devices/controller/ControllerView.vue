@@ -19,6 +19,7 @@ import {
   Wrench
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
 import ProjectOverviewTab from './ProjectOverviewTab.vue'
 import HardwareSouthboundTab from './HardwareSouthboundTab.vue'
 import PointsTableTab from './PointsTableTab.vue'
@@ -29,10 +30,46 @@ import OnlineDebugTab from './OnlineDebugTab.vue'
 import FloatingTopologyMonitor from './FloatingTopologyMonitor.vue'
 
 const controller = useControllerStore()
+const workspace = useWorkspaceStore()
 const route = useRoute()
 const router = useRouter()
 const isDebugMode = computed(() => route.name === 'ControllerDebug')
 const topologyFloatOpen = ref(false)
+const manualSerialNumber = ref(workspace.activeSerialNumber)
+
+const workspaceName = computed(() => {
+  const normalized = workspace.rootPath.replace(/\\/g, '/').replace(/\/$/, '')
+  return normalized.split('/').pop() || '未选择工作空间'
+})
+
+watch(
+  () => workspace.activeSerialNumber,
+  (serialNumber) => {
+    manualSerialNumber.value = serialNumber
+  }
+)
+
+async function locateDeviceWorkspace() {
+  const serialNumber = manualSerialNumber.value.trim()
+  if (!serialNumber) {
+    controller.showMessage('请输入设备 SN', false)
+    return
+  }
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(serialNumber)) {
+    controller.showMessage('设备 SN 只能包含字母、数字、中划线和下划线', false)
+    return
+  }
+  try {
+    const stored = await controller.loadWorkspaceConfigForSerial(serialNumber)
+    if (!workspace.configured) {
+      controller.showMessage('已记录当前设备 SN；请先在全局设置中选择工作空间')
+    } else if (!stored) {
+      controller.showMessage(`已切换到设备 ${serialNumber}；当前没有已归档配置`)
+    }
+  } catch (error) {
+    controller.showMessage(error instanceof Error ? error.message : String(error), false)
+  }
+}
 
 watch(
   isDebugMode,
@@ -72,6 +109,9 @@ function leaveDebugMode() {
           <strong :title="controller.doc.project.name || '未命名工程'">{{ controller.doc.project.name || '未命名工程' }}</strong>
           <code :title="`${controller.doc.project.id}@${controller.doc.project.version}`">{{ controller.doc.project.id }}@{{ controller.doc.project.version }}</code>
         </div>
+        <span v-if="workspace.activeSerialNumber" class="debug-device-sn">
+          SN {{ workspace.activeSerialNumber }}
+        </span>
         <button
           class="floating-monitor-btn"
           :class="{ active: topologyFloatOpen }"
@@ -147,6 +187,36 @@ function leaveDebugMode() {
           </button>
         </div>
       </header>
+
+      <section class="workspace-context-bar">
+        <div class="workspace-context-copy">
+          <span class="workspace-kicker">本地工作空间</span>
+          <strong>{{ workspaceName }}</strong>
+          <small v-if="workspace.rootPath" :title="workspace.rootPath">{{ workspace.rootPath }}</small>
+          <small v-else>请先到全局设置选择工作目录</small>
+        </div>
+        <div class="device-context">
+          <label for="controller-workspace-sn">当前设备 SN</label>
+          <input
+            id="controller-workspace-sn"
+            v-model="manualSerialNumber"
+            class="device-sn-input"
+            type="text"
+            maxlength="64"
+            placeholder="连接后自动识别，也可手工输入"
+            @keyup.enter="locateDeviceWorkspace"
+          />
+          <button class="workspace-locate-btn" :disabled="workspace.busy" @click="locateDeviceWorkspace">
+            <FolderOpen :size="14" />
+            <span>加载设备配置</span>
+          </button>
+        </div>
+        <div class="workspace-state" :class="{ ready: !!workspace.currentConfig }">
+          <span>{{ workspace.currentConfig ? '已加载本地配置' : '等待设备配置' }}</span>
+          <code v-if="workspace.currentConfig">{{ workspace.currentConfig.revisionId }}</code>
+          <small v-else>导入 YAML 时会归档到当前 SN</small>
+        </div>
+      </section>
 
       <!-- Navigation Tabs Bar -->
       <nav class="nav-tabs-bar">
@@ -344,6 +414,15 @@ function leaveDebugMode() {
   font-size: 10px;
 }
 
+.debug-device-sn {
+  padding: 3px 7px;
+  border: 1px solid #a9bdca;
+  border-radius: 3px;
+  background: #f4f7f9;
+  color: #40515f;
+  font: 10px var(--font-mono, monospace);
+}
+
 .mode-safety-badge {
   display: inline-flex;
   align-items: center;
@@ -468,6 +547,117 @@ function leaveDebugMode() {
   gap: 10px;
   margin-left: auto;
   flex-wrap: wrap;
+}
+
+.workspace-context-bar {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(390px, 1.35fr) minmax(180px, 0.7fr);
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid #b9c5cf;
+  border-left: 4px solid #2d759d;
+  border-radius: 4px;
+  background: #f9fbfc;
+  flex-shrink: 0;
+}
+
+.workspace-context-copy,
+.workspace-state {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspace-kicker,
+.device-context label {
+  color: #607482;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.workspace-context-copy strong {
+  color: #17212b;
+  font-size: 12px;
+}
+
+.workspace-context-copy small {
+  overflow: hidden;
+  color: #607482;
+  font: 10px var(--font-mono, monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-context {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.device-sn-input {
+  min-width: 0;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid #aebcc7;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #17212b;
+  font: 12px var(--font-mono, monospace);
+}
+
+.device-sn-input:focus {
+  border-color: #2d759d;
+  outline: 2px solid rgba(45, 117, 157, 0.14);
+}
+
+.workspace-locate-btn {
+  height: 29px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #7f9dad;
+  border-radius: 3px;
+  background: #edf4f7;
+  color: #235d7a;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workspace-locate-btn:hover:not(:disabled) {
+  border-color: #2d759d;
+  background: #deedf4;
+}
+
+.workspace-state {
+  padding-left: 10px;
+  border-left: 1px solid #d5dde4;
+}
+
+.workspace-state span {
+  color: #607482;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workspace-state code,
+.workspace-state small {
+  overflow: hidden;
+  color: #71838e;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-state.ready span,
+.workspace-state.ready code {
+  color: #176b45;
 }
 
 .status-btn {
@@ -649,6 +839,14 @@ function leaveDebugMode() {
 }
 
 @media (max-width: 960px) {
+  .workspace-context-bar {
+    grid-template-columns: minmax(150px, 0.7fr) minmax(360px, 1.3fr);
+  }
+
+  .workspace-state {
+    display: none;
+  }
+
   .tab-btn {
     gap: 4px;
     padding-inline: 5px;
@@ -657,6 +855,24 @@ function leaveDebugMode() {
 
   .tab-btn svg {
     display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-context-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-context-copy small {
+    display: none;
+  }
+
+  .device-context {
+    grid-template-columns: 1fr auto;
+  }
+
+  .device-context label {
+    grid-column: 1 / -1;
   }
 }
 

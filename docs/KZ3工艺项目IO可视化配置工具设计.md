@@ -1038,7 +1038,7 @@ NP-Tools 通过独立路由提供“在线调试”工作模式，消费控制�
 | 工程兼容性 | 读取 `/api/v1/project`，重算 ID/版本/点表 manifest/点数 | `matched` 只证明北向访问契约；原始 YAML `configuration_hash`、逻辑与 HIL 不能由工具独立证明 |
 | 点位监视 | 从当前北向映射生成本地 descriptor，最多同时轮询 12 点；监视组按工程保存在本机 | 设备不枚举点位；设备质量与工具本地陈旧分别显示 |
 | 板级 I/O | DI/AI 标为采样，DO/AO 标为软件目标 | 软件目标、寄存器回读影子和物理反馈不得混称“当前值” |
-| Parameter/Command 写入 | BOOL/FLOAT parameter 和 BOOL 单次 command（含 runtime clear）可在受控门禁下写入 | U16/U32、`point.*`、`state.*`、物理 I/O 和只读字段保持禁用 |
+| Parameter/Command 写入 | BOOL/FLOAT/U32 parameter 和 BOOL 单次 command（含 runtime clear）可在受控门禁下写入 | U16/I16/I32、`point.*`、`state.*`、物理 I/O 和只读字段保持禁用 |
 | 写入门禁 | 工程契约匹配、操作员、四项健康、无 active fault、显式依据和 10 分钟许可 | 每次写前重新读取 health/io/project；HTTP 无 CAS、request ID、认证或 TLS，失败不重试 |
 | 审计证据 | 记录诊断、写前值、请求值、owner 接受、写后读回和人工备注 | owner 接受、读回或备注不等于逻辑、物理或 HIL 结论 |
 

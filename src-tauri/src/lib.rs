@@ -14,6 +14,7 @@ mod kz3_http;
 mod modbus_tcp;
 mod mqtt;
 mod ssh_sftp;
+mod workspace;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -384,6 +385,10 @@ pub fn run() {
             kz3_http::kz3_http_get_diagnostic,
             kz3_http::kz3_http_get_point,
             kz3_http::kz3_http_write_point,
+            // 本地设备工作空间（平台 ID 仅在元数据中预留，不作为前置条件）
+            workspace::workspace_initialize,
+            workspace::workspace_store_controller_config,
+            workspace::workspace_load_controller_config,
             // File Save & Open Dialogs
             app_save_file,
             app_open_file

@@ -1,4 +1,4 @@
-# NP-Tools 工业硬件产品调试与配置平台 (v1.0)
+# NP-Tools 工业硬件产品调试与配置平台 (v1.0.4)
 
 > 基于 **Tauri v2 + Rust + Vue 3 (Vite + TypeScript) + Pinia + ECharts** 构建的高性能、跨平台（Windows / macOS）现代化工业硬件调试与产线生产配置工具。
 
@@ -25,7 +25,7 @@
   - 提供工程组态与独立的 HTTP 在线调试工作模式；可按 `project_io.yaml` 还原双 RS-485 端口、标准扩展模块和 ET703 等第三方 Profile。大点表设备在 I/O 拓扑中以摘要卡展示，悬停或键盘聚焦可查看全部已配置点的中文含义、当前值和质量。在线模式支持固定诊断、`/api/v1/project` 工程身份与点表 manifest 核对、最多 12 点 PLC 风格周期监视、质量/时效判断、诊断侧栏和会话报告导出；参数调试期间可打开可拖动、缩放和收起的 I/O 拓扑伴随浮窗，共享同一调试会话并直接管理当前监测点，不额外建立连接或轮询器。
   - 提供独立的 UART1 设备初始化与维护工作台：固定 `115200 8N1`，结构化配置生产 SN、Ethernet、星闪 SLE、Cat.1/MQTT、Edge TCP 和调试日志；支持写前校验、写后查询、RUN/SAVED 对照、SLE 多层生效状态及会话记录导出。Ethernet 重启后只能由 `SAVED_*` 回读值生成单一 HTTP 复连候选，不扫描网络；Edge TCP 的 `ONLINE` 仅表示固件客户端状态，不等同于网关路由或现场业务验收。
   - 当前 `KZ3_F427_SLE_V1` 的 `TCP_NETTY` 固件分支不提供旧版 `@CFG,IO,*` 系统角色命令；工具已收敛为当前支持的 `@CFG,EDGE,*`。详见 [SJZDV3 与 KZ3 F427 调试兼容性核查](docs/SJZDV3与KZ3_F427_SLE_V1调试兼容性核查.md)。
-  - 仅当工程 ID、版本、manifest 算法/hash、点数匹配，且健康、无 active fault、操作员信息和 10 分钟显式许可均满足时，才允许 BOOL/FLOAT parameter 与 BOOL 单次 command（含累计运行时间清零）受控写入。U16/U32、`point.*`、`state.*` 和物理 I/O 保持禁用；HTTP 缺少 CAS、request ID、认证和 TLS，失败不重试。任何工具端接口都不代表 HIL 或现场验证通过。使用前阅读 [KZ3 在线调试工具交付与现场使用说明](docs/KZ3在线调试工具交付与现场使用说明.md)。
+  - 仅当工程 ID、版本、manifest 算法/hash、点数匹配，且健康、无 active fault、操作员信息和 10 分钟显式许可均满足时，才允许 BOOL/FLOAT/U32 parameter 与 BOOL 单次 command（含累计运行时间清零）受控写入。U16/I16/I32、`point.*`、`state.*` 和物理 I/O 保持禁用；HTTP 缺少 CAS、request ID、认证和 TLS，失败不重试。任何工具端接口都不代表 HIL 或现场验证通过。使用前阅读 [KZ3 在线调试工具交付与现场使用说明](docs/KZ3在线调试工具交付与现场使用说明.md)。
 - **STM32F407/F427 双星闪级联协调器**：
   - 提供 USART1 `115200 8N1` 设备识别与 `@STATUS` 周期监视，分别展示两颗 Radio 的角色、状态机、STA/READY、观测地址和错误计数，以及路由、点缓存、同步和 Ethernet 摘要。
   - 支持五类 EEPROM owner 和 `DeviceCapability0..31` 的读取、严格 schema 校验、草稿导入导出、单槽确认写入与读回；owner 重启后进入 30 秒恢复窗口，只重开本次已知串口、不扫描端口，恢复后自动复核。
@@ -109,7 +109,7 @@ pnpm tauri build
 
 #### 打包输出产物路径：
 编译完成后，可在以下路径获取独立的 Windows 安装程序：
-- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_2.0.0_x64-setup.exe`
+- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.0.4_x64-setup.exe`
 - **单文件便携可执行程序**：`src-tauri\target\release\np-tools.exe`
 
 ---

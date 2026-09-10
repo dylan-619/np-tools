@@ -13,6 +13,9 @@ const server = await createServer({
 after(() => server.close())
 const { numericWriteConstraints, pointValuesEqual, pointValueMatchesType, writeValueError } =
   await server.ssrLoadModule('/src/utils/controllerDebugValues.ts')
+const { controllerSourceOrder, sortControllerPoints } = await server.ssrLoadModule(
+  '/src/utils/controllerPointOrder.ts'
+)
 const { useControllerStore } = await server.ssrLoadModule('/src/stores/controllerStore.ts')
 const { useControllerDebugStore } = await server.ssrLoadModule(
   '/src/stores/controllerDebugStore.ts'
@@ -37,6 +40,56 @@ function field(overrides = {}) {
     ...overrides
   }
 }
+
+test('KZ3 点表按物理模块与通道号排序而不是按创建顺序排序', () => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const controller = useControllerStore()
+  controller.doc.project.devices = [
+    {
+      id: 'dev-2',
+      name: 'dio_second',
+      profile: 'sp4055_701',
+      port: 'rs485_1',
+      slave_address: 2,
+      poll_period_ms: 500,
+      stale_after_ms: 1500,
+      use: { inputs: ['di03', 'di01', 'di02'], outputs: {} }
+    }
+  ]
+
+  const points = [
+    { id: 'p5', name: 'module_di3', source: 'rtu.dio_second.di03', description: '' },
+    { id: 'p3', name: 'board_di3', source: 'board.di03', description: '' },
+    { id: 'p4', name: 'module_di1', source: 'rtu.dio_second.di01', description: '' },
+    { id: 'p2', name: 'board_ai1', source: 'board.ai01', description: '' },
+    { id: 'p1', name: 'board_di2', source: 'board.di02', description: '' }
+  ]
+
+  const ordered = sortControllerPoints(
+    points,
+    controllerSourceOrder(controller.doc, 'input')
+  )
+  assert.deepEqual(
+    ordered.map((point) => point.source),
+    ['board.di02', 'board.di03', 'board.ai01', 'rtu.dio_second.di01', 'rtu.dio_second.di03']
+  )
+  assert.deepEqual(
+    controller.availableInputSources
+      .filter((source) => source.value.startsWith('rtu.dio_second.'))
+      .map((source) => source.value),
+    ['rtu.dio_second.di01', 'rtu.dio_second.di02', 'rtu.dio_second.di03']
+  )
+
+  controller.doc.project.points.inputs = points
+  const exportedYaml = controller.getYamlString()
+  assert.ok(exportedYaml.indexOf('source: board.di02') < exportedYaml.indexOf('source: board.di03'))
+  assert.ok(
+    exportedYaml.indexOf('source: rtu.dio_second.di01') <
+      exportedYaml.indexOf('source: rtu.dio_second.di03')
+  )
+  disposePinia(pinia)
+})
 
 function descriptor(overrides = {}) {
   return { ...field(), category: 'parameter', writeSupported: true, ...overrides }
@@ -187,7 +240,9 @@ async function setupVerifiedKz3(
       id: item.id,
       name: item.bind.slice('parameter.'.length),
       c_type: item.c_type,
-      default: item.c_type === 'bool' ? false : 0
+      default: item.c_type === 'bool' ? false : 0,
+      min: item.min,
+      max: item.max
     }))
   controller.doc.project.application_variables.commands = projectFields
     .filter((item) => item.bind.startsWith('command.'))
@@ -394,7 +449,7 @@ test('KZ3 点表 manifest 字节序列与固件生成器一致', async () => {
   )
 })
 
-test('KZ3 descriptor 只开放当前 HTTP owner 实际可处理的北向写入', (t) => {
+test('KZ3 descriptor 开放 BOOL/FLOAT/U32 parameter 并继续拒绝未实现整数 owner', (t) => {
   const { controller, debug } = setup(t)
   controller.doc.project.northbound.fields = [
     field({ name: 'parameter.enabled', bind: 'parameter.enabled', c_type: 'bool', description: '运行使能参数' }),
@@ -413,7 +468,7 @@ test('KZ3 descriptor 只开放当前 HTTP owner 实际可处理的北向写入',
     true,
     true,
     false,
-    false,
+    true,
     false,
     false,
     true,
@@ -424,13 +479,43 @@ test('KZ3 descriptor 只开放当前 HTTP owner 实际可处理的北向写入',
   ])
   assert.equal(debug.pointDescriptors[0].description, '运行使能参数')
   assert.equal(debug.pointDescriptors[6].description, '启动一次控制流程')
-  assert.match(debug.pointDescriptors[2].writeDisabledReason, /BOOL\/FLOAT parameter/)
+  assert.match(debug.pointDescriptors[2].writeDisabledReason, /BOOL\/FLOAT\/U32 parameter/)
   assert.equal(debug.pointDescriptors[7].category, 'command')
   assert.equal(debug.pointDescriptors[7].description, '累计时间清零')
   assert.equal(debug.pointDescriptors[8].description, '过程输出反馈')
   assert.equal(debug.pointDescriptors[9].description, '设备运行状态')
   assert.match(debug.pointDescriptors[8].writeDisabledReason, /禁止|仅允许/)
   assert.match(debug.pointDescriptors[10].writeDisabledReason, /只读/)
+})
+
+test('KZ3 U32 parameter 通过受控 HTTP 写入并按整数范围读回', async (t) => {
+  const target = field({
+    name: 'MODE',
+    bind: 'parameter.grating_mode',
+    c_type: 'u32',
+    reference: '40001',
+    min: 0,
+    max: 2,
+    description: '控制模式：0 手动，1 液位差，2 时序'
+  })
+  const { debug, calls, pointValues } = await setupVerifiedKz3(t, {
+    fields: [target],
+    values: { MODE: 0 }
+  })
+  const descriptor = debug.pointDescriptors[0]
+
+  assert.equal(descriptor.writeSupported, true)
+  assert.deepEqual(numericWriteConstraints(descriptor), { min: 0, max: 2, step: 1 })
+  assert.match(writeValueError(descriptor, 3), /不得大于 2/)
+
+  debug.enableWrites('HOST-KZ3-U32')
+  const event = await debug.writePoint('MODE', 2, 'HOST-KZ3-U32')
+  const writes = calls.filter((item) => item.command === 'kz3_http_write_point')
+  assert.equal(writes.length, 1)
+  assert.equal(writes[0].args.value, 2)
+  assert.equal(pointValues.MODE, 2)
+  assert.equal(event.afterValue, 2)
+  assert.equal(event.readbackObserved, 'passed')
 })
 
 test('KZ3 掉电保持 parameter 不会被误标为 RAM 参数', (t) => {

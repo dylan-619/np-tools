@@ -1,7 +1,7 @@
 # KZ3 在线调试工具交付与现场使用说明
 
 > 交付状态：HTTP 诊断、工程身份核对、点位观察和受控北向写入已接入；真实设备、HIL 与现场验证未完成。
-> 软件版本：NP-Tools 2.0.0；HTTP API：KZ3 v1；文档日期：2026-09-05。
+> 软件版本：NP-Tools 1.0.4；HTTP API：KZ3 v1；文档更新日期：2026-09-10。
 
 ## 1. 当前范围
 
@@ -10,7 +10,7 @@
 - 读取 `/api/v1/device`、`hardware`、`project`、`network`、`sle`、`io`、`config`、`services`、`health`；
 - 用本地工程的北向字段按固件 `point_config_gen.py` 同一算法计算 manifest，并核对设备工程 ID、版本、算法、hash 和点数；
 - 从当前本地工程生成最多 12 个点位的观察列表，并读取 `/api/v1/point/<name>`；
-- 在严格门禁下，对 BOOL/FLOAT parameter 和 BOOL 单次 command（含 `runtime.<name>.clear`）执行受控 HTTP 写入；
+- 在严格门禁下，对 BOOL/FLOAT/U32 parameter 和 BOOL 单次 command（含 `runtime.<name>.clear`）执行受控 HTTP 写入；
 - 显示设备质量码、本机陈旧状态、请求耗时、健康/网络/服务/I/O 诊断与会话日志；
 - 使用 UART 维护页读取保存的 Ethernet 候选地址后，对单一目标做 HTTP 复连；不做 ARP、端口或子网扫描；
 - 导出诊断、样本、写入证据和明确的验证边界。
@@ -46,9 +46,10 @@
 | --- | --- |
 | `parameter.*` + BOOL | 允许写入 `true` 或 `false`；若工程标记 `persistent`，弹窗明确标为掉电保持参数 |
 | `parameter.*` + FLOAT | 允许写入有限的 FLOAT 32 位数值，并遵守工程 min/max；掉电保持参数仍需受控重启后另行复核 |
+| `parameter.*` + U32 | 允许写入 `0`～`4294967295` 范围内的整数，并同时遵守工程 min/max；写后按 U32 整数精确读回 |
 | `command.*` + BOOL | 仅允许单次 `true`，不允许 false、保持或自动重试 |
 | `runtime.<name>.clear` + BOOL | 仅允许单次 `true`；后续要另行核对累计值与清零状态 |
-| U16/U32/I16/I32 parameter | 禁用；当前 KZ3 HTTP owner 未实现这些 parameter 写入 |
+| U16/I16/I32 parameter | 禁用；当前 KZ3 HTTP owner 未实现这些 parameter 写入 |
 | `point.*`、`state.*`、直接物理 I/O | 禁用；不得绕过工艺逻辑、互锁与安全 owner |
 | 只读字段 | 禁用 |
 

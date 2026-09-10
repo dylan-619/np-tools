@@ -9,6 +9,7 @@ import {
   Search,
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
+import { sortControllerPoints } from '../../../utils/controllerPointOrder'
 import CustomSelect from '../../../components/common/CustomSelect.vue'
 
 const controller = useControllerStore()
@@ -43,7 +44,10 @@ const northboundPublishedMap = computed(() => {
 
 const filteredInputs = computed(() => {
   if (filterMode.value === 'OUTPUTS') return []
-  let list = controller.doc.project.points.inputs
+  let list = sortControllerPoints(
+    controller.doc.project.points.inputs,
+    controller.availableInputSources.map((source) => source.value),
+  )
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(
@@ -58,7 +62,10 @@ const filteredInputs = computed(() => {
 
 const filteredOutputs = computed(() => {
   if (filterMode.value === 'INPUTS') return []
-  let list = controller.doc.project.points.outputs
+  let list = sortControllerPoints(
+    controller.doc.project.points.outputs,
+    controller.availableOutputSources.map((source) => source.value),
+  )
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(
@@ -130,6 +137,16 @@ function handleAutoGeneratePoints() {
   }
 
   controller.showMessage('已从当前硬件机架通道全部同步生成业务点位！')
+}
+
+function removeInputPoint(pointId: string) {
+  const index = controller.doc.project.points.inputs.findIndex((point) => point.id === pointId)
+  if (index >= 0) controller.removeInputPoint(index)
+}
+
+function removeOutputPoint(pointId: string) {
+  const index = controller.doc.project.points.outputs.findIndex((point) => point.id === pointId)
+  if (index >= 0) controller.removeOutputPoint(index)
 }
 </script>
 
@@ -292,7 +309,7 @@ function handleAutoGeneratePoints() {
                 <button
                   class="btn-icon btn-danger"
                   title="删除该输入点"
-                  @click="controller.removeInputPoint(idx)"
+                  @click="removeInputPoint(pt.id)"
                 >
                   <Trash2 :size="14" />
                 </button>
@@ -355,7 +372,7 @@ function handleAutoGeneratePoints() {
                 <button
                   class="btn-icon btn-danger"
                   title="删除该输出点"
-                  @click="controller.removeOutputPoint(idx)"
+                  @click="removeOutputPoint(pt.id)"
                 >
                   <Trash2 :size="14" />
                 </button>

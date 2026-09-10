@@ -1155,7 +1155,7 @@ onUnmounted(() => {
         debug.writesEnabled ? '北向写入许可已启用' : '北向写入默认锁定'
       }}</strong><span>{{
         debug.writesEnabled
-          ? '剩余 ' + writePermitLabel + '；仅允许 BOOL/FLOAT parameter 与 BOOL 单次 command，写前重新校验工程 manifest，写后自动读回。'
+          ? '剩余 ' + writePermitLabel + '；仅允许 BOOL/FLOAT/U32 parameter 与 BOOL 单次 command，写前重新校验工程 manifest，写后自动读回。'
           : debug.compatibilityState === 'matched'
             ? '工程 ID、版本和北向 manifest 已匹配；仍须由工程师显式解锁。HTTP 无 CAS、request ID、认证或 TLS，超时不会重试。'
             : '需先完成设备工程 ID、版本和北向 manifest 校验；校验失败或不完整时不会发送点位写入请求。'

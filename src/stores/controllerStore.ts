@@ -8,8 +8,10 @@ import type {
   NorthboundField,
 } from '../types/controllerIo'
 import { KZ3_BOARD_DEF, PROFILE_CATALOG, resolveDeviceProfile } from '../utils/controllerIoCatalog'
+import { controllerSourceOrder, sortControllerPoints } from '../utils/controllerPointOrder'
 import { serializeProjectIoYaml, deserializeProjectIoYaml } from '../utils/yamlHelper'
 import { appSaveFile, appOpenFile } from '../api/sjzdApi'
+import { useWorkspaceStore } from './workspaceStore'
 
 const DEFAULT_MARQUEE_YAML = `schema: kz3-project-io/v3
 
@@ -108,6 +110,7 @@ project:
 `
 
 export const useControllerStore = defineStore('controller', () => {
+  const workspace = useWorkspaceStore()
   const activeTab = ref<'overview' | 'hardware' | 'points' | 'variables' | 'northbound' | 'debug' | 'yaml'>('overview')
   const doc = ref<ProjectIoDocument>(deserializeProjectIoYaml(DEFAULT_MARQUEE_YAML))
   const toastMessage = ref<{ text: string; isSuccess: boolean } | null>(null)
@@ -140,17 +143,23 @@ export const useControllerStore = defineStore('controller', () => {
     // 2. 扩展设备已使能输入
     for (const dev of doc.value.project.devices) {
       const profile = resolveDeviceProfile(doc.value, dev)
-      for (const inCode of dev.use.inputs || []) {
-        const sig = profile.inputs.find((s) => s.code === inCode)
-        const sigName = sig ? sig.name : inCode
+      for (const sig of profile.inputs) {
+        if (!(dev.use.inputs || []).includes(sig.code)) continue
         list.push({
-          label: `[${dev.name} / ${dev.profile}] ${sigName} (rtu.${dev.name}.${inCode})`,
-          value: `rtu.${dev.name}.${inCode}`,
-          type: sig ? sig.type : 'bool',
+          label: `[${dev.name} / ${dev.profile}] ${sig.name} (rtu.${dev.name}.${sig.code})`,
+          value: `rtu.${dev.name}.${sig.code}`,
+          type: sig.type,
         })
       }
     }
-    return list
+    const ranks = new Map(
+      controllerSourceOrder(doc.value, 'input').map((source, index) => [source, index]),
+    )
+    return list.sort(
+      (left, right) =>
+        (ranks.get(left.value) ?? Number.MAX_SAFE_INTEGER) -
+        (ranks.get(right.value) ?? Number.MAX_SAFE_INTEGER),
+    )
   })
 
   const availableOutputSources = computed(() => {
@@ -168,17 +177,23 @@ export const useControllerStore = defineStore('controller', () => {
     // 2. 扩展设备已使能输出
     for (const dev of doc.value.project.devices) {
       const profile = resolveDeviceProfile(doc.value, dev)
-      for (const outCode of Object.keys(dev.use.outputs || {})) {
-        const sig = profile.outputs.find((s) => s.code === outCode)
-        const sigName = sig ? sig.name : outCode
+      for (const sig of profile.outputs) {
+        if (!Object.prototype.hasOwnProperty.call(dev.use.outputs || {}, sig.code)) continue
         list.push({
-          label: `[${dev.name} / ${dev.profile}] ${sigName} (rtu.${dev.name}.${outCode})`,
-          value: `rtu.${dev.name}.${outCode}`,
-          type: sig ? sig.type : 'bool',
+          label: `[${dev.name} / ${dev.profile}] ${sig.name} (rtu.${dev.name}.${sig.code})`,
+          value: `rtu.${dev.name}.${sig.code}`,
+          type: sig.type,
         })
       }
     }
-    return list
+    const ranks = new Map(
+      controllerSourceOrder(doc.value, 'output').map((source, index) => [source, index]),
+    )
+    return list.sort(
+      (left, right) =>
+        (ranks.get(left.value) ?? Number.MAX_SAFE_INTEGER) -
+        (ranks.get(right.value) ?? Number.MAX_SAFE_INTEGER),
+    )
   })
 
   function getSourceType(sourceStr: string): 'bool' | 'u16' | 'float' {
@@ -670,6 +685,10 @@ export const useControllerStore = defineStore('controller', () => {
       description: pt?.description || `输入点位 ${count}`,
     }
     doc.value.project.points.inputs.push(newPt)
+    doc.value.project.points.inputs = sortControllerPoints(
+      doc.value.project.points.inputs,
+      controllerSourceOrder(doc.value, 'input'),
+    )
   }
 
   function removeInputPoint(index: number) {
@@ -685,6 +704,10 @@ export const useControllerStore = defineStore('controller', () => {
       description: pt?.description || `输出点位 ${count}`,
     }
     doc.value.project.points.outputs.push(newPt)
+    doc.value.project.points.outputs = sortControllerPoints(
+      doc.value.project.points.outputs,
+      controllerSourceOrder(doc.value, 'output'),
+    )
   }
 
   function removeOutputPoint(index: number) {
@@ -1096,12 +1119,44 @@ export const useControllerStore = defineStore('controller', () => {
   async function importYamlFile() {
     const result = await appOpenFile('YAML 配置文件 (*.yaml, *.yml)', ['yaml', 'yml'])
     if (result && result.content) {
+      let importedDocument: ProjectIoDocument
       try {
-        doc.value = deserializeProjectIoYaml(result.content)
-        showMessage(`已成功从 ${result.path} 载入工程配置！`)
+        importedDocument = deserializeProjectIoYaml(result.content)
       } catch (err: any) {
         showMessage(`解析 YAML 失败: ${err.message}`, false)
+        return
       }
+
+      doc.value = importedDocument
+      if (workspace.readyForArchive) {
+        try {
+          const stored = await workspace.archiveControllerConfig(result.content)
+          showMessage(
+            `已载入工程配置，并归档到 SN ${stored.serialNumber}（${stored.revisionId}）`
+          )
+        } catch (err: any) {
+          showMessage(`工程配置已载入，但归档失败: ${err.message}`, false)
+        }
+      } else if (!workspace.configured) {
+        showMessage('工程配置已载入；尚未选择工作空间，本次未归档')
+      } else {
+        showMessage('工程配置已载入；尚未识别或输入设备 SN，本次未归档')
+      }
+    }
+  }
+
+  async function loadWorkspaceConfigForSerial(serialNumber: string) {
+    const stored = await workspace.loadForSerialNumber(serialNumber)
+    if (!stored?.content) return null
+    try {
+      doc.value = deserializeProjectIoYaml(stored.content)
+      showMessage(
+        `已按设备 SN ${stored.serialNumber} 自动加载本地配置（${stored.revisionId}）`
+      )
+      return stored
+    } catch (err: any) {
+      showMessage(`设备 ${serialNumber} 的工作空间配置解析失败: ${err.message}`, false)
+      throw err
     }
   }
 
@@ -1154,6 +1209,7 @@ export const useControllerStore = defineStore('controller', () => {
     loadPreset,
     exportYamlFile,
     importYamlFile,
+    loadWorkspaceConfigForSerial,
     getYamlString,
     applyYamlString,
   }

@@ -4,11 +4,13 @@ import { Settings, Save, CheckCircle2, Cpu, Info, FolderOpen } from 'lucide-vue-
 import { open } from '@tauri-apps/plugin-dialog'
 import { useFlashStore } from '../stores/flashStore'
 import { useSerialStore } from '../stores/serialStore'
+import { useWorkspaceStore } from '../stores/workspaceStore'
 import CustomSelect from '../components/common/CustomSelect.vue'
 import { formatSerialConfig } from '../utils/serialFormat'
 
 const flash = useFlashStore()
 const serial = useSerialStore()
+const workspace = useWorkspaceStore()
 
 const savedSuccess = ref(false)
 
@@ -60,6 +62,21 @@ async function chooseCliPath() {
   }
 }
 
+async function chooseWorkspaceRoot() {
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: true,
+      title: '选择 NP-Tools 本地工作空间',
+    })
+    if (selected && typeof selected === 'string') {
+      await workspace.setRoot(selected)
+    }
+  } catch (err) {
+    console.error('初始化工作空间失败:', err)
+  }
+}
+
 function saveSettings() {
   serial.persistConfig()
   flash.persistCustomCliPath()
@@ -97,7 +114,48 @@ function saveSettings() {
       </div>
     </transition>
 
-    <!-- Section 1: STM32 Programmer Toolchain -->
+    <!-- Section 1: Local device workspace -->
+    <div class="section-card workspace-card">
+      <div class="card-header">
+        <div class="header-left">
+          <FolderOpen :size="16" class="icon-blue" />
+          <h3>本地设备工作空间</h3>
+        </div>
+        <span class="local-mode-badge">本地模式</span>
+      </div>
+
+      <div class="card-body">
+        <div class="form-group">
+          <label>工作目录</label>
+          <div class="input-with-button">
+            <input
+              :value="workspace.rootPath"
+              type="text"
+              class="form-input mono-text"
+              readonly
+              placeholder="尚未选择工作空间"
+            />
+            <button class="btn btn-secondary" :disabled="workspace.busy" @click="chooseWorkspaceRoot">
+              <FolderOpen :size="14" />
+              <span>{{ workspace.rootPath ? '更换目录' : '选择目录' }}</span>
+            </button>
+          </div>
+          <span class="field-hint">
+            导入 KZ3 配置后，将按 <code>devices/KZ3/设备 SN/configurations</code>
+            保存版本；以后连接并读到相同 SN 时自动加载。平台组织、项目和注册 ID 本期不要求填写。
+          </span>
+        </div>
+        <div
+          v-if="workspace.lastMessage"
+          class="workspace-message"
+          :class="{ error: !workspace.lastMessageSuccess }"
+        >
+          {{ workspace.lastMessage }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: STM32 Programmer Toolchain -->
     <div class="section-card">
       <div class="card-header">
         <div class="header-left">
@@ -128,7 +186,7 @@ function saveSettings() {
       </div>
     </div>
 
-    <!-- Section 2: Default Serial Config -->
+    <!-- Section 3: Default Serial Config -->
     <div class="section-card">
       <div class="card-header">
         <div class="header-left">
@@ -181,7 +239,7 @@ function saveSettings() {
       </div>
     </div>
 
-    <!-- Section 3: About Application -->
+    <!-- Section 4: About Application -->
     <div class="section-card">
       <div class="card-header">
         <div class="header-left">
@@ -193,11 +251,11 @@ function saveSettings() {
       <div class="card-body about-box">
         <div class="about-item">
           <span class="about-label">软件版本：</span>
-          <span class="about-val">v1.0.0 (Tauri v2 + Rust Actor Architecture)</span>
+          <span class="about-val">v1.0.4 (Tauri v2 + Rust Actor Architecture)</span>
         </div>
         <div class="about-item">
           <span class="about-label">支持硬件产品线：</span>
-          <span class="about-val">SJZDV3 星闪现场采集终端、智能控制器（规划中）</span>
+          <span class="about-val">SJZDV3 星闪现场采集终端、KZ3 F427 智能控制器</span>
         </div>
         <div class="about-item">
           <span class="about-label">底层通信引擎：</span>
@@ -320,6 +378,12 @@ function saveSettings() {
   gap: 8px;
 }
 
+.input-with-button > .btn {
+  min-width: 96px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .form-input,
 .form-select {
   width: 100%;
@@ -344,6 +408,31 @@ function saveSettings() {
 .field-hint {
   font-size: 0.72rem;
   color: var(--text-muted, #40515f);
+}
+
+.local-mode-badge {
+  padding: 3px 7px;
+  border: 1px solid #a9bdca;
+  border-radius: 999px;
+  background: #f7fafc;
+  color: #40515f;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.workspace-message {
+  padding: 7px 9px;
+  border-left: 3px solid var(--color-success, #176b45);
+  background: #edf8f2;
+  color: #176b45;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.workspace-message.error {
+  border-left-color: var(--color-danger, #9d2d35);
+  background: #fff1f2;
+  color: #8d2730;
 }
 .field-hint code {
   color: #1769aa;

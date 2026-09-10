@@ -1,5 +1,6 @@
 import { dump, load } from 'js-yaml'
 import type { ProjectIoDocument } from '../types/controllerIo'
+import { controllerSourceOrder, sortControllerPoints } from './controllerPointOrder'
 
 /**
  * 序列化 ProjectIoDocument 为标准格式的 YAML 字符串
@@ -11,6 +12,14 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
   // 自动派生 features
   const hasPid = doc.project.pids.length > 0
   const hasCounter = (doc.project.logic_blocks?.counters?.length || 0) > 0
+  const orderedInputs = sortControllerPoints(
+    doc.project.points?.inputs || [],
+    controllerSourceOrder(doc, 'input'),
+  )
+  const orderedOutputs = sortControllerPoints(
+    doc.project.points?.outputs || [],
+    controllerSourceOrder(doc, 'output'),
+  )
 
   const cleanDoc: any = {
     schema: doc.schema || 'kz3-project-io/v3',
@@ -49,12 +58,12 @@ export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
         },
       })),
       points: {
-        inputs: (doc.project.points?.inputs || []).map((p) => ({
+        inputs: orderedInputs.map((p) => ({
           name: p.name,
           source: p.source,
           description: p.description || '',
         })),
-        outputs: (doc.project.points?.outputs || []).map((p) => ({
+        outputs: orderedOutputs.map((p) => ({
           name: p.name,
           source: p.source,
           description: p.description || '',

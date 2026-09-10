@@ -293,14 +293,17 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       let writeDisabledReason: string | undefined
       if (field.access !== 'read_write') {
         writeDisabledReason = '工程北向契约为只读'
-      } else if (category === 'parameter' && (field.c_type === 'bool' || field.c_type === 'float')) {
+      } else if (
+        category === 'parameter' &&
+        (field.c_type === 'bool' || field.c_type === 'float' || field.c_type === 'u32')
+      ) {
         writeSupported = true
       } else if (category === 'command' && field.c_type === 'bool') {
         writeSupported = true
-      } else if (category === 'parameter' && ['u16', 'u32', 'i16', 'i32'].includes(field.c_type)) {
-        writeDisabledReason = `当前 KZ3 HTTP owner 仅实现 BOOL/FLOAT parameter 写入，${field.c_type.toUpperCase()} 保持禁用`
+      } else if (category === 'parameter' && ['u16', 'i16', 'i32'].includes(field.c_type)) {
+        writeDisabledReason = `当前 KZ3 HTTP owner 仅实现 BOOL/FLOAT/U32 parameter 写入，${field.c_type.toUpperCase()} 保持禁用`
       } else {
-        writeDisabledReason = '当前固件仅允许 BOOL/FLOAT parameter 或 BOOL 单次 command 写入'
+        writeDisabledReason = '当前固件仅允许 BOOL/FLOAT/U32 parameter 或 BOOL 单次 command 写入'
       }
 
       return {
@@ -669,6 +672,40 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
 
     try {
       await readDiagnostic('device', false, sessionId)
+      const detectedSerialNumber = diagnostics.value.device?.data.serial_number?.trim()
+      if (detectedSerialNumber) {
+        try {
+          const storedConfig = await controller.loadWorkspaceConfigForSerial(detectedSerialNumber)
+          if (storedConfig && session.value?.sessionId === sessionId) {
+            const loadedProject = controller.doc.project
+            session.value.expectedProjectId = loadedProject.id
+            session.value.expectedProjectVersion = loadedProject.version
+            sessionProjectContractSignature = projectContractSignature()
+            appendLog(
+              'success',
+              'session',
+              `已按设备 SN ${detectedSerialNumber} 自动加载本地配置`,
+              `${loadedProject.id}@${loadedProject.version}；${storedConfig.revisionId}`
+            )
+          } else {
+            appendLog(
+              'info',
+              'session',
+              `已识别设备 SN ${detectedSerialNumber}`,
+              '当前工作空间中没有该设备的已归档配置，继续使用页面当前工程并保持兼容性校验'
+            )
+          }
+        } catch (error) {
+          appendLog(
+            'warning',
+            'session',
+            `设备 SN ${detectedSerialNumber} 的本地配置自动加载失败`,
+            `${errorDetail(error)}；继续使用页面当前工程，由后续兼容性校验决定是否只读`
+          )
+        }
+      } else {
+        appendLog('warning', 'session', '设备身份缺少有效 SN，未执行工作空间配置自动加载')
+      }
       try {
         await readDiagnostic('project', false, sessionId)
         await verifyProjectCompatibility(sessionId)
