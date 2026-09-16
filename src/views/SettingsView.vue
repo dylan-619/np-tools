@@ -4,12 +4,14 @@ import { Settings, Save, CheckCircle2, Cpu, Info, FolderOpen } from 'lucide-vue-
 import { open } from '@tauri-apps/plugin-dialog'
 import { useFlashStore } from '../stores/flashStore'
 import { useSerialStore } from '../stores/serialStore'
+import { useControllerStore } from '../stores/controllerStore'
 import { useWorkspaceStore } from '../stores/workspaceStore'
 import CustomSelect from '../components/common/CustomSelect.vue'
 import { formatSerialConfig } from '../utils/serialFormat'
 
 const flash = useFlashStore()
 const serial = useSerialStore()
+const controller = useControllerStore()
 const workspace = useWorkspaceStore()
 
 const savedSuccess = ref(false)
@@ -71,6 +73,9 @@ async function chooseWorkspaceRoot() {
     })
     if (selected && typeof selected === 'string') {
       await workspace.setRoot(selected)
+      if (workspace.activeSerialNumber) {
+        await controller.loadWorkspaceConfigForSerial(workspace.activeSerialNumber)
+      }
     }
   } catch (err) {
     console.error('初始化工作空间失败:', err)
@@ -141,8 +146,8 @@ function saveSettings() {
             </button>
           </div>
           <span class="field-hint">
-            导入 KZ3 配置后，将按 <code>devices/KZ3/设备 SN/configurations</code>
-            保存版本；以后连接并读到相同 SN 时自动加载。平台组织、项目和注册 ID 本期不要求填写。
+            识别或输入有效 SN 后立即创建 <code>devices/KZ3/设备 SN</code>；导入 KZ3 配置时在其
+            <code>configurations</code> 下保存版本，以后连接并读到相同 SN 时自动加载。平台组织、项目和注册 ID 本期不要求填写。
           </span>
         </div>
         <div

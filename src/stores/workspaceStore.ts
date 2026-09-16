@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
+  activateControllerWorkspace,
   initializeWorkspace,
   loadControllerConfig,
   storeControllerConfig,
@@ -17,6 +18,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const rootPath = ref(storedValue(ROOT_STORAGE_KEY))
   // SN 不跨应用启动保留，避免新一轮调试在尚未识别设备时误归档到上一台设备。
   const activeSerialNumber = ref('')
+  const activeDevicePath = ref('')
   const currentConfig = ref<StoredControllerConfig | null>(null)
   const busy = ref(false)
   const lastMessage = ref('')
@@ -39,6 +41,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     try {
       const info = await initializeWorkspace(normalized)
       rootPath.value = info.rootPath
+      activeDevicePath.value = ''
+      currentConfig.value = null
       localStorage.setItem(ROOT_STORAGE_KEY, info.rootPath)
       setMessage(`工作空间已启用：${info.rootPath}`)
       return info
@@ -53,6 +57,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   function setActiveSerialNumber(serialNumber: string) {
     const normalized = serialNumber.trim()
     activeSerialNumber.value = normalized
+    activeDevicePath.value = ''
     currentConfig.value = null
   }
 
@@ -61,6 +66,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     if (!activeSerialNumber.value) throw new Error('尚未识别或输入设备 SN，配置已载入但未归档')
     busy.value = true
     try {
+      const deviceWorkspace = await activateControllerWorkspace(
+        rootPath.value,
+        activeSerialNumber.value
+      )
+      activeDevicePath.value = deviceWorkspace.devicePath
       const stored = await storeControllerConfig(
         rootPath.value,
         activeSerialNumber.value,
@@ -83,6 +93,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     if (!configured.value || !normalized) return null
     busy.value = true
     try {
+      const deviceWorkspace = await activateControllerWorkspace(rootPath.value, normalized)
+      activeDevicePath.value = deviceWorkspace.devicePath
       const stored = await loadControllerConfig(rootPath.value, normalized)
       currentConfig.value = stored
       setMessage(
@@ -102,6 +114,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   return {
     rootPath,
     activeSerialNumber,
+    activeDevicePath,
     currentConfig,
     busy,
     lastMessage,

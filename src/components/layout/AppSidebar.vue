@@ -124,7 +124,19 @@ function groupIsCollapsed(group: ProductGroup) {
           <ChevronDown v-if="!isCompact" :size="14" class="group-chevron" />
         </button>
         <nav v-show="!groupIsCollapsed('controller')" class="nav-list">
-          <span class="nav-section-label">工程与调试</span>
+          <span class="nav-section-label workflow-first-label">第一步 · 识别设备</span>
+          <button
+            class="nav-item controller-identity-entry"
+            :class="{ active: isMaintenanceRoute }"
+            aria-label="KZ3 设备识别与串口维护"
+            title="先读取生产 SN 并激活设备工作目录，再进入 I/O 配置和在线调试"
+            @click="navigateTo('/devices/controller/maintenance')"
+          >
+            <Wrench :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">设备识别与串口维护</span>
+          </button>
+
+          <span class="nav-section-label">识别后继续</span>
           <button
             class="nav-item"
             :class="{ active: route.name === 'ControllerProduct' }"
@@ -144,16 +156,6 @@ function groupIsCollapsed(group: ProductGroup) {
           >
             <Activity :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">在线调试工作台</span>
-          </button>
-          <button
-            class="nav-item"
-            :class="{ active: isMaintenanceRoute }"
-            aria-label="KZ3 UART 设备维护"
-            title="KZ3 UART 设备维护 (生产 SN / Ethernet / SLE / Cat.1 / Edge TCP / DEBUG)"
-            @click="navigateTo('/devices/controller/maintenance')"
-          >
-            <Wrench :size="16" class="nav-icon" />
-            <span v-if="!isCompact" class="nav-text">UART 设备维护</span>
           </button>
           <button
             class="nav-item"
@@ -541,6 +543,19 @@ function groupIsCollapsed(group: ProductGroup) {
   font-size: .7rem;
   font-weight: 800;
   letter-spacing: .04em;
+}
+
+.workflow-first-label {
+  color: #8a5a13;
+}
+
+.controller-identity-entry:not(.active) {
+  border-color: #dcc99f;
+  background: #fffaf0;
+}
+
+.controller-identity-entry:not(.active) .nav-icon {
+  color: #9a6517;
 }
 
 .nav-item {

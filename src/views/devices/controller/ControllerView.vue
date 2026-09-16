@@ -212,8 +212,9 @@ function leaveDebugMode() {
           </button>
         </div>
         <div class="workspace-state" :class="{ ready: !!workspace.currentConfig }">
-          <span>{{ workspace.currentConfig ? '已加载本地配置' : '等待设备配置' }}</span>
+          <span>{{ workspace.currentConfig ? '已加载本地配置' : workspace.activeDevicePath ? '当前设备目录已就绪' : '等待设备配置' }}</span>
           <code v-if="workspace.currentConfig">{{ workspace.currentConfig.revisionId }}</code>
+          <small v-if="workspace.activeDevicePath" :title="workspace.activeDevicePath">{{ workspace.activeDevicePath }}</small>
           <small v-else>导入 YAML 时会归档到当前 SN</small>
         </div>
       </section>

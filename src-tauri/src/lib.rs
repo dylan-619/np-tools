@@ -389,6 +389,7 @@ pub fn run() {
             kz3_http::kz3_http_write_point,
             // 本地设备工作空间（平台 ID 仅在元数据中预留，不作为前置条件）
             workspace::workspace_initialize,
+            workspace::workspace_activate_controller,
             workspace::workspace_store_controller_config,
             workspace::workspace_load_controller_config,
             // smart-edge-gateway 采集点导入兼容 Excel

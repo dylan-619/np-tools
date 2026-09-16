@@ -5,6 +5,11 @@ export interface WorkspaceInfo {
   devicesPath: string
 }
 
+export interface ControllerWorkspaceInfo {
+  serialNumber: string
+  devicePath: string
+}
+
 export interface StoredControllerConfig {
   serialNumber: string
   path: string
@@ -15,6 +20,16 @@ export interface StoredControllerConfig {
 
 export async function initializeWorkspace(root: string): Promise<WorkspaceInfo> {
   return await invoke<WorkspaceInfo>('workspace_initialize', { root })
+}
+
+export async function activateControllerWorkspace(
+  root: string,
+  serialNumber: string
+): Promise<ControllerWorkspaceInfo> {
+  return await invoke<ControllerWorkspaceInfo>('workspace_activate_controller', {
+    root,
+    serialNumber,
+  })
 }
 
 export async function storeControllerConfig(

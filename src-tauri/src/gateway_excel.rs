@@ -1,8 +1,7 @@
 use rust_xlsxwriter::{Color, Format, FormatAlign, FormatBorder, Workbook};
 use serde::Deserialize;
 use std::collections::HashSet;
-use tauri::AppHandle;
-use tauri_plugin_dialog::DialogExt;
+use std::path::PathBuf;
 
 const HEADERS: [&str; 14] = [
     "ID",
@@ -319,36 +318,36 @@ fn build_workbook(
 }
 
 #[tauri::command]
-pub fn gateway_points_export_xlsx(
-    default_name: String,
+pub async fn gateway_points_export_xlsx(
+    target_path: String,
     rows: Vec<GatewayPointRow>,
     profile: GatewayPointExportProfile,
-    app: AppHandle,
-) -> Result<Option<String>, String> {
-    let bytes = build_workbook(&rows, profile)?;
-    let path = app
-        .dialog()
-        .file()
-        .set_file_name(&default_name)
-        .add_filter("网关采集点 Excel (*.xlsx)", &["xlsx"])
-        .blocking_save_file();
-
-    let Some(file_path) = path else {
-        return Ok(None);
-    };
-    let mut path = file_path
-        .into_path()
-        .map_err(|error| format!("导出路径无效: {error:?}"))?;
-    let has_xlsx_extension = path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx"));
-    if !has_xlsx_extension {
-        path.set_extension("xlsx");
-    }
-    std::fs::write(&path, bytes)
-        .map_err(|error| format!("保存网关采集点 Excel 失败 {}: {error}", path.display()))?;
-    Ok(Some(path.to_string_lossy().into_owned()))
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = build_workbook(&rows, profile)?;
+        if target_path.trim().is_empty() {
+            return Err("导出路径无效，请选择 Excel 文件名".to_string());
+        }
+        let mut path = PathBuf::from(target_path);
+        if path.file_name().is_none() {
+            return Err("导出路径无效，请选择 Excel 文件名".to_string());
+        }
+        if path.is_dir() {
+            return Err("导出目标不能是目录，请选择 Excel 文件名".to_string());
+        }
+        let has_xlsx_extension = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx"));
+        if !has_xlsx_extension {
+            path.set_extension("xlsx");
+        }
+        std::fs::write(&path, bytes)
+            .map_err(|error| format!("保存网关采集点 Excel 失败 {}: {error}", path.display()))?;
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|error| format!("网关采集点 Excel 导出任务异常: {error}"))?
 }
 
 #[cfg(test)]

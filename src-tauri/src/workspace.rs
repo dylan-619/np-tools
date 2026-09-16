@@ -16,6 +16,13 @@ pub struct WorkspaceInfo {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ControllerWorkspaceInfo {
+    pub serial_number: String,
+    pub device_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StoredControllerConfig {
     pub serial_number: String,
     pub path: String,
@@ -125,6 +132,33 @@ fn initialize_workspace(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_controller_workspace(root: &Path, serial_number: &str) -> Result<PathBuf, String> {
+    initialize_workspace(root)?;
+    let device_root = controller_root(root, serial_number);
+    let revisions_root = device_root.join("configurations").join("revisions");
+    fs::create_dir_all(&revisions_root)
+        .map_err(|error| format!("创建设备工作目录失败 {}: {error}", revisions_root.display()))?;
+
+    let device_metadata_path = device_root.join("device.json");
+    if !device_metadata_path.exists() {
+        write_json(
+            &device_metadata_path,
+            &DeviceMetadata {
+                schema: DEVICE_SCHEMA,
+                product_type: "KZ3",
+                serial_number,
+                platform_binding: PlatformBinding {
+                    organization_id: None,
+                    project_id: None,
+                    controller_id: None,
+                },
+                created_at_ms: now_ms()?,
+            },
+        )?;
+    }
+    Ok(device_root)
+}
+
 #[tauri::command]
 pub fn workspace_initialize(root: String) -> Result<WorkspaceInfo, String> {
     let root = validate_workspace_root(&root)?;
@@ -132,6 +166,20 @@ pub fn workspace_initialize(root: String) -> Result<WorkspaceInfo, String> {
     Ok(WorkspaceInfo {
         root_path: root.to_string_lossy().into_owned(),
         devices_path: root.join("devices").to_string_lossy().into_owned(),
+    })
+}
+
+#[tauri::command]
+pub fn workspace_activate_controller(
+    root: String,
+    serial_number: String,
+) -> Result<ControllerWorkspaceInfo, String> {
+    let root = validate_workspace_root(&root)?;
+    let serial_number = validate_serial_number(&serial_number)?;
+    let device_root = ensure_controller_workspace(&root, serial_number)?;
+    Ok(ControllerWorkspaceInfo {
+        serial_number: serial_number.to_string(),
+        device_path: device_root.to_string_lossy().into_owned(),
     })
 }
 
@@ -152,11 +200,9 @@ pub fn workspace_store_controller_config(
             MAX_CONFIG_BYTES / 1024 / 1024
         ));
     }
-    initialize_workspace(&root)?;
-
     let imported_at_ms = now_ms()?;
     let revision_id = format!("local-{}", now_ns()?);
-    let device_root = controller_root(&root, serial_number);
+    let device_root = ensure_controller_workspace(&root, serial_number)?;
     let revisions_root = device_root.join("configurations").join("revisions");
     let revision_root = revisions_root.join(&revision_id);
     fs::create_dir_all(&revision_root).map_err(|error| {
@@ -169,24 +215,6 @@ pub fn workspace_store_controller_config(
     let config_path = revision_root.join("project_io.yaml");
     fs::write(&config_path, content.as_bytes())
         .map_err(|error| format!("保存设备配置失败 {}: {error}", config_path.display()))?;
-
-    let device_metadata_path = device_root.join("device.json");
-    if !device_metadata_path.exists() {
-        write_json(
-            &device_metadata_path,
-            &DeviceMetadata {
-                schema: DEVICE_SCHEMA,
-                product_type: "KZ3",
-                serial_number,
-                platform_binding: PlatformBinding {
-                    organization_id: None,
-                    project_id: None,
-                    controller_id: None,
-                },
-                created_at_ms: imported_at_ms,
-            },
-        )?;
-    }
 
     let relative_path = Path::new("revisions")
         .join(&revision_id)
@@ -290,6 +318,34 @@ mod tests {
         assert_eq!(loaded.revision_id, stored.revision_id);
         assert!(loaded.path.contains("devices"));
         assert!(loaded.path.contains("2000000000000061"));
+
+        fs::remove_dir_all(&test_root).expect("remove isolated test workspace");
+    }
+
+    #[test]
+    fn activates_controller_directory_before_any_config_is_imported() {
+        let test_root = std::env::temp_dir().join(format!(
+            "np-tools-workspace-activate-test-{}-{}",
+            std::process::id(),
+            now_ns().expect("test timestamp")
+        ));
+        let root = test_root.to_string_lossy().into_owned();
+        let serial_number = "020325090118".to_string();
+
+        let activated = workspace_activate_controller(root.clone(), serial_number.clone())
+            .expect("activate controller workspace");
+        let device_root = test_root.join("devices").join("KZ3").join(&serial_number);
+
+        assert_eq!(activated.serial_number, serial_number);
+        assert_eq!(PathBuf::from(activated.device_path), device_root);
+        assert!(device_root.join("device.json").is_file());
+        assert!(device_root
+            .join("configurations")
+            .join("revisions")
+            .is_dir());
+        assert!(workspace_load_controller_config(root, serial_number)
+            .expect("load empty controller workspace")
+            .is_none());
 
         fs::remove_dir_all(&test_root).expect("remove isolated test workspace");
     }

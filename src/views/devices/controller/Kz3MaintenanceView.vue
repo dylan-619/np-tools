@@ -26,7 +26,9 @@ import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 import { appSaveFile } from '../../../api/sjzdApi'
 import { useSerialStore } from '../../../stores/serialStore'
 import { useControllerDebugStore } from '../../../stores/controllerDebugStore'
+import { useControllerStore } from '../../../stores/controllerStore'
 import { useKz3MaintenanceStore } from '../../../stores/kz3MaintenanceStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
 import type {
   Kz3ConfigGroup,
   Kz3Cat1Candidate,
@@ -59,6 +61,8 @@ type Section = 'overview' | Kz3ConfigGroup | 'session'
 const serial = useSerialStore()
 const maintenance = useKz3MaintenanceStore()
 const httpDebug = useControllerDebugStore()
+const controller = useControllerStore()
+const workspace = useWorkspaceStore()
 const activeSection = ref<Section>('overview')
 const pageMessage = ref<{ text: string; error: boolean } | null>(null)
 const customCommandInput = ref('')
@@ -327,9 +331,28 @@ async function exportSession() {
 }
 
 watch(
-  () => maintenance.snapshots.system,
-  (snapshot) => {
-    if (snapshot?.fields.SN && snapshot.fields.VALID === '1') snCandidate.value = snapshot.fields.SN
+  () => [maintenance.snapshots.system, workspace.rootPath] as const,
+  async ([snapshot]) => {
+    const serialNumber = snapshot?.fields.SN?.trim() || ''
+    if (!serialNumber || snapshot?.fields.VALID !== '1') return
+    snCandidate.value = serialNumber
+    if (
+      workspace.activeSerialNumber === serialNumber &&
+      (!workspace.configured || workspace.activeDevicePath)
+    ) return
+
+    try {
+      const stored = await controller.loadWorkspaceConfigForSerial(serialNumber)
+      if (!workspace.configured) {
+        showMessage(`已识别控制器 SN ${serialNumber}；请先在全局设置中选择工作空间`)
+      } else if (stored) {
+        showMessage(`当前控制器已切换为 ${serialNumber}，并自动加载本地配置`)
+      } else {
+        showMessage(`当前控制器已切换为 ${serialNumber}，设备工作目录已创建`)
+      }
+    } catch (error) {
+      showMessage(`控制器 ${serialNumber} 的工作空间激活失败：${String(error)}`, true)
+    }
   }
 )
 
