@@ -267,6 +267,20 @@ export const useSjzdStore = defineStore('sjzd', () => {
     )
   }
 
+  function snPersistenceFailure(line: string): string | undefined {
+    const eepromError = line.match(/EEPROM Write ERROR at\s+(0x[0-9a-f]+):\s*(\d+)/i)
+    if (eepromError) {
+      const [, address, status] = eepromError
+      if (status === '2') {
+        return `EEPROM 写入通道忙（HAL_BUSY，地址 ${address}）：SN 未写入且设备未重启。请等待设备空闲或重启后仅重试一次；持续出现时请检查 EEPROM I²C 总线及写保护电路。`
+      }
+      return `设备 EEPROM 写入失败（地址 ${address}，HAL 状态 ${status}）：SN 未写入且设备未重启。`
+    }
+    return line.includes('SN persistence failed')
+      ? '设备拒绝持久化 SN，当前运行身份保持不变；请根据前一条 EEPROM 日志排查后再重试。'
+      : undefined
+  }
+
   function configProtocolMarker(feature: SjzdConfigFeature) {
     return `${feature}_CONFIG:`
   }
@@ -1237,7 +1251,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
         'SN 烧录',
         () => sjzdSendSn(port, targetSn),
         (line) => line.includes(`Set SN ${targetSn} Done`) && line.includes('Restart System'),
-        (line) => (line.includes('SN persistence failed') ? line : undefined),
+        snPersistenceFailure,
         2500
       )
       deviceInfo.value = null

@@ -5,10 +5,11 @@ use app_types::{
 };
 use device_protocol::*;
 use flash_service::FlashManager;
+use serde::Serialize;
 use serial_core::connection::ConnectionManager;
 use serial_core::list_ports;
 use std::sync::Arc;
-use tauri::ipc::Channel;
+use tauri::{ipc::Channel, Emitter};
 
 mod gateway_excel;
 mod kz3_http;
@@ -101,15 +102,47 @@ async fn serial_stop_recording(
 // SJZDV3 Commands
 // ==============================================================================
 
+/// 专用编码命令绕开了前端的通用串口发送入口；写入成功后发送 TX 事件，
+/// 让公共串口终端能够统一显示实际指令和准确字节数。
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SerialTxEvent {
+    path: String,
+    text: String,
+    byte_length: usize,
+}
+
+async fn write_sjzd_command(
+    app: &tauri::AppHandle,
+    state: &ConnectionManager,
+    path: &str,
+    encoded: EncodedCommand,
+) -> Result<String, String> {
+    let byte_length = encoded.payload.len();
+    let text = encoded.text;
+    state.write(path, encoded.payload).await?;
+
+    // 设备已写成功时，日志事件投递异常不应反向把操作标记为失败。
+    let _ = app.emit(
+        "serial-tx",
+        SerialTxEvent {
+            path: path.to_string(),
+            text: text.clone(),
+            byte_length,
+        },
+    );
+    Ok(text)
+}
+
 #[tauri::command]
 async fn sjzd_send_sn(
     path: String,
     sn: String,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_sn_command(&sn)?;
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -117,10 +150,10 @@ async fn sjzd_send_modbus_points(
     path: String,
     points: Vec<ModbusPointConfig>,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_modbus_points(&points)?;
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -131,10 +164,10 @@ async fn sjzd_send_modbus_debug(
     reg: u32,
     length: u8,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_modbus_debug(addr, func, reg, length)?;
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -142,10 +175,10 @@ async fn sjzd_send_sle_pwr(
     path: String,
     level: u8,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_sle_pwr(level)?;
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -153,10 +186,10 @@ async fn sjzd_send_sle_maxpwr(
     path: String,
     level: u8,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_sle_maxpwr(level)?;
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -164,10 +197,10 @@ async fn sjzd_send_sle_netname(
     path: String,
     name: String,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_sle_netname(&name)?;
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -175,10 +208,10 @@ async fn sjzd_send_sle_apid(
     path: String,
     apid: u8,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_sle_apid(apid);
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -186,10 +219,10 @@ async fn sjzd_send_wlan_bridge(
     path: String,
     enable: bool,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = encode_wlan_bridge(enable);
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]
@@ -198,10 +231,10 @@ async fn sjzd_send_raw_command(
     text: String,
     exact_bytes: bool,
     state: tauri::State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     let encoded = EncodedCommand::new(text, exact_bytes);
-    state.write(&path, encoded.payload).await?;
-    Ok(encoded.text)
+    write_sjzd_command(&app, &state, &path, encoded).await
 }
 
 #[tauri::command]

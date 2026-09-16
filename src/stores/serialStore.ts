@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { listen } from '@tauri-apps/api/event'
 import {
   listPorts,
   openPort,
@@ -23,6 +24,7 @@ import { formatSerialConfig } from '../utils/serialFormat'
  */
 function redactSensitiveTxText(text: string): string {
   const normalized = text.trim()
+  if (/^MQTT_PASS:/i.test(normalized)) return 'MQTT_PASS:***'
   const parts = normalized.split(',')
   if (parts[0] !== '@CFG' || parts[1] !== '4G') return text
   if (parts[2] === 'INIT' && parts.length === 11) {
@@ -61,6 +63,12 @@ interface SerialChunkListenerOptions {
   suppressText?: boolean
 }
 
+interface SerialTxEvent {
+  path: string
+  text: string
+  byteLength: number
+}
+
 function loadPersistedSerialConfig(): SerialOpenConfig {
   if (typeof localStorage === 'undefined') return { ...DEFAULT_SERIAL_CONFIG }
   try {
@@ -94,6 +102,17 @@ export const useSerialStore = defineStore('serial', () => {
   const lineListeners = new Map<string, (line: string) => void>()
   const chunkListeners = new Map<string, (payload: Uint8Array, chunk: IoChunk) => void>()
   const chunkListenerOptions = new Map<string, SerialChunkListenerOptions>()
+
+  /** 专用命令由 Rust 完成编码/写入；通用串口面板自身不走此事件，避免重复计数。 */
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    void listen<SerialTxEvent>('serial-tx', ({ payload }) => {
+      if (payload.path !== connectedPort.value) return
+      txBytes.value += payload.byteLength
+      appendLog('tx', redactSensitiveTxText(payload.text))
+    }).catch((error) => {
+      console.warn('监听串口 TX 回显失败:', error)
+    })
+  }
 
   function registerLineListener(id: string, listener: (line: string) => void) {
     lineListeners.set(id, listener)
