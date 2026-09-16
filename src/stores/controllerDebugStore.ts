@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import {
   kz3GetDiagnostic,
   kz3GetPoint,
+  kz3GetPointsPage,
   kz3WritePoint,
   type DiagnosticResource
 } from '../api/controllerDebugApi'
@@ -27,6 +28,7 @@ import type {
   DiagnosticEnvelope,
   Kz3Diagnostics,
   Kz3HttpResponse,
+  Kz3PointPage,
   Kz3Scalar,
   ObservationState,
   PointDescriptor,
@@ -38,11 +40,10 @@ import type {
 
 const POLL_INTERVAL_MS = 1000
 const LOCAL_STALE_AFTER_MS = 3000
-const MAX_SELECTED_POINTS = 12
+const POINT_PAGE_LIMIT = 30
 const WRITE_PERMIT_MS = 10 * 60 * 1000
 const MIN_WRITE_INTERVAL_MS = 700
 const POLL_DRAIN_TIMEOUT_MS = 10000
-const MONITOR_STORAGE_PREFIX = 'np-tools:kz3-watch-list:'
 const OPERATOR_STORAGE_KEY = 'np-tools:kz3-debug-operator'
 const SITE_STORAGE_KEY = 'np-tools:kz3-debug-site'
 
@@ -67,6 +68,8 @@ class HttpResponseError extends Error {
     this.body = response.body
   }
 }
+
+class PointPageContractError extends Error {}
 
 function createId(prefix: string): string {
   const suffix =
@@ -145,7 +148,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   const compatibilityReason = ref('尚未读取设备工程身份')
   const session = ref<DeviceDebugSession | null>(null)
   const diagnostics = ref<Kz3Diagnostics>({})
-  const selectedPointNames = ref<string[]>([])
   const samples = ref<Record<string, PointSample>>({})
   const logs = ref<DebugLogEntry[]>([])
   const writeEvents = ref<WriteEvent[]>([])
@@ -162,10 +164,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   let diagnosticCursor = 0
   let lastWriteAt = 0
   let sessionProjectContractSignature = ''
-
-  function projectSignature(): string {
-    return `${controller.doc.project.id}@${controller.doc.project.version}`
-  }
+  let pointsPageCapability: 'unknown' | 'supported' | 'unsupported' = 'unknown'
 
   function projectContractSignature(): string {
     const project = controller.doc.project
@@ -180,24 +179,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         String(field.reference)
       ])
     ])
-  }
-
-  function monitorStorageKey(): string {
-    return `${MONITOR_STORAGE_PREFIX}${projectSignature()}`
-  }
-
-  function loadStoredMonitorList(): string[] {
-    if (typeof localStorage === 'undefined') return []
-    try {
-      const value = JSON.parse(localStorage.getItem(monitorStorageKey()) || '[]')
-      if (!Array.isArray(value)) return []
-      const available = new Set(pointDescriptors.value.map((item) => item.name))
-      return value
-        .filter((item): item is string => typeof item === 'string' && available.has(item))
-        .slice(0, MAX_SELECTED_POINTS)
-    } catch {
-      return []
-    }
   }
 
   if (typeof window !== 'undefined') {
@@ -321,8 +302,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       }
     })
   })
-
-  selectedPointNames.value = loadStoredMonitorList()
 
   const isConnected = computed(
     () => transportState.value === 'online' || transportState.value === 'degraded'
@@ -640,6 +619,144 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     }
   }
 
+  function parsePointPage(value: unknown, requestedOffset: number): Kz3PointPage {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new PointPageContractError('点位分页响应必须为对象')
+    }
+    const page = value as Record<string, unknown>
+    if (
+      !isUnsigned16(page.offset) ||
+      !isUnsigned16(page.limit) ||
+      !isUnsigned16(page.count) ||
+      !isUnsigned16(page.total) ||
+      page.offset !== requestedOffset ||
+      page.limit !== POINT_PAGE_LIMIT
+    ) {
+      throw new PointPageContractError('点位分页 offset/limit/count/total 无效或与请求不一致')
+    }
+    if (!page.points || typeof page.points !== 'object' || Array.isArray(page.points)) {
+      throw new PointPageContractError('点位分页 points 必须为名称到 [value, quality] 的 Map')
+    }
+    const entries = Object.entries(page.points as Record<string, unknown>)
+    if (entries.length !== page.count || page.offset + page.count > page.total) {
+      throw new PointPageContractError('点位分页 count 与 points 数量或 total 不一致')
+    }
+    for (const [name, tuple] of entries) {
+      if (
+        !Array.isArray(tuple) ||
+        tuple.length !== 2 ||
+        (typeof tuple[0] !== 'boolean' && typeof tuple[0] !== 'number') ||
+        !Number.isInteger(tuple[1]) ||
+        (tuple[1] as number) < 0 ||
+        (tuple[1] as number) > 4
+      ) {
+        throw new PointPageContractError(`点位 ${name} 的分页值不是 [value, quality]`)
+      }
+    }
+    if (page.next_offset !== null && !isUnsigned16(page.next_offset)) {
+      throw new PointPageContractError('点位分页 next_offset 必须为 U16 或 null')
+    }
+    const expectedNext = page.offset + page.count
+    if (
+      (page.next_offset === null && expectedNext !== page.total) ||
+      (page.next_offset !== null &&
+        (page.count === 0 || page.next_offset !== expectedNext || page.next_offset >= page.total))
+    ) {
+      throw new PointPageContractError('点位分页 next_offset 未指向实际下一条数据')
+    }
+    return page as unknown as Kz3PointPage
+  }
+
+  async function readAllPointPages(
+    quiet = false,
+    expectedSessionId = session.value?.sessionId
+  ): Promise<void> {
+    const received: Array<{
+      name: string
+      value: Kz3Scalar
+      quality: PointQuality
+      elapsedMs: number
+    }> = []
+    const seen = new Set<string>()
+    let offset = 0
+    let expectedTotal: number | null = null
+
+    try {
+      for (let pageIndex = 0; pageIndex <= pointDescriptors.value.length; pageIndex += 1) {
+        const response = await kz3GetPointsPage(baseUrl.value, offset, POINT_PAGE_LIMIT)
+        if (!isActiveSession(expectedSessionId)) {
+          throw new Error('调试会话已结束，已丢弃过期点位分页响应')
+        }
+        const page = parsePointPage(parseSuccessJson<unknown>(response), offset)
+        if (expectedTotal === null) expectedTotal = page.total
+        if (page.total !== expectedTotal || page.total !== pointDescriptors.value.length) {
+          throw new PointPageContractError(
+            `点位分页 total=${page.total}，本地工程点数=${pointDescriptors.value.length}`
+          )
+        }
+        for (const [name, tuple] of Object.entries(page.points)) {
+          if (seen.has(name)) throw new PointPageContractError(`点位分页重复返回 ${name}`)
+          const descriptor = pointDescriptors.value.find((item) => item.name === name)
+          if (!descriptor) throw new PointPageContractError(`设备返回本地工程不存在的点位 ${name}`)
+          if (!pointValueMatchesType(descriptor.c_type, tuple[0])) {
+            throw new PointPageContractError(
+              `点位 ${name} 设备值类型与工程 ${descriptor.c_type} 不一致`
+            )
+          }
+          seen.add(name)
+          received.push({
+            name,
+            value: tuple[0],
+            quality: tuple[1],
+            elapsedMs: response.elapsedMs
+          })
+        }
+        if (page.next_offset === null) break
+        offset = page.next_offset
+      }
+      if (expectedTotal === null || seen.size !== expectedTotal) {
+        throw new PointPageContractError(
+          `点位分页未完整结束：收到 ${seen.size} 条，期望 ${String(expectedTotal)}`
+        )
+      }
+
+      const receivedAt = Date.now()
+      for (const item of received) {
+        const descriptor = pointDescriptors.value.find((entry) => entry.name === item.name)
+        const previous = samples.value[item.name]
+        const changed =
+          previous !== undefined &&
+          !pointValuesEqual(previous.value, item.value, descriptor?.c_type)
+        samples.value[item.name] = {
+          name: item.name,
+          value: item.value,
+          quality: item.quality,
+          receivedAt,
+          httpStatus: 200,
+          elapsedMs: item.elapsedMs,
+          localStale: false,
+          previousValue: previous?.value,
+          changedAt: changed ? receivedAt : previous?.changedAt
+        }
+      }
+      pointsPageCapability = 'supported'
+      markSuccess(expectedSessionId)
+      if (!quiet) {
+        appendLog('success', 'point', `分页读取全部 ${received.length} 个北向点位成功`)
+      }
+    } catch (error) {
+      markFailure(expectedSessionId)
+      if (!isActiveSession(expectedSessionId)) throw error
+      if (error instanceof PointPageContractError) {
+        const reason = `设备点位分页契约不匹配：${error.message}`
+        setCompatibility('mismatch', expectedSessionId, reason)
+        disableWrites(reason)
+      }
+      if (!quiet) appendLog('error', 'point', '分页读取北向点位失败', errorDetail(error))
+      throw error
+    }
+  }
+
   async function connect(): Promise<void> {
     stopPolling()
     disableWrites()
@@ -650,6 +767,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     samples.value = {}
     consecutiveErrors.value = 0
     consecutiveHealthErrors.value = 0
+    pointsPageCapability = 'unknown'
     const project = controller.doc.project
     sessionProjectContractSignature = projectContractSignature()
     session.value = {
@@ -736,16 +854,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         setCompatibility('partial', sessionId, '尚未完成工程身份与点表校验')
       }
       const finalCompatibility = compatibilityState.value as CompatibilityState
-      const stored = loadStoredMonitorList()
-      if (
-        selectedPointNames.value.length === 0 ||
-        selectedPointNames.value.some(
-          (name) => !pointDescriptors.value.some((item) => item.name === name)
-        )
-      ) {
-        selectedPointNames.value =
-          stored.length > 0 ? stored : pointDescriptors.value.slice(0, 8).map((item) => item.name)
-      }
       if (finalCompatibility === 'partial') {
         appendLog(
           'warning',
@@ -773,6 +881,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     compatibilityState.value = 'unverified'
     compatibilityReason.value = '会话已结束'
     sessionProjectContractSignature = ''
+    pointsPageCapability = 'unknown'
     appendLog('info', 'session', '已断开 KZ3 HTTP 调试会话')
   }
 
@@ -825,12 +934,20 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         /* 日志已记录 */
       }
 
-      for (const name of selectedPointNames.value) {
-        if (!isActiveSession(sessionId)) return
+      if (pointsPageCapability !== 'unsupported') {
         try {
-          await readPoint(name, true, sessionId)
-        } catch {
-          /* 单点失败不阻止其他监视点 */
+          await readAllPointPages(true, sessionId)
+        } catch (error) {
+          if (error instanceof HttpResponseError && error.status === 404) {
+            pointsPageCapability = 'unsupported'
+            markSuccess(sessionId)
+            appendLog(
+              'warning',
+              'point',
+              '当前固件不支持点位分页，实时点表无法批量采样',
+              '请升级固件；工具不会退回高频逐点轮询'
+            )
+          }
         }
       }
     } finally {
@@ -879,28 +996,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   function suspend() {
     stopPolling()
     disableWrites('离开在线调试页，已解除北向写入许可')
-  }
-
-  function togglePointSelection(name: string) {
-    const index = selectedPointNames.value.indexOf(name)
-    if (index >= 0) {
-      selectedPointNames.value.splice(index, 1)
-      return
-    }
-    if (selectedPointNames.value.length >= MAX_SELECTED_POINTS) {
-      throw new Error(
-        `最多同时监视 ${MAX_SELECTED_POINTS} 个点位，避免高频短连接占满控制器 HTTP client`
-      )
-    }
-    selectedPointNames.value.push(name)
-  }
-
-  function clearPointSelection() {
-    selectedPointNames.value = []
-  }
-
-  function selectDefaultPoints() {
-    selectedPointNames.value = pointDescriptors.value.slice(0, 8).map((item) => item.name)
   }
 
   function enableWrites(reason: string) {
@@ -1096,7 +1191,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         consecutiveErrors: consecutiveErrors.value
       },
       diagnostics: JSON.parse(JSON.stringify(diagnostics.value)) as Kz3Diagnostics,
-      monitoredPoints: [...selectedPointNames.value],
+      // 保留 v1 报告字段名以兼容既有导出消费者；现在记录的是全部自动采样点位。
+      monitoredPoints: pointDescriptors.value.map((item) => item.name),
       samples: Object.values(samples.value).map((item) => ({ ...item })),
       logs: logs.value.map((item) => ({ ...item })),
       writeEvents: writeEvents.value.map((item) => ({
@@ -1115,19 +1211,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   })
 
   watch(
-    selectedPointNames,
-    (value) => {
-      if (typeof localStorage !== 'undefined')
-        localStorage.setItem(monitorStorageKey(), JSON.stringify(value))
-    },
-    { deep: true }
-  )
-
-  watch(
     () => projectContractSignature(),
     () => {
       samples.value = {}
-      selectedPointNames.value = loadStoredMonitorList()
       if (session.value && session.value.endedAt === undefined) {
         const reason = '本地工程 ID、版本或北向点表已变化，已解除写入许可；请结束会话后重新连接'
         compatibilityState.value = 'mismatch'
@@ -1147,7 +1233,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     compatibilityReason,
     session,
     diagnostics,
-    selectedPointNames,
     samples,
     logs,
     writeEvents,
@@ -1176,9 +1261,6 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     readDiagnostic,
     verifyProjectCompatibility,
     readPoint,
-    togglePointSelection,
-    clearPointSelection,
-    selectDefaultPoints,
     enableWrites,
     disableWrites,
     writePoint,

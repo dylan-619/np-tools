@@ -17,6 +17,16 @@ export interface Kz3HttpResponse {
   elapsedMs: number
 }
 
+/** `GET /api/v1/points` 的紧凑分页值；tuple 顺序固定为 `[value, quality]`。 */
+export interface Kz3PointPage {
+  offset: number
+  limit: number
+  count: number
+  total: number
+  next_offset: number | null
+  points: Record<string, [Kz3Scalar, PointQuality]>
+}
+
 export interface DiagnosticEnvelope<T> {
   api_version: string
   timestamp_ms: number
@@ -252,6 +262,7 @@ export interface DebugSessionReport {
     consecutiveErrors: number
   }
   diagnostics: Kz3Diagnostics
+  /** v1 兼容字段：当前记录全部自动采样的北向点位名称。 */
   monitoredPoints: string[]
   samples: PointSample[]
   logs: DebugLogEntry[]

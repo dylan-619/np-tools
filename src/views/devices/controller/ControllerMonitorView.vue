@@ -8,7 +8,6 @@ import {
   CircleDot,
   Cpu,
   Eye,
-  EyeOff,
   Gauge,
   Network,
   Pause,
@@ -41,12 +40,9 @@ interface SignalView {
   quality?: PointQuality
   range?: string
   unit?: string
-  monitored: boolean
   localStale: boolean
 }
 
-const MAX_MONITORED_POINTS = 12
-const MODULE_PREVIEW_LIMIT = 8
 const controller = useControllerStore()
 const debug = useControllerDebugStore()
 const router = useRouter()
@@ -130,7 +126,6 @@ const boardSignals = computed<SignalView[]>(() =>
       descriptorName: binding.descriptorName,
       value: boardChannelValue(channel),
       range: channel.range,
-      monitored: true,
       localStale: debug.transportState === 'degraded',
     }
   }),
@@ -161,9 +156,6 @@ function expansionSignals(device: DeviceInstanceConfig): SignalView[] {
       quality: sample?.quality,
       range: signal.engineeringRange,
       unit: signal.unit,
-      monitored: Boolean(
-        binding.descriptorName && debug.selectedPointNames.includes(binding.descriptorName),
-      ),
       localStale: sample?.localStale ?? false,
     }
   })
@@ -173,22 +165,8 @@ function profileForDevice(device: DeviceInstanceConfig) {
   return resolveDeviceProfile(controller.doc, device)
 }
 
-function previewSignals(device: DeviceInstanceConfig): SignalView[] {
-  const signals = expansionSignals(device)
-  const enabled = signals.filter((signal) => signal.enabled)
-  return (enabled.length ? enabled : signals).slice(0, MODULE_PREVIEW_LIMIT)
-}
-
-function hiddenSignalCount(device: DeviceInstanceConfig): number {
-  return Math.max(
-    0,
-    expansionSignals(device).filter((signal) => signal.enabled).length - MODULE_PREVIEW_LIMIT,
-  )
-}
-
-function isWidePreviewSignal(device: DeviceInstanceConfig, signal: SignalView): boolean {
-  const preview = previewSignals(device)
-  return preview.length % 2 === 1 && preview[preview.length - 1]?.key === signal.key
+function configuredSignals(device: DeviceInstanceConfig): SignalView[] {
+  return expansionSignals(device).filter((signal) => signal.enabled)
 }
 
 const busGroups = computed(() => {
@@ -204,20 +182,6 @@ const busGroups = computed(() => {
         .slice()
         .sort((a, b) => a.slave_address - b.slave_address || a.name.localeCompare(b.name)),
     }))
-})
-
-const topologyPointNames = computed(() => {
-  const names: string[] = []
-  for (const group of busGroups.value) {
-    for (const device of group.devices) {
-      for (const signal of expansionSignals(device)) {
-        if (signal.enabled && signal.descriptorName && !names.includes(signal.descriptorName)) {
-          names.push(signal.descriptorName)
-        }
-      }
-    }
-  }
-  return names
 })
 
 const configuredExpansionCount = computed(() =>
@@ -257,18 +221,10 @@ const connectionLabel = computed(() => {
   return '尚未连接控制器'
 })
 
-function primeTopologyMonitor() {
-  debug.clearPointSelection()
-  for (const name of topologyPointNames.value.slice(0, MAX_MONITORED_POINTS)) {
-    debug.togglePointSelection(name)
-  }
-}
-
 async function connect() {
   connectError.value = ''
   try {
     await debug.connect()
-    primeTopologyMonitor()
     await debug.pollOnce()
   } catch (error) {
     connectError.value = error instanceof Error ? error.message : String(error)
@@ -287,15 +243,6 @@ async function refreshNow() {
 function togglePolling() {
   if (debug.isPolling) debug.stopPolling()
   else debug.startPolling()
-}
-
-function toggleSignalMonitor(signal: SignalView) {
-  if (!signal.descriptorName) return
-  try {
-    debug.togglePointSelection(signal.descriptorName)
-  } catch (error) {
-    controller.showMessage(error instanceof Error ? error.message : String(error), false)
-  }
 }
 
 function qualityLabel(quality?: PointQuality): string {
@@ -334,7 +281,6 @@ function parityLabel(parity?: string): string {
 
 onMounted(() => {
   if (debug.session && debug.isConnected) {
-    primeTopologyMonitor()
     debug.startPolling()
   }
 })
@@ -404,7 +350,7 @@ onUnmounted(() => debug.suspend())
       <div class="metric"><Router :size="15" /><span>扩展模块</span><strong>{{ controller.doc.project.devices.length }}</strong><small>{{ busGroups.length }} 条 RS-485 总线</small></div>
       <div class="metric"><Gauge :size="15" /><span>已配置通道</span><strong>{{ configuredExpansionCount }}</strong><small>扩展模块启用点</small></div>
       <div class="metric live"><Zap :size="15" /><span>数字量 ON</span><strong>{{ debug.isConnected ? activeDigitalCount : '—' }}</strong><small>当前快照</small></div>
-      <div class="metric"><Eye :size="15" /><span>周期监测</span><strong>{{ debug.selectedPointNames.length }}/{{ MAX_MONITORED_POINTS }}</strong><small>扩展北向点位</small></div>
+      <div class="metric"><Eye :size="15" /><span>实时点位</span><strong>{{ debug.pointDescriptors.length }}</strong><small>全部自动分页采样</small></div>
     </section>
 
     <main class="topology-canvas">
@@ -461,33 +407,32 @@ onUnmounted(() => debug.suspend())
                 :key="device.id"
                 class="module-card"
                 :class="{ 'third-party': profileForDevice(device).deviceClass === 'third_party' }"
-                tabindex="0"
               >
                 <div class="drop-line"><span /></div>
                 <header class="module-header">
                   <span class="address-badge">ADDR <b>{{ device.slave_address }}</b></span>
                   <div class="module-title"><strong>{{ device.name }}</strong><code>{{ device.profile }}</code></div>
                   <span v-if="profileForDevice(device).deviceClass === 'third_party'" class="third-party-badge">第三方</span>
+                  <span class="point-count-badge">{{ configuredSignals(device).length }} 点</span>
                   <span class="module-state" :class="debug.isConnected ? 'online' : 'unknown'"><i />{{ debug.isConnected ? 'POLL' : 'IDLE' }}</span>
                 </header>
                 <p class="profile-description" :title="profileForDevice(device).description">
                   {{ profileForDevice(device).description }}
-                  <span v-if="expansionSignals(device).filter((signal) => signal.enabled).length > MODULE_PREVIEW_LIMIT" class="hover-hint">
-                    悬停查看全部 {{ expansionSignals(device).filter((signal) => signal.enabled).length }} 点
-                  </span>
                 </p>
+                <div class="module-list-heading">
+                  <strong>配置点位</strong>
+                  <span>滚动查看全部 · 连接后自动显示实时值</span>
+                </div>
                 <div class="module-signals">
-                  <button
-                    v-for="signal in previewSignals(device)"
+                  <div
+                    v-for="signal in configuredSignals(device)"
                     :key="signal.key"
                     class="module-signal"
                     :class="[
                       signal.kind.toLowerCase(),
-                      { enabled: signal.enabled, on: signal.value === true, monitored: signal.monitored, stale: signal.localStale, wide: isWidePreviewSignal(device, signal) },
+                      { on: signal.value === true, stale: signal.localStale },
                     ]"
-                    :disabled="!signal.descriptorName"
-                    :title="signal.descriptorName ? `${signal.description || signal.name}\n点击${signal.monitored ? '移出' : '加入'}周期监测` : `${signal.description || signal.name} · 未绑定北向点位`"
-                    @click="toggleSignalMonitor(signal)"
+                    :title="signal.descriptorName ? `${signal.description || signal.name}\n${signal.descriptorName}` : `${signal.description || signal.name} · 未绑定北向点位`"
                   >
                     <span v-if="signal.kind === 'DI' || signal.kind === 'DO'" class="mini-lamp" />
                     <span class="signal-id">{{ signal.code.toUpperCase() }}</span>
@@ -495,40 +440,20 @@ onUnmounted(() => debug.suspend())
                       <span class="signal-point">{{ signal.pointName || (signal.enabled ? '未映射' : '未启用') }}</span>
                       <span class="module-description" :class="{ placeholder: !signal.description }">{{ signal.description || signal.name }}</span>
                     </span>
-                    <strong>{{ formatValue(signal) }}</strong>
-                    <Eye v-if="signal.monitored" :size="11" class="watch-icon" /><EyeOff v-else-if="signal.descriptorName" :size="11" class="watch-icon" />
-                  </button>
-                  <div v-if="hiddenSignalCount(device)" class="more-signals">还有 {{ hiddenSignalCount(device) }} 个已配置点位</div>
+                    <span class="signal-reading">
+                      <strong>{{ formatValue(signal) }}</strong>
+                      <em>{{ qualityLabel(signal.quality) }}</em>
+                    </span>
+                  </div>
+                  <div v-if="configuredSignals(device).length === 0" class="empty-signals">
+                    当前模块没有启用点位
+                  </div>
                 </div>
                 <footer class="module-footer">
-                  <span>{{ expansionSignals(device).filter((signal) => signal.enabled).length }} 通道已配置</span>
-                  <span>{{ expansionSignals(device).filter((signal) => signal.monitored).length }} 周期监测</span>
+                  <span>{{ configuredSignals(device).length }} 通道已配置</span>
+                  <span>{{ expansionSignals(device).filter((signal) => signal.value !== null).length }} 已有实时值</span>
                   <span :class="{ warning: expansionSignals(device).some((signal) => signal.enabled && !signal.descriptorName) }">{{ expansionSignals(device).filter((signal) => signal.enabled && !signal.descriptorName).length }} 未映射</span>
                 </footer>
-                <section class="module-inspector" aria-label="模块点位完整说明">
-                  <header>
-                    <div><small>DEVICE DATASET</small><strong>{{ profileForDevice(device).name }}</strong></div>
-                    <span>{{ expansionSignals(device).filter((signal) => signal.enabled).length }} 点</span>
-                  </header>
-                  <p>
-                    <code>{{ device.port }}</code> / 站号 {{ device.slave_address }} / 轮询 {{ device.poll_period_ms }} ms /
-                    stale {{ device.stale_after_ms }} ms。值来自北向点位；未加入周期监测的点显示“—”，不等于 0。
-                  </p>
-                  <div class="inspector-point-list">
-                    <button
-                      v-for="signal in expansionSignals(device).filter((item) => item.enabled)"
-                      :key="`detail-${signal.key}`"
-                      :disabled="!signal.descriptorName"
-                      :class="{ monitored: signal.monitored, stale: signal.localStale }"
-                      @click="toggleSignalMonitor(signal)"
-                    >
-                      <span><code>{{ signal.code }}</code><small>{{ signal.description || signal.name }}</small></span>
-                      <b>{{ formatValue(signal) }}</b>
-                      <em>{{ qualityLabel(signal.quality) }}</em>
-                    </button>
-                  </div>
-                  <footer>鼠标悬停或键盘聚焦保持详情；点击点位可切换最多 {{ MAX_MONITORED_POINTS }} 个 HTTP 周期监测名额。</footer>
-                </section>
               </article>
             </div>
             <div v-else class="empty-bus">该端口尚未配置从站模块</div>
@@ -543,7 +468,7 @@ onUnmounted(() => debug.suspend())
 
     <footer class="monitor-legend">
       <span><i class="legend-dot on" />数字量 ON</span><span><i class="legend-dot off" />数字量 OFF</span><span><i class="legend-dot none" />无实时证据</span>
-      <span class="legend-note">扩展点按从站地址顺序显示；点击已映射通道可加入/移出周期监测。{{ topologyPointNames.length > MAX_MONITORED_POINTS ? `当前 ${topologyPointNames.length} 个扩展点可监测，受设备 HTTP 并发保护限制同时轮询前 ${MAX_MONITORED_POINTS} 个。` : '' }}</span>
+      <span class="legend-note">扩展点按从站地址顺序显示；所有已映射北向点位自动按 30 条一页周期采样。</span>
       <span class="quality-note">{{ qualityLabel(undefined) }} 不等于 OFF / 0</span>
     </footer>
   </div>
@@ -644,33 +569,24 @@ onUnmounted(() => debug.suspend())
 .bus-origin { position: absolute; left: 12px; top: 25px; z-index: 2; display: grid; justify-items: center; gap: 1px; color: var(--cyan); }.bus-origin small { color: var(--color-text-tertiary, #5f6f7d); font: 8px var(--font-mono); }.port-socket { width: 29px; height: 29px; display: grid; place-items: center; border: 1px solid #79aacf; border-radius: 50%; background: #e7f1fa; }
 .bus-wire { position: absolute; left: 39px; right: 10px; top: 39px; height: 3px; border-top: 1px solid #4b91c5; border-bottom: 1px solid #0f5f9e; background: #1769aa; box-shadow: 0 0 6px rgba(23,105,170,.22); }
 .module-row { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 8px; min-width: max-content; }
-.module-card { position: relative; width: 392px; margin-top: 20px; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; outline: none; background: #ffffff; box-shadow: 0 6px 16px rgba(35,56,71,.12); }
+.module-card { position: relative; width: 440px; margin-top: 20px; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; background: #ffffff; box-shadow: 0 6px 16px rgba(35,56,71,.12); }
 .module-card.third-party { border-top: 3px solid #a5660d; }
-.module-card:focus-visible { box-shadow: 0 0 0 3px rgba(23,105,170,.2), 0 6px 16px rgba(35,56,71,.12); }
 .drop-line { position: absolute; top: -22px; left: 22px; width: 2px; height: 22px; background: #1769aa; }.drop-line span { position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; border: 2px solid #1769aa; border-radius: 50%; background: #ffffff; }
 .module-header { height: 42px; padding: 5px 7px; gap: 7px; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); background: linear-gradient(100deg, #e7f1fa, #f7f9fb); }
 .address-badge { width: 42px; height: 30px; display: grid; place-items: center; border: 1px solid #79aacf; border-radius: 4px; color: var(--color-text-tertiary, #5f6f7d); background: #ffffff; font: 7px var(--font-mono); line-height: .9; }.address-badge b { color: var(--cyan); font-size: 14px; }
 .module-title { min-width: 0; display: grid; flex: 1; }.module-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 11px; }.module-title code { color: var(--color-text-tertiary, #5f6f7d); font-size: 8px; }
 .third-party-badge { padding: 2px 4px; border: 1px solid #d5aa69; border-radius: 3px; color: #7a4b00; background: #fff5df; font: 700 7px var(--font-mono); white-space: nowrap; }
+.point-count-badge { padding: 2px 5px; border: 1px solid #a9bac5; border-radius: 3px; color: var(--muted); background: #fff; font: 700 8px/1.2 var(--font-mono); white-space: nowrap; }
 .module-state { display: flex; align-items: center; gap: 4px; color: var(--color-text-tertiary, #5f6f7d); font: 8px var(--font-mono); }.module-state.online { color: var(--green); }
-.profile-description { min-height: 36px; margin: 0; padding: 6px 8px; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); color: var(--color-text-secondary, #40515f); background: var(--panel-2); font-size: 10px; line-height: 1.4; }
-.hover-hint { display: inline-block; margin-left: 4px; color: #7a4b00; font-weight: 700; }
-.module-signals { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; background: var(--color-border-subtle, #d5dde4); }
-.module-signal { position: relative; min-width: 0; min-height: 58px; padding: 5px 6px; display: grid; grid-template-columns: 12px 32px minmax(0,1fr) minmax(58px,auto) 12px; align-items: center; gap: 4px; border: 0; color: var(--color-text-disabled, #667784); background: #f1f4f6; text-align: left; cursor: default; }
-.module-signal.ai, .module-signal.ao { grid-template-columns: 32px minmax(0,1fr) minmax(68px,auto) 12px; }
-.module-signal.wide { grid-column: 1 / -1; }
-.module-signal.enabled { color: var(--ink); background: #ffffff; }.module-signal.enabled:not(:disabled) { cursor: pointer; }.module-signal.enabled:not(:disabled):hover { background: #eef6fb; }.module-signal.monitored { box-shadow: inset 2px 0 var(--cyan); background: #f4f9fc; }.module-signal.stale { opacity: .55; }
-.more-signals { grid-column: 1 / -1; padding: 6px 8px; color: #7a4b00; background: #fff8e9; font: 700 8px var(--font-mono); text-align: center; }
-.signal-id { min-width: 0; font: 700 10px/1.2 var(--font-mono); }.module-signal-copy { min-width: 0; display: grid; gap: 2px; }.signal-point { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-tertiary, #5f6f7d); font-size: 8px; line-height: 1.2; }.module-description { min-width: 0; overflow: hidden; overflow-wrap: anywhere; word-break: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--muted); font-size: 10px; line-height: 1.3; }.module-signal strong { min-width: 58px; color: var(--muted); font: 700 10px/1.2 var(--font-mono); text-align: right; white-space: nowrap; }.module-signal.on strong { color: var(--green); }.watch-icon { color: #78909c; }.module-signal.monitored .watch-icon { color: var(--cyan); }
+.profile-description { min-height: 36px; margin: 0; padding: 6px 8px; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); color: var(--color-text-secondary, #40515f); background: var(--panel-2); font-size: 9px; line-height: 1.45; }
+.module-list-heading { min-height: 26px; padding: 5px 8px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--color-border-subtle, #d5dde4); color: var(--muted); background: #fff; }.module-list-heading strong { font-size: 9px; }.module-list-heading span { margin-left: auto; color: var(--color-text-tertiary, #5f6f7d); font-size: 8px; }
+.module-signals { max-height: clamp(180px, calc(100vh - 330px), 430px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; background: var(--color-border-subtle, #d5dde4); }
+.module-signal { position: relative; min-width: 0; min-height: 60px; height: auto; padding: 7px 8px; display: grid; grid-template-columns: 11px 42px minmax(0, 1fr) minmax(76px, auto); align-items: center; gap: 6px; border: 0; color: var(--ink); background: #fff; text-align: left; cursor: default; }
+.module-signal.ai, .module-signal.ao { grid-template-columns: 42px minmax(0, 1fr) minmax(76px, auto); }
+.module-signal.stale { opacity: .58; }
+.empty-signals { padding: 18px 10px; color: var(--color-text-tertiary, #5f6f7d); background: #fff; font-size: 9px; text-align: center; }
+.signal-id { min-width: 0; font: 700 9px/1.25 var(--font-mono); overflow-wrap: anywhere; }.module-signal-copy { min-width: 0; display: grid; gap: 3px; align-content: center; }.signal-point { min-width: 0; overflow-wrap: anywhere; word-break: break-word; color: var(--color-text-tertiary, #5f6f7d); font: 8px/1.3 var(--font-mono); }.module-description { min-width: 0; overflow-wrap: anywhere; word-break: break-word; color: var(--muted); font-size: 9px; line-height: 1.4; }.signal-reading { min-width: 0; display: grid; justify-items: end; gap: 3px; }.signal-reading strong { color: var(--muted); font: 700 9px/1.25 var(--font-mono); text-align: right; white-space: nowrap; }.signal-reading em { color: var(--color-text-tertiary, #5f6f7d); font: 700 7px/1.2 var(--font-mono); font-style: normal; white-space: nowrap; }.module-signal.on .signal-reading strong { color: var(--green); }
 .module-footer { height: 23px; padding: 0 7px; gap: 8px; color: var(--color-text-tertiary, #5f6f7d); background: var(--panel-2); font-size: 7px; }.module-footer span:last-child { margin-left: auto; }.module-footer .warning { color: var(--amber); }
-.module-inspector { position: absolute; inset: 42px 0 0; z-index: 5; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border-top: 1px solid #d5aa69; opacity: 0; pointer-events: none; transform: translateY(7px); transition: opacity .14s ease, transform .14s ease; background: rgba(255,255,255,.985); }
-.module-card:hover .module-inspector, .module-card:focus-within .module-inspector { opacity: 1; pointer-events: auto; transform: translateY(0); }
-.module-inspector > header { min-height: 38px; padding: 6px 8px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #ead9bc; background: linear-gradient(90deg, #fff5df, #fff); }
-.module-inspector > header div { min-width: 0; display: grid; }.module-inspector > header small { color: #8a641f; font: 700 7px var(--font-mono); letter-spacing: .12em; }.module-inspector > header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 10px; }.module-inspector > header > span { margin-left: auto; padding: 2px 5px; border-radius: 3px; color: #7a4b00; background: #f4dfb8; font: 700 8px var(--font-mono); }
-.module-inspector > p { margin: 0; padding: 6px 8px; border-bottom: 1px solid #e6e0d6; color: var(--muted); background: #fffdf8; font-size: 8px; line-height: 1.45; }.module-inspector > p code { color: var(--cyan); }
-.inspector-point-list { min-height: 0; overflow-y: auto; display: grid; align-content: start; grid-template-columns: minmax(0,1fr); gap: 1px; background: #dce3e7; }
-.inspector-point-list button { min-width: 0; min-height: 48px; padding: 5px 8px; display: grid; grid-template-columns: minmax(0,1fr) minmax(64px,auto); grid-template-rows: auto auto; align-items: center; gap: 3px 8px; border: 0; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }.inspector-point-list button:disabled { cursor: default; }.inspector-point-list button.monitored { box-shadow: inset 3px 0 var(--cyan); background: #f3f8fc; }.inspector-point-list button.stale { opacity: .58; }.inspector-point-list button > span { min-width: 0; display: grid; gap: 2px; }.inspector-point-list code { overflow: hidden; color: var(--cyan); font: 8px/1.2 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }.inspector-point-list small { min-width: 0; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--muted); font-size: 10px; line-height: 1.3; }.inspector-point-list b { align-self: center; color: var(--ink); font: 700 10px var(--font-mono); text-align: right; white-space: nowrap; }.inspector-point-list em { grid-column: 2; color: var(--color-text-tertiary, #5f6f7d); font: 700 8px var(--font-mono); font-style: normal; text-align: right; }
-.module-inspector > footer { padding: 5px 7px; border-top: 1px solid #e6e0d6; color: var(--color-text-tertiary, #5f6f7d); background: #faf7f0; font-size: 7px; line-height: 1.35; }
 .empty-bus, .empty-topology { min-height: 100px; display: grid; place-items: center; align-content: center; gap: 5px; color: var(--color-text-tertiary, #5f6f7d); font-size: 10px; }.empty-topology { min-height: 180px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel); }.empty-topology strong { color: var(--muted); font-size: 12px; }.empty-topology span { max-width: 320px; text-align: center; }
 
 .monitor-legend { min-height: 30px; padding: 5px 9px; gap: 13px; border-radius: 6px; color: var(--color-text-tertiary, #5f6f7d); font-size: 9px; }

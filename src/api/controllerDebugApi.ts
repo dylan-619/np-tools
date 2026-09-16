@@ -23,6 +23,14 @@ export async function kz3GetPoint(baseUrl: string, pointName: string): Promise<K
   return await invoke<Kz3HttpResponse>('kz3_http_get_point', { baseUrl, pointName })
 }
 
+export async function kz3GetPointsPage(
+  baseUrl: string,
+  offset: number,
+  limit: number
+): Promise<Kz3HttpResponse> {
+  return await invoke<Kz3HttpResponse>('kz3_http_get_points_page', { baseUrl, offset, limit })
+}
+
 export async function kz3WritePoint(
   baseUrl: string,
   pointName: string,

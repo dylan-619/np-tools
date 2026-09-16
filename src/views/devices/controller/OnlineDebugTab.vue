@@ -37,7 +37,6 @@ import type {
   PointQuality
 } from '../../../types/controllerDebug'
 
-const MAX_MONITOR_POINTS = 12
 const DIAGNOSTIC_WIDTH_STORAGE_KEY = 'np_tools_kz3_diagnostic_width'
 const DEFAULT_DIAGNOSTIC_WIDTH = 400
 const MIN_DIAGNOSTIC_WIDTH = 340
@@ -95,7 +94,6 @@ const controller = useControllerStore()
 const debug = useControllerDebugStore()
 const searchText = ref('')
 const categoryFilter = ref<'all' | PointDescriptor['category']>('all')
-const monitorOnly = ref(false)
 const collapsedPointGroups = ref<Record<PointGroupKey, boolean>>({
   commands: false,
   parameters: false,
@@ -201,7 +199,6 @@ const filteredDescriptors = computed(() => {
   const keyword = searchText.value.trim().toLowerCase()
   return debug.pointDescriptors.filter((descriptor) => {
     if (categoryFilter.value !== 'all' && descriptor.category !== categoryFilter.value) return false
-    if (monitorOnly.value && !debug.selectedPointNames.includes(descriptor.name)) return false
     if (!keyword) return true
     return [
       descriptor.name,
@@ -223,10 +220,7 @@ const descriptorGroups = computed(() =>
     return {
       ...group,
       descriptors,
-      writableCount: descriptors.filter((descriptor) => descriptor.writeSupported).length,
-      monitoredCount: descriptors.filter((descriptor) =>
-        debug.selectedPointNames.includes(descriptor.name)
-      ).length
+      writableCount: descriptors.filter((descriptor) => descriptor.writeSupported).length
     }
   }).filter((group) => group.descriptors.length > 0)
 )
@@ -528,14 +522,6 @@ async function handleRefreshPoint(name: string) {
   }
 }
 
-function handleToggleMonitor(name: string) {
-  try {
-    debug.togglePointSelection(name)
-  } catch (error) {
-    controller.showMessage(error instanceof Error ? error.message : String(error), false)
-  }
-}
-
 function togglePolling() {
   if (debug.isPolling) debug.stopPolling()
   else debug.startPolling()
@@ -673,10 +659,9 @@ onUnmounted(() => {
         <header class="panel-toolbar">
           <div class="panel-heading">
             <Eye :size="15" />
-            <div><strong>监视表</strong><small>设备质量与本机时效分别显示</small></div>
-            <span class="monitor-count" title="只有监视组参与周期轮询">监视
-              {{ debug.selectedPointNames.length }}/{{ MAX_MONITOR_POINTS }} · 共
-              {{ debug.pointDescriptors.length }}</span>
+            <div><strong>实时点表</strong><small>连接后自动分页采样全部北向点位，每页 30 条</small></div>
+            <span class="monitor-count" title="全部北向点位参与周期分页采样">共
+              {{ debug.pointDescriptors.length }} 点</span>
           </div>
           <div class="point-tools">
             <label class="search-box"><Search :size="13" /><input v-model="searchText" placeholder="点名 / Modbus 地址 / bind"></label>
@@ -690,22 +675,6 @@ onUnmounted(() => {
               <option value="unknown">其他上报</option>
             </select>
             <button
-              class="tool-btn"
-              :class="{ active: monitorOnly }"
-              @click="monitorOnly = !monitorOnly"
-            >
-              <Eye v-if="monitorOnly" :size="12" /><EyeOff v-else :size="12" />{{
-                monitorOnly ? '仅监视组' : '全部点'
-              }}
-            </button>
-            <button
-              class="tool-btn optional-tool"
-              title="恢复工程默认监视点"
-              @click="debug.selectDefaultPoints()"
-            >
-              默认组
-            </button>
-            <button
               class="tool-btn optional-tool"
               :title="allVisibleGroupsCollapsed ? '展开当前分组' : '收起当前分组'"
               @click="toggleAllPointGroups"
@@ -713,13 +682,6 @@ onUnmounted(() => {
               <ChevronDown v-if="allVisibleGroupsCollapsed" :size="12" /><ChevronUp v-else :size="12" />{{
                 allVisibleGroupsCollapsed ? '展开' : '收起'
               }}
-            </button>
-            <button
-              class="tool-btn icon-only"
-              title="清空监视组"
-              @click="debug.clearPointSelection()"
-            >
-              <Trash2 :size="12" />
             </button>
             <button class="tool-btn" :disabled="!debug.isConnected" @click="togglePolling">
               <Pause v-if="debug.isPolling" :size="12" /><Play v-else :size="12" />{{
@@ -740,7 +702,6 @@ onUnmounted(() => {
           <table class="point-table">
             <thead>
               <tr>
-                <th class="monitor-col">监视</th>
                 <th>北向字段 / 描述</th>
                 <th>Modbus 地址</th>
                 <th>类型</th>
@@ -753,7 +714,7 @@ onUnmounted(() => {
             <tbody>
               <template v-for="group in descriptorGroups" :key="group.key">
                 <tr class="point-group-row" :class="`group-${group.key}`">
-                  <td colspan="8">
+                  <td colspan="7">
                     <button
                       class="point-group-toggle"
                       :aria-expanded="!collapsedPointGroups[group.key]"
@@ -763,7 +724,6 @@ onUnmounted(() => {
                       <span class="group-copy"><strong>{{ group.label }}</strong><small :title="group.description">{{ group.description }}</small></span>
                       <span class="group-stat">{{ group.descriptors.length }} 点</span>
                       <span v-if="group.writableCount" class="group-access writable">{{ group.writableCount }} 可写</span><span v-else class="group-access readonly">只读</span>
-                      <span class="group-monitored">{{ group.monitoredCount }} 监视</span>
                     </button>
                   </td>
                 </tr>
@@ -772,28 +732,10 @@ onUnmounted(() => {
                   v-show="!collapsedPointGroups[group.key]"
                   :key="descriptor.id"
                   :class="{
-                    monitored: debug.selectedPointNames.includes(descriptor.name),
                     stale: debug.samples[descriptor.name]?.localStale,
                     changed: recentlyChanged(descriptor.name)
                   }"
                 >
-                  <td class="monitor-col">
-                    <button
-                      class="monitor-toggle"
-                      :class="{ active: debug.selectedPointNames.includes(descriptor.name) }"
-                      :title="
-                        debug.selectedPointNames.includes(descriptor.name)
-                          ? '从监视组移除'
-                          : '加入监视组'
-                      "
-                      @click="handleToggleMonitor(descriptor.name)"
-                    >
-                      <Eye
-                        v-if="debug.selectedPointNames.includes(descriptor.name)"
-                        :size="13"
-                      /><EyeOff v-else :size="13" />
-                    </button>
-                  </td>
                   <td>
                     <strong class="point-name" :title="descriptor.name">{{ descriptor.name }}</strong><small :title="descriptor.description">{{ descriptor.description }}</small>
                   </td>
@@ -851,13 +793,7 @@ onUnmounted(() => {
                 </tr>
               </template>
               <tr v-if="descriptorGroups.length === 0">
-                <td colspan="8" class="empty-row">
-                  {{
-                    monitorOnly
-                      ? '当前监视组为空。切换“全部点”后选择需要观察的点位。'
-                      : '当前筛选条件下没有北向点位。'
-                  }}
-                </td>
+                <td colspan="7" class="empty-row">当前筛选条件下没有北向点位。</td>
               </tr>
             </tbody>
           </table>
@@ -1786,8 +1722,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .group-stat,
-.group-access,
-.group-monitored {
+.group-access {
   flex-shrink: 0;
   padding: 2px 5px;
   border-radius: 8px;
@@ -1803,46 +1738,29 @@ onUnmounted(() => {
   color: #82b9df;
   background: rgba(59, 130, 181, 0.14);
 }
-.group-monitored {
-  color: #84bcec;
-  background: rgba(59, 130, 246, 0.13);
-}
-.point-table tr.monitored td:first-child {
-  box-shadow: inset 2px 0 #4396dc;
-}
 .point-table tr.stale td {
   background: #171c1d;
 }
-.point-table tr.changed td:nth-child(5) {
+.point-table tr.changed td:nth-child(4) {
   animation: valueChanged 1.3s ease-out;
 }
-.point-table th:nth-child(2) {
+.point-table th:nth-child(1) {
   width: 190px;
 }
-.point-table th:nth-child(3) {
+.point-table th:nth-child(2) {
   width: 112px;
 }
-.point-table th:nth-child(4) {
+.point-table th:nth-child(3) {
   width: 70px;
 }
-.point-table th:nth-child(5) {
+.point-table th:nth-child(4) {
   width: 105px;
 }
-.point-table th:nth-child(6) {
+.point-table th:nth-child(5) {
   width: 90px;
 }
-.point-table th:nth-child(7) {
+.point-table th:nth-child(6) {
   width: 72px;
-}
-.monitor-col {
-  position: sticky !important;
-  left: 0;
-  z-index: 4 !important;
-  width: 43px;
-  text-align: center !important;
-}
-.point-table td.monitor-col {
-  background: #111b22;
 }
 .action-col {
   position: sticky !important;
@@ -1888,7 +1806,6 @@ onUnmounted(() => {
   font: 700 9px var(--font-mono);
   letter-spacing: 0.04em;
 }
-.monitor-toggle,
 .row-btn {
   width: 23px;
   height: 23px;
@@ -1899,11 +1816,6 @@ onUnmounted(() => {
   background: #111b22;
   color: #617988;
   cursor: pointer;
-}
-.monitor-toggle.active {
-  color: #72b8f2;
-  border-color: #3e78a4;
-  background: #12283a;
 }
 .type-chip,
 .access-chip,
@@ -2702,14 +2614,12 @@ onUnmounted(() => {
 .point-tools select:focus-visible,
 .tool-btn:focus-visible,
 .rack-btn:focus-visible,
-.monitor-toggle:focus-visible,
 .row-btn:focus-visible,
 .diagnostic-toggle:focus-visible {
   outline: 2px solid #2f82c4;
   outline-offset: 1px;
 }
 .tool-btn:hover:not(:disabled),
-.monitor-toggle:hover:not(:disabled),
 .row-btn:hover:not(:disabled) {
   border-color: #6e94ad;
   background: #edf4f8;
@@ -2755,8 +2665,7 @@ onUnmounted(() => {
   font-size: 9px;
 }
 .group-stat,
-.group-access,
-.group-monitored {
+.group-access {
   color: #405766;
   background: #dce5eb;
   font-size: 9px;
@@ -2769,14 +2678,9 @@ onUnmounted(() => {
   color: #0f5f9e;
   background: var(--debug-blue-soft);
 }
-.group-monitored {
-  color: #0f5f9e;
-  background: #dcecf8;
-}
 .point-table tr.stale td {
   background: #f4f1e9;
 }
-.point-table td.monitor-col,
 .point-table td.action-col {
   background: #f8fafb;
 }
@@ -2801,16 +2705,10 @@ onUnmounted(() => {
   color: #164f75;
   font-size: 10px;
 }
-.monitor-toggle,
 .row-btn {
   border-color: #aebcc7;
   background: #ffffff;
   color: #3f5d70;
-}
-.monitor-toggle.active {
-  color: #0f5f9e;
-  border-color: #6a9bc0;
-  background: var(--debug-blue-soft);
 }
 .type-chip,
 .access-chip,

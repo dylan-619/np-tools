@@ -58,7 +58,6 @@ interface SignalRow {
   localStale: boolean
   unit?: string
   range?: string
-  monitored: boolean
   enabled: boolean
   semantic: string
 }
@@ -186,7 +185,6 @@ function boardRows(): SignalRow[] {
       value: boardValue(channel),
       localStale: debug.transportState === 'degraded',
       range: channel.range,
-      monitored: true,
       enabled: true,
       semantic: channel.direction === 'output' ? '板载输出目标值，不等同于端子物理反馈' : '板载输入采样',
     }
@@ -218,7 +216,6 @@ function deviceRows(device: DeviceInstanceConfig): SignalRow[] {
       localStale: sample?.localStale === true,
       unit: signal.unit,
       range: signal.engineeringRange,
-      monitored: descriptorName ? debug.selectedPointNames.includes(descriptorName) : false,
       enabled: isEnabled(device, signal),
       semantic: signal.direction === 'output'
         ? signal.hasFeedbackShadow
@@ -301,7 +298,18 @@ const visiblePointCount = computed(() =>
   ),
 )
 
-const monitoredCount = computed(() => debug.selectedPointNames.length)
+const sampledPointCount = computed(() =>
+  topologyGroups.value.reduce(
+    (total, group) =>
+      total +
+      group.modules.reduce(
+        (moduleTotal, module) =>
+          moduleTotal + module.rows.filter((row) => row.value !== null).length,
+        0,
+      ),
+    0,
+  ),
+)
 const connectionLabel = computed(() => {
   if (debug.transportState === 'online') return debug.isPolling ? '在线采样' : '在线已暂停'
   if (debug.transportState === 'degraded') return '连接降级'
@@ -336,15 +344,6 @@ function formatValue(row: SignalRow): string {
   if (!Number.isFinite(row.value)) return String(row.value)
   const value = row.kind === 'AI' || row.kind === 'AO' ? row.value.toFixed(3) : String(row.value)
   return row.unit ? `${value} ${row.unit}` : value
-}
-
-function toggleMonitor(row: SignalRow) {
-  if (!row.descriptorName) return
-  try {
-    debug.togglePointSelection(row.descriptorName)
-  } catch (error) {
-    controller.showMessage(error instanceof Error ? error.message : String(error), false)
-  }
 }
 
 function clampLayout() {
@@ -530,7 +529,7 @@ onBeforeUnmount(() => {
         <section class="float-summary">
           <div><span>模块</span><strong>{{ moduleCount }}</strong></div>
           <div><span>可见点</span><strong>{{ visiblePointCount }}</strong></div>
-          <div><span>监测点</span><strong>{{ monitoredCount }}/12</strong></div>
+          <div><span>已有实时值</span><strong>{{ sampledPointCount }}</strong></div>
           <p><Activity :size="12" />本窗不创建额外连接；输出显示目标值或回读影子，不能替代端子物理反馈。</p>
         </section>
 
@@ -585,19 +584,16 @@ onBeforeUnmount(() => {
                   >
                     <header><strong>{{ kind }}</strong><span>{{ groupRows(module, kind).length }} CH</span></header>
                     <div class="signal-tile-grid">
-                      <button
+                      <div
                         v-for="row in groupRows(module, kind)"
                         :key="row.key"
                         class="signal-tile"
                         :class="{
                           on: row.value === true,
                           stale: row.localStale || (row.quality !== undefined && row.quality !== 0),
-                          monitored: row.monitored,
                           analog: row.kind === 'AI' || row.kind === 'AO',
                         }"
                         :title="`${row.source}\n${row.semantic}${row.range ? `\n${row.range}` : ''}`"
-                        :disabled="!module.device || !row.descriptorName"
-                        @click="toggleMonitor(row)"
                       >
                         <span v-if="row.kind === 'DI' || row.kind === 'DO'" class="signal-lamp" />
                         <span v-else class="signal-type">{{ row.kind }}</span>
@@ -606,8 +602,7 @@ onBeforeUnmount(() => {
                         <span class="signal-name">{{ row.name }}</span>
                         <span class="signal-point">{{ row.descriptorName || row.pointName || '未绑定北向点' }}</span>
                         <span class="signal-quality" :class="qualityClass(module, row)"><i />{{ statusLabel(module, row) }}</span>
-                        <em v-if="module.device && row.descriptorName">{{ row.monitored ? '已监测' : '+监测' }}</em>
-                      </button>
+                      </div>
                     </div>
                   </section>
                 </div>
@@ -623,7 +618,7 @@ onBeforeUnmount(() => {
         </div>
 
         <footer class="float-footer">
-          <span>扩展点位可点击加入监测；板载值来自 /diagnostic/io 快照</span>
+          <span>全部已映射北向点自动分页采样；板载值来自 /diagnostic/io 快照</span>
           <button @click="minimized = true"><ChevronDown :size="12" />收起到标题栏</button>
         </footer>
         <span class="resize-handle resize-n" @pointerdown="startResize($event, 'n')" />
@@ -652,7 +647,7 @@ onBeforeUnmount(() => {
 .topology-lane { position: relative; display: grid; gap: 7px; margin-bottom: 11px; }.topology-lane.bus { padding-top: 8px; }.topology-lane.bus::before { content: ''; position: absolute; top: 21px; left: 18px; right: 8px; height: 3px; border-top: 1px solid #4b91c5; border-bottom: 1px solid #0f5f9e; background: #1769aa; box-shadow: 0 0 6px rgba(23,105,170,.18); }.lane-header { position: relative; z-index: 1; width: fit-content; min-height: 27px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid #9fb4c1; border-radius: 4px; color: #185c82; background: #eef6fb; }.lane-header strong { font: 800 9px var(--font-mono, monospace); letter-spacing: .06em; }.lane-header span { color: #627987; font: 8px var(--font-mono, monospace); }
 .module-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; gap: 9px; }.module-card { min-width: 0; overflow: hidden; border: 1px solid #9eafba; border-radius: 6px; background: #fff; box-shadow: 0 5px 14px rgba(31,55,70,.12); }.module-card.board { grid-column: 1 / -1; border-top: 3px solid #24729f; }.module-header { min-height: 47px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid #cbd6dd; background: linear-gradient(100deg, #e6f0f6, #f8fafb); }.address-badge { width: 46px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; align-content: center; border: 1px solid #79aacf; border-radius: 4px; color: #627987; background: #fff; font: 7px/1 var(--font-mono, monospace); }.address-badge b { margin-top: 3px; color: #17699a; font-size: 12px; }.module-title { min-width: 0; display: grid; flex: 1; gap: 1px; }.module-title small { color: #748791; font: 700 7px var(--font-mono, monospace); letter-spacing: .11em; }.module-title strong,.module-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.module-title strong { font-size: 11px; }.module-title span { color: #647782; font: 8px var(--font-mono, monospace); }.module-state { display: inline-flex; align-items: center; gap: 4px; color: #72838d; font: 700 8px var(--font-mono, monospace); }.module-state i { width: 7px; height: 7px; border-radius: 50%; background: #95a3aa; }.module-state.online i { background: #2eaf70; box-shadow: 0 0 0 3px rgba(46,175,112,.12); }.module-state.degraded i { background: #dc982b; }.module-description { min-height: 32px; margin: 0; padding: 6px 8px; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border-bottom: 1px solid #d8e0e5; color: #4f626e; background: #f7f9fa; font-size: 10px; line-height: 1.4; }
 .module-signal-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; background: #cad5dc; }.module-card.board .module-signal-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }.signal-kind-group { min-width: 0; background: #fff; }.signal-kind-group > header { height: 23px; display: flex; align-items: center; gap: 6px; padding: 0 7px; border-bottom: 1px solid #d2dce2; background: #eef3f6; }.signal-kind-group > header strong { color: #17638f; font: 800 9px var(--font-mono, monospace); }.signal-kind-group.do > header strong,.signal-kind-group.ao > header strong { color: #8b5a18; }.signal-kind-group > header span { margin-left: auto; color: #6c7d87; font: 8px var(--font-mono, monospace); }.signal-tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #d8e0e5; }
-.signal-tile { min-width: 0; min-height: 91px; display: grid; grid-template-columns: 12px minmax(37px, auto) minmax(58px, 1fr); grid-template-rows: auto auto auto auto; align-items: center; gap: 3px 5px; padding: 6px 7px; border: 0; color: #263944; background: #fff; text-align: left; cursor: pointer; }.signal-tile:hover:not(:disabled) { background: #eef7fb; }.signal-tile:disabled { cursor: default; }.signal-tile.monitored { box-shadow: inset 3px 0 #247aa9; background: #f4f9fc; }.signal-tile.stale { box-shadow: inset 3px 0 #d89527; }.signal-tile.monitored.stale { box-shadow: inset 3px 0 #d89527, inset 6px 0 #247aa9; }.signal-tile.analog { grid-template-columns: 25px minmax(37px, auto) minmax(58px, 1fr); }.signal-lamp { width: 10px; height: 10px; border: 1px solid #8499a8; border-radius: 50%; background: #d7e0e6; box-shadow: inset 0 0 2px rgba(23,33,43,.24); }.signal-tile.on .signal-lamp { border-color: #128148; background: #22b866; box-shadow: 0 0 8px rgba(34,184,102,.62); }.signal-type { padding: 2px 3px; border-radius: 2px; color: #17638f; background: #dceaf2; font: 800 8px var(--font-mono, monospace); text-align: center; }.signal-kind-group.ao .signal-type { color: #87551d; background: #efe4d4; }.signal-code { font: 800 10px var(--font-mono, monospace); }.signal-value { justify-self: end; overflow: hidden; color: #183f55; font: 800 11px var(--font-mono, monospace); text-overflow: ellipsis; white-space: nowrap; }.signal-name { grid-column: 1 / -1; min-width: 0; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #415560; font-size: 10px; line-height: 1.3; }.signal-point { grid-column: 1 / -1; min-width: 0; overflow: hidden; color: #71838d; font: 8px var(--font-mono, monospace); text-overflow: ellipsis; white-space: nowrap; }.signal-quality { grid-column: 1 / 3; display: inline-flex; align-items: center; gap: 4px; color: #778791; font: 700 7px var(--font-mono, monospace); white-space: nowrap; }.signal-quality i { width: 6px; height: 6px; border-radius: 50%; background: #a4afb5; }.signal-quality.good i,.signal-quality.snapshot i { background: #2eaf70; }.signal-quality.stale i,.signal-quality.local-stale i { background: #dc982b; }.signal-quality.offline i,.signal-quality.invalid i { background: #c64e57; }.signal-tile:disabled .signal-quality { grid-column: 1 / -1; }.signal-tile em { grid-column: 3; justify-self: end; padding: 2px 4px; border: 1px solid #a9bdc9; border-radius: 2px; color: #226b93; font: 700 7px var(--font-mono, monospace); font-style: normal; white-space: nowrap; }.empty-state { min-height: 150px; display: grid; place-items: center; align-content: center; gap: 6px; color: #7a8992; font-size: 10px; }.empty-state strong { color: #435761; font-size: 12px; }
+.signal-tile { min-width: 0; min-height: 91px; display: grid; grid-template-columns: 12px minmax(37px, auto) minmax(58px, 1fr); grid-template-rows: auto auto auto auto; align-items: center; gap: 3px 5px; padding: 6px 7px; border: 0; color: #263944; background: #fff; text-align: left; cursor: default; }.signal-tile.stale { box-shadow: inset 3px 0 #d89527; }.signal-tile.analog { grid-template-columns: 25px minmax(37px, auto) minmax(58px, 1fr); }.signal-lamp { width: 10px; height: 10px; border: 1px solid #8499a8; border-radius: 50%; background: #d7e0e6; box-shadow: inset 0 0 2px rgba(23,33,43,.24); }.signal-tile.on .signal-lamp { border-color: #128148; background: #22b866; box-shadow: 0 0 8px rgba(34,184,102,.62); }.signal-type { padding: 2px 3px; border-radius: 2px; color: #17638f; background: #dceaf2; font: 800 8px var(--font-mono, monospace); text-align: center; }.signal-kind-group.ao .signal-type { color: #87551d; background: #efe4d4; }.signal-code { font: 800 10px var(--font-mono, monospace); }.signal-value { justify-self: end; overflow: hidden; color: #183f55; font: 800 11px var(--font-mono, monospace); text-overflow: ellipsis; white-space: nowrap; }.signal-name { grid-column: 1 / -1; min-width: 0; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #415560; font-size: 10px; line-height: 1.3; }.signal-point { grid-column: 1 / -1; min-width: 0; overflow: hidden; color: #71838d; font: 8px var(--font-mono, monospace); text-overflow: ellipsis; white-space: nowrap; }.signal-quality { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 4px; color: #778791; font: 700 7px var(--font-mono, monospace); white-space: nowrap; }.signal-quality i { width: 6px; height: 6px; border-radius: 50%; background: #a4afb5; }.signal-quality.good i,.signal-quality.snapshot i { background: #2eaf70; }.signal-quality.stale i,.signal-quality.local-stale i { background: #dc982b; }.signal-quality.offline i,.signal-quality.invalid i { background: #c64e57; }.empty-state { min-height: 150px; display: grid; place-items: center; align-content: center; gap: 6px; color: #7a8992; font-size: 10px; }.empty-state strong { color: #435761; font-size: 12px; }
 .float-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 9px; border-top: 1px solid #c6d0d7; background: #edf1f3; color: #61747f; font-size: 9px; }.float-footer button { display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border: 0; background: transparent; color: #245f80; cursor: pointer; font-size: 9px; }
 .resize-handle { position: absolute; z-index: 20; touch-action: none; }.resize-n,.resize-s { left: 12px; right: 12px; height: 8px; cursor: ns-resize; }.resize-n { top: -3px; }.resize-s { bottom: -3px; }.resize-e,.resize-w { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }.resize-e { right: -3px; }.resize-w { left: -3px; }.resize-ne,.resize-se,.resize-sw,.resize-nw { width: 15px; height: 15px; }.resize-ne { top: -4px; right: -4px; cursor: nesw-resize; }.resize-se { right: -4px; bottom: -4px; cursor: nwse-resize; }.resize-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }.resize-nw { top: -4px; left: -4px; cursor: nwse-resize; }.resize-ne::after,.resize-se::after,.resize-sw::after,.resize-nw::after { content: ''; position: absolute; width: 7px; height: 7px; border-color: rgba(83,111,127,.68); border-style: solid; }.resize-ne::after { top: 4px; right: 4px; border-width: 1px 1px 0 0; }.resize-se::after { right: 4px; bottom: 4px; border-width: 0 1px 1px 0; }.resize-sw::after { bottom: 4px; left: 4px; border-width: 0 0 1px 1px; }.resize-nw::after { top: 4px; left: 4px; border-width: 1px 0 0 1px; }
 @media (max-width: 760px) { .topology-float { inset: auto 6px 6px 6px !important; width: auto !important; height: min(72vh, 620px) !important; min-width: 0; }.topology-float.minimized { height: 42px !important; }.float-titlebar { cursor: default; }.float-title small,.float-summary p,.topology-toolbar span { display: none; }.float-summary { grid-template-columns: repeat(3, 1fr); }.topology-toolbar label { width: min(210px, 52vw); }.module-card.board .module-signal-groups { grid-template-columns: minmax(0, 1fr); }.resize-handle { display: none; } }

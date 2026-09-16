@@ -385,6 +385,7 @@ pub fn run() {
             // KZ3 HTTP 在线调试
             kz3_http::kz3_http_get_diagnostic,
             kz3_http::kz3_http_get_point,
+            kz3_http::kz3_http_get_points_page,
             kz3_http::kz3_http_write_point,
             // 本地设备工作空间（平台 ID 仅在元数据中预留，不作为前置条件）
             workspace::workspace_initialize,

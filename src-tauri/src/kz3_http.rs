@@ -142,6 +142,20 @@ fn validate_point_name(point_name: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn points_page_url(base_url: &str, offset: u16, limit: u16) -> Result<Url, String> {
+    if !(1..=100).contains(&limit) {
+        return Err("点位分页 limit 必须为 1..100".to_string());
+    }
+    let base = normalize_base_url(base_url)?;
+    let mut url = base
+        .join("api/v1/points")
+        .map_err(|_| "构建设备点位分页 URL 失败".to_string())?;
+    url.query_pairs_mut()
+        .append_pair("offset", &offset.to_string())
+        .append_pair("limit", &limit.to_string());
+    Ok(url)
+}
+
 fn validate_write_target(binding: &str, value: &Value) -> Result<(), String> {
     /* Rust 层只守住 transport 允许的 bind/value 形状；工程 ID、版本、manifest
      * 和健康门禁由前端会话在每次写入前重新验证。绝不允许直接写 point/state。 */
@@ -198,6 +212,17 @@ pub async fn kz3_http_get_point(
 }
 
 #[tauri::command]
+pub async fn kz3_http_get_points_page(
+    base_url: String,
+    offset: u16,
+    limit: u16,
+    state: tauri::State<'_, Kz3HttpClient>,
+) -> Result<Kz3HttpResponse, String> {
+    let url = points_page_url(&base_url, offset, limit)?;
+    state.execute(reqwest::Method::GET, url, None).await
+}
+
+#[tauri::command]
 pub async fn kz3_http_write_point(
     base_url: String,
     point_name: String,
@@ -239,6 +264,18 @@ mod tests {
         assert!(validate_point_name("../health").is_err());
         assert!(validate_point_name("state/pid").is_err());
         assert!(validate_point_name(&"a".repeat(49)).is_err());
+    }
+
+    #[test]
+    fn 点位分页_url_固定_offset_和_limit() {
+        assert_eq!(
+            points_page_url("http://192.168.11.59:8080", 100, 100)
+                .unwrap()
+                .as_str(),
+            "http://192.168.11.59:8080/api/v1/points?offset=100&limit=100"
+        );
+        assert!(points_page_url("http://192.168.11.59:8080", 0, 0).is_err());
+        assert!(points_page_url("http://192.168.11.59:8080", 0, 101).is_err());
     }
 
     #[test]

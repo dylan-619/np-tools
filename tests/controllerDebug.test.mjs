@@ -184,7 +184,14 @@ function pointResponse(name, value) {
  */
 async function setupVerifiedKz3(
   t,
-  { fields, values = {}, projectOverrides = {}, writeStatus = 200 } = {}
+  {
+    fields,
+    values = {},
+    projectOverrides = {},
+    writeStatus = 200,
+    pageChunkSize = 100,
+    pointsPageStatus = 200
+  } = {}
 ) {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -206,6 +213,38 @@ async function setupVerifiedKz3(
         }
         if (command === 'kz3_http_get_point') {
           return pointResponse(args.pointName, pointValues[args.pointName])
+        }
+        if (command === 'kz3_http_get_points_page') {
+          if (pointsPageStatus !== 200) {
+            return {
+              status: pointsPageStatus,
+              body: JSON.stringify({ error: { code: 'not_found', message: '端点不存在' } }),
+              contentType: 'application/json',
+              elapsedMs: 1
+            }
+          }
+          const end = Math.min(
+            projectFields.length,
+            args.offset + Math.min(args.limit, pageChunkSize)
+          )
+          const points = Object.fromEntries(
+            projectFields
+              .slice(args.offset, end)
+              .map((item) => [item.name, [pointValues[item.name], 1]])
+          )
+          return {
+            status: 200,
+            body: JSON.stringify({
+              offset: args.offset,
+              limit: args.limit,
+              total: projectFields.length,
+              points,
+              count: end - args.offset,
+              next_offset: end < projectFields.length ? end : null
+            }),
+            contentType: 'application/json',
+            elapsedMs: 1
+          }
         }
         if (command === 'kz3_http_write_point') {
           if (writeStatus >= 200 && writeStatus < 300) {
@@ -575,6 +614,52 @@ test('KZ3 工程 ID、版本和点表 manifest 匹配后才可申请受控写入
     ).length,
     0
   )
+})
+
+test('KZ3 周期采样跟随实际 next_offset 分页读取全部北向点位', async (t) => {
+  const fields = [
+    field({ name: 'state.ready', bind: 'state.ready', c_type: 'bool', access: 'read' }),
+    field({ name: 'state.pressure', bind: 'state.pressure', c_type: 'float', access: 'read' }),
+    field({ name: 'state.counter', bind: 'state.counter', c_type: 'u32', access: 'read' })
+  ]
+  const { debug, calls } = await setupVerifiedKz3(t, {
+    fields,
+    values: { 'state.ready': true, 'state.pressure': 12.5, 'state.counter': 100 },
+    pageChunkSize: 2
+  })
+
+  await debug.pollOnce()
+
+  const pageReads = calls.filter((item) => item.command === 'kz3_http_get_points_page')
+  assert.deepEqual(
+    pageReads.map((item) => item.args),
+    [
+      { baseUrl: debug.baseUrl, offset: 0, limit: 30 },
+      { baseUrl: debug.baseUrl, offset: 2, limit: 30 }
+    ]
+  )
+  assert.equal(calls.some((item) => item.command === 'kz3_http_get_point'), false)
+  assert.equal(debug.samples['state.ready'].value, true)
+  assert.equal(debug.samples['state.pressure'].value, 12.5)
+  assert.equal(debug.samples['state.counter'].value, 100)
+})
+
+test('旧固件缺少分页端点时不退回高频逐点轮询', async (t) => {
+  const fields = [
+    field({ name: 'state.ready', bind: 'state.ready', c_type: 'bool', access: 'read' }),
+    field({ name: 'state.pressure', bind: 'state.pressure', c_type: 'float', access: 'read' })
+  ]
+  const { debug, calls } = await setupVerifiedKz3(t, { fields, pointsPageStatus: 404 })
+
+  await debug.pollOnce()
+  await debug.pollOnce()
+
+  assert.equal(
+    calls.filter((item) => item.command === 'kz3_http_get_points_page').length,
+    1
+  )
+  assert.equal(calls.some((item) => item.command === 'kz3_http_get_point'), false)
+  assert.deepEqual(debug.samples, {})
 })
 
 test('KZ3 manifest 不匹配保持写入锁定且不会发送 POST', async (t) => {
