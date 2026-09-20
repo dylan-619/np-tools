@@ -29,6 +29,7 @@ import {
 import { appSaveFile } from '../../../api/sjzdApi'
 import { useControllerStore } from '../../../stores/controllerStore'
 import { useControllerDebugStore } from '../../../stores/controllerDebugStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
 import { numericWriteConstraints, writeValueError } from '../../../utils/controllerDebugValues'
 import type {
   Kz3Scalar,
@@ -92,6 +93,7 @@ const POINT_GROUPS: Array<{
 
 const controller = useControllerStore()
 const debug = useControllerDebugStore()
+const workspace = useWorkspaceStore()
 const searchText = ref('')
 const categoryFilter = ref<'all' | PointDescriptor['category']>('all')
 const collapsedPointGroups = ref<Record<PointGroupKey, boolean>>({
@@ -120,6 +122,7 @@ const writeNumberInput = ref<HTMLInputElement | null>(null)
 const writeReason = ref('')
 const writeAcknowledged = ref(false)
 const pendingWriteTarget = ref<PointDescriptor | null>(null)
+const refreshingConfiguration = ref(false)
 let diagnosticResizeStartX = 0
 let diagnosticResizeStartWidth = 0
 let previousBodyCursor = ''
@@ -527,6 +530,35 @@ function togglePolling() {
   else debug.startPolling()
 }
 
+async function refreshCurrentConfiguration() {
+  if (debug.transportState !== 'disconnected') {
+    controller.showMessage('请先结束当前在线调试会话，再刷新当前设备配置', false)
+    return
+  }
+  const serialNumber =
+    debug.diagnostics.device?.data.serial_number?.trim() || workspace.activeSerialNumber.trim()
+  if (!serialNumber) {
+    controller.showMessage('尚未识别设备 SN；请先连接设备识别，或在工程组态页输入当前设备 SN', false)
+    return
+  }
+
+  refreshingConfiguration.value = true
+  try {
+    const stored = await controller.refreshWorkspaceConfigForSerial(serialNumber)
+    if (stored) {
+      controller.showMessage(`已刷新 SN ${serialNumber} 的当前配置，请重新连接并预检`)
+    } else if (!workspace.configured) {
+      controller.showMessage('尚未选择工作空间，无法刷新设备配置', false)
+    } else {
+      controller.showMessage(`SN ${serialNumber} 没有可刷新配置，继续保持当前${controller.currentConfigurationSourceLabel}`)
+    }
+  } catch (error) {
+    controller.showMessage(error instanceof Error ? error.message : String(error), false)
+  } finally {
+    refreshingConfiguration.value = false
+  }
+}
+
 function openBottomMode(mode: 'logs' | 'writes') {
   bottomMode.value = mode
   dockExpanded.value = true
@@ -599,21 +631,31 @@ onUnmounted(() => {
             {{ debug.consecutiveErrors }}</small>
         </div>
       </div>
-      <button
-        v-if="debug.transportState === 'disconnected'"
-        class="rack-btn connect"
-        @click="handleConnect"
-      >
-        <Cable :size="14" /> 连接并预检
-      </button>
-      <button
-        v-else
-        class="rack-btn disconnect"
-        :disabled="debug.transportState === 'connecting'"
-        @click="debug.disconnect()"
-      >
-        <Power :size="14" /> 结束会话
-      </button>
+      <div class="rack-actions">
+        <button
+          class="rack-btn refresh-config"
+          :disabled="refreshingConfiguration || debug.transportState !== 'disconnected'"
+          title="显式从当前设备 SN 的工作空间存档重新加载；不会自动覆盖刚导入的配置"
+          @click="refreshCurrentConfiguration"
+        >
+          <RefreshCw :size="14" :class="{ spinning: refreshingConfiguration }" /> 刷新当前配置
+        </button>
+        <button
+          v-if="debug.transportState === 'disconnected'"
+          class="rack-btn connect"
+          @click="handleConnect"
+        >
+          <Cable :size="14" /> 连接并预检
+        </button>
+        <button
+          v-else
+          class="rack-btn disconnect"
+          :disabled="debug.transportState === 'connecting'"
+          @click="debug.disconnect()"
+        >
+          <Power :size="14" /> 结束会话
+        </button>
+      </div>
     </section>
 
     <section class="identity-strip" :class="debug.compatibilityState">
@@ -2517,6 +2559,18 @@ onUnmounted(() => {
   color: #8d2028;
   background: #fff1f2;
   border-color: #d89297;
+}
+.rack-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+.rack-btn.refresh-config {
+  color: #155a87;
+  background: #edf6fb;
+  border-color: #9cc7de;
 }
 .rack-btn:disabled,
 .tool-btn:disabled {

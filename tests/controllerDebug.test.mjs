@@ -17,6 +17,7 @@ const { controllerSourceOrder, sortControllerPoints } = await server.ssrLoadModu
   '/src/utils/controllerPointOrder.ts'
 )
 const { useControllerStore } = await server.ssrLoadModule('/src/stores/controllerStore.ts')
+const { useWorkspaceStore } = await server.ssrLoadModule('/src/stores/workspaceStore.ts')
 const { useControllerDebugStore } = await server.ssrLoadModule(
   '/src/stores/controllerDebugStore.ts'
 )
@@ -89,6 +90,57 @@ test('KZ3 点表按物理模块与通道号排序而不是按创建顺序排序'
       exportedYaml.indexOf('source: rtu.dio_second.di03')
   )
   disposePinia(pinia)
+})
+
+test('导入 YAML 后自动识别 SN 不覆盖当前配置，只有显式刷新才载入设备存档', async (t) => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const controller = useControllerStore()
+  controller.doc.project.id = 'imported-project'
+  const importedYaml = controller.getYamlString()
+  const workspaceYaml = importedYaml.replace('id: imported-project', 'id: workspace-project')
+  const oldWindow = globalThis.window
+  globalThis.window = {
+    setTimeout,
+    clearTimeout,
+    __TAURI_INTERNALS__: {
+      invoke: async (command) => {
+        if (command === 'app_open_file') return ['/tmp/imported-project.yaml', importedYaml]
+        if (command === 'workspace_activate_controller') {
+          return { serialNumber: 'KZ3-TEST-001', devicePath: '/tmp/np-tools/KZ3-TEST-001' }
+        }
+        if (command === 'workspace_load_controller_config') {
+          return {
+            serialNumber: 'KZ3-TEST-001',
+            path: '/tmp/np-tools/KZ3-TEST-001/config/project_io.yaml',
+            revisionId: 'workspace-revision',
+            importedAtMs: 1,
+            content: workspaceYaml
+          }
+        }
+        throw new Error(`测试禁止未声明的工作空间调用：${command}`)
+      }
+    }
+  }
+  t.after(() => {
+    disposePinia(pinia)
+    if (oldWindow === undefined) delete globalThis.window
+    else globalThis.window = oldWindow
+  })
+
+  await controller.importYamlFile()
+  assert.equal(controller.doc.project.id, 'imported-project')
+  assert.equal(controller.currentConfigurationSource, 'imported')
+
+  const workspace = useWorkspaceStore()
+  workspace.rootPath = '/tmp/np-tools'
+  await controller.loadWorkspaceConfigForSerial('KZ3-TEST-001')
+  assert.equal(controller.doc.project.id, 'imported-project')
+  assert.equal(controller.currentConfigurationSource, 'imported')
+
+  await controller.refreshWorkspaceConfigForSerial('KZ3-TEST-001')
+  assert.equal(controller.doc.project.id, 'workspace-project')
+  assert.equal(controller.currentConfigurationSource, 'workspace')
 })
 
 function descriptor(overrides = {}) {

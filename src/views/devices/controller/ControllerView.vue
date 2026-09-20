@@ -16,7 +16,8 @@ import {
   ArrowLeft,
   LayoutDashboard,
   PanelsTopLeft,
-  Wrench
+  Wrench,
+  RefreshCw
 } from 'lucide-vue-next'
 import { useControllerStore } from '../../../stores/controllerStore'
 import { useWorkspaceStore } from '../../../stores/workspaceStore'
@@ -49,7 +50,7 @@ watch(
   }
 )
 
-async function locateDeviceWorkspace() {
+async function refreshDeviceWorkspace() {
   const serialNumber = manualSerialNumber.value.trim()
   if (!serialNumber) {
     controller.showMessage('请输入设备 SN', false)
@@ -60,11 +61,13 @@ async function locateDeviceWorkspace() {
     return
   }
   try {
-    const stored = await controller.loadWorkspaceConfigForSerial(serialNumber)
+    const stored = await controller.refreshWorkspaceConfigForSerial(serialNumber)
     if (!workspace.configured) {
       controller.showMessage('已记录当前设备 SN；请先在全局设置中选择工作空间')
-    } else if (!stored) {
+    } else if (!workspace.currentConfig) {
       controller.showMessage(`已切换到设备 ${serialNumber}；当前没有已归档配置`)
+    } else if (!stored) {
+      controller.showMessage(`设备 ${serialNumber} 的本地配置尚未刷新成功`, false)
     }
   } catch (error) {
     controller.showMessage(error instanceof Error ? error.message : String(error), false)
@@ -204,15 +207,15 @@ function leaveDebugMode() {
             type="text"
             maxlength="64"
             placeholder="连接后自动识别，也可手工输入"
-            @keyup.enter="locateDeviceWorkspace"
+            @keyup.enter="refreshDeviceWorkspace"
           />
-          <button class="workspace-locate-btn" :disabled="workspace.busy" @click="locateDeviceWorkspace">
-            <FolderOpen :size="14" />
-            <span>加载设备配置</span>
+          <button class="workspace-locate-btn" :disabled="workspace.busy" @click="refreshDeviceWorkspace">
+            <RefreshCw :size="14" />
+            <span>刷新当前配置</span>
           </button>
         </div>
         <div class="workspace-state" :class="{ ready: !!workspace.currentConfig }">
-          <span>{{ workspace.currentConfig ? '已加载本地配置' : workspace.activeDevicePath ? '当前设备目录已就绪' : '等待设备配置' }}</span>
+          <span>{{ workspace.currentConfig ? `当前：${controller.currentConfigurationSourceLabel}` : workspace.activeDevicePath ? '当前设备目录已就绪' : '等待设备配置' }}</span>
           <code v-if="workspace.currentConfig">{{ workspace.currentConfig.revisionId }}</code>
           <small v-if="workspace.activeDevicePath" :title="workspace.activeDevicePath">{{ workspace.activeDevicePath }}</small>
           <small v-else>导入 YAML 时会归档到当前 SN</small>

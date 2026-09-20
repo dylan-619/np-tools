@@ -345,8 +345,10 @@ watch(
       const stored = await controller.loadWorkspaceConfigForSerial(serialNumber)
       if (!workspace.configured) {
         showMessage(`已识别控制器 SN ${serialNumber}；请先在全局设置中选择工作空间`)
-      } else if (stored) {
+      } else if (stored && !controller.hasManualCurrentConfiguration) {
         showMessage(`当前控制器已切换为 ${serialNumber}，并自动加载本地配置`)
+      } else if (stored) {
+        showMessage(`当前控制器已切换为 ${serialNumber}，保持当前${controller.currentConfigurationSourceLabel}`)
       } else {
         showMessage(`当前控制器已切换为 ${serialNumber}，设备工作目录已创建`)
       }

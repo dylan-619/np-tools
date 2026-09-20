@@ -794,7 +794,11 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       if (detectedSerialNumber) {
         try {
           const storedConfig = await controller.loadWorkspaceConfigForSerial(detectedSerialNumber)
-          if (storedConfig && session.value?.sessionId === sessionId) {
+          if (
+            storedConfig &&
+            !controller.hasManualCurrentConfiguration &&
+            session.value?.sessionId === sessionId
+          ) {
             const loadedProject = controller.doc.project
             session.value.expectedProjectId = loadedProject.id
             session.value.expectedProjectVersion = loadedProject.version
@@ -804,6 +808,13 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
               'session',
               `已按设备 SN ${detectedSerialNumber} 自动加载本地配置`,
               `${loadedProject.id}@${loadedProject.version}；${storedConfig.revisionId}`
+            )
+          } else if (storedConfig) {
+            appendLog(
+              'info',
+              'session',
+              `已识别设备 SN ${detectedSerialNumber}`,
+              `保留当前${controller.currentConfigurationSourceLabel}；设备存档 ${storedConfig.revisionId} 可通过“刷新当前配置”显式载入`
             )
           } else {
             appendLog(

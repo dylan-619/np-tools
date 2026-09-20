@@ -109,12 +109,35 @@ project:
       - {name: expansion_marquee_08, bind: point.expansion_marquee_08, c_type: bool, access: read, reference: "00019"}
 `
 
+type CurrentConfigurationSource = 'default' | 'preset' | 'imported' | 'edited' | 'workspace'
+
+const CONFIGURATION_SOURCE_LABEL: Record<CurrentConfigurationSource, string> = {
+  default: '默认工程',
+  preset: '工程模板',
+  imported: '已导入 YAML',
+  edited: 'YAML 编辑器',
+  workspace: '设备工作空间',
+}
+
 export const useControllerStore = defineStore('controller', () => {
   const workspace = useWorkspaceStore()
   const activeTab = ref<'overview' | 'hardware' | 'points' | 'variables' | 'northbound' | 'debug' | 'yaml'>('overview')
   const doc = ref<ProjectIoDocument>(deserializeProjectIoYaml(DEFAULT_MARQUEE_YAML))
+  const currentConfigurationSource = ref<CurrentConfigurationSource>('default')
   const toastMessage = ref<{ text: string; isSuccess: boolean } | null>(null)
   let toastTimer: number | null = null
+
+  const currentConfigurationSourceLabel = computed(
+    () => CONFIGURATION_SOURCE_LABEL[currentConfigurationSource.value]
+  )
+  const hasManualCurrentConfiguration = computed(
+    () => currentConfigurationSource.value === 'imported' || currentConfigurationSource.value === 'edited'
+  )
+
+  function replaceDocument(nextDocument: ProjectIoDocument, source: CurrentConfigurationSource) {
+    doc.value = nextDocument
+    currentConfigurationSource.value = source
+  }
 
   function showMessage(text: string, isSuccess = true) {
     if (toastTimer) clearTimeout(toastTimer)
@@ -1057,10 +1080,10 @@ export const useControllerStore = defineStore('controller', () => {
 
   function loadPreset(presetKey: 'marquee' | 'full_expansion' | 'blank') {
     if (presetKey === 'marquee') {
-      doc.value = deserializeProjectIoYaml(DEFAULT_MARQUEE_YAML)
+      replaceDocument(deserializeProjectIoYaml(DEFAULT_MARQUEE_YAML), 'preset')
       showMessage('已载入《扩展 DO 北向跑马灯》工程配置模板')
     } else if (presetKey === 'blank') {
-      doc.value = {
+      replaceDocument({
         schema: 'kz3-project-io/v3',
         project: {
           name: '新工艺控制器工程',
@@ -1100,7 +1123,7 @@ export const useControllerStore = defineStore('controller', () => {
             fields: [],
           },
         },
-      }
+      }, 'preset')
       showMessage('已创建空白 KZ3 工程配置')
     }
   }
@@ -1136,31 +1159,40 @@ export const useControllerStore = defineStore('controller', () => {
         return
       }
 
-      doc.value = importedDocument
+      replaceDocument(importedDocument, 'imported')
       if (workspace.readyForArchive) {
         try {
           const stored = await workspace.archiveControllerConfig(result.content)
           showMessage(
-            `已载入工程配置，并归档到 SN ${stored.serialNumber}（${stored.revisionId}）`
+            `已载入工程配置并设为当前可用配置，已归档到 SN ${stored.serialNumber}（${stored.revisionId}）`
           )
         } catch (err: any) {
           showMessage(`工程配置已载入，但归档失败: ${err.message}`, false)
         }
       } else if (!workspace.configured) {
-        showMessage('工程配置已载入；尚未选择工作空间，本次未归档')
+        showMessage('工程配置已载入并设为当前可用配置；尚未选择工作空间，本次未归档')
       } else {
-        showMessage('工程配置已载入；尚未识别或输入设备 SN，本次未归档')
+        showMessage('工程配置已载入并设为当前可用配置；尚未识别或输入设备 SN，本次未归档')
       }
     }
   }
 
-  async function loadWorkspaceConfigForSerial(serialNumber: string) {
+  async function loadWorkspaceConfigForSerial(
+    serialNumber: string,
+    options: { force?: boolean } = {}
+  ) {
     const stored = await workspace.loadForSerialNumber(serialNumber)
     if (!stored?.content) return null
-    try {
-      doc.value = deserializeProjectIoYaml(stored.content)
+    if (hasManualCurrentConfiguration.value && !options.force) {
       showMessage(
-        `已按设备 SN ${stored.serialNumber} 自动加载本地配置（${stored.revisionId}）`
+        `已识别设备 ${stored.serialNumber}；保持当前${currentConfigurationSourceLabel.value}，如需载入该设备存档请点击“刷新当前配置”`
+      )
+      return stored
+    }
+    try {
+      replaceDocument(deserializeProjectIoYaml(stored.content), 'workspace')
+      showMessage(
+        `已载入设备 ${stored.serialNumber} 的工作空间配置（${stored.revisionId}）`
       )
       return stored
     } catch (err: any) {
@@ -1169,14 +1201,18 @@ export const useControllerStore = defineStore('controller', () => {
     }
   }
 
+  async function refreshWorkspaceConfigForSerial(serialNumber: string) {
+    return await loadWorkspaceConfigForSerial(serialNumber, { force: true })
+  }
+
   function getYamlString(): string {
     return serializeProjectIoYaml(doc.value)
   }
 
   function applyYamlString(yamlText: string) {
     try {
-      doc.value = deserializeProjectIoYaml(yamlText)
-      showMessage('已成功应用 YAML 编辑更改！')
+      replaceDocument(deserializeProjectIoYaml(yamlText), 'edited')
+      showMessage('已成功应用 YAML 编辑更改，并设为当前可用配置！')
     } catch (err: any) {
       showMessage(`应用 YAML 失败: ${err.message}`, false)
       throw err
@@ -1186,6 +1222,9 @@ export const useControllerStore = defineStore('controller', () => {
   return {
     doc,
     activeTab,
+    currentConfigurationSource,
+    currentConfigurationSourceLabel,
+    hasManualCurrentConfiguration,
     toastMessage,
     availableInputSources,
     availableOutputSources,
@@ -1219,6 +1258,7 @@ export const useControllerStore = defineStore('controller', () => {
     exportYamlFile,
     importYamlFile,
     loadWorkspaceConfigForSerial,
+    refreshWorkspaceConfigForSerial,
     getYamlString,
     applyYamlString,
   }
