@@ -43,7 +43,7 @@ import {
   buildCat1UpdateCommands,
   buildDebugCommand,
   buildEdgeTcpCommand,
-  buildEthernetCommands,
+  buildEthernetInitCommand,
   buildKz3HttpBaseUrl,
   buildIdentityCommand,
   buildSleInitCommand,
@@ -167,6 +167,10 @@ const savedHttpUrl = computed(() => {
 const latestNetworkRecovery = computed(
   () => maintenance.networkRecoveryAttempts[maintenance.networkRecoveryAttempts.length - 1]
 )
+const ethernetSnapshotReady = computed(() => {
+  const fields = maintenance.snapshots.ethernet?.fields
+  return Boolean(fields?.SAVED_IP && fields.SAVED_MASK && fields.SAVED_GW && fields.SAVED_PORT)
+})
 
 function showMessage(text: string, error = false) {
   pageMessage.value = { text, error }
@@ -688,8 +692,9 @@ onMounted(() => {
               <label class="form-field"><span>网关</span><input v-model="ethernet.gateway" class="mono"></label>
               <label class="form-field"><span>HTTP 端口</span><input v-model="ethernet.port" class="mono" inputmode="numeric"></label>
             </div>
-            <p class="info-box">按 IP → MASK → GW → PORT 逐条发送；每条等待回包并完成 SHOW 复核后再发送下一条。写入后 LwIP 不在线切换，必须重启并再次查询。</p>
-            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认逐项写入 Ethernet 配置', '四个参数将拆为独立指令顺序写入；任意一条失败会立即停止。成功后仍需物理重启。', () => buildEthernetCommands(ethernet))"><Save :size="14" /> 逐项写入网络配置</button>
+            <p class="info-box">先点击“查询”读取完整 SAVED 配置，工具会自动回填。保存时使用单条 <code>@CFG,ETH,INIT</code> 原子提交 IP、掩码、网关和端口，并在发送前校验 IP/网关同网段及 HTTP 端口不占用 Modbus TCP 502。写入后必须重启并再次查询。</p>
+            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy || !ethernetSnapshotReady" title="先查询并读取完整 SAVED 网络配置后，才能原子保存" @click="requestWrite('确认原子写入 Ethernet 配置', '将通过一条 ETH,INIT 指令整体校验并保存四项网络参数；设备拒绝时不会留下部分新配置。成功后仍需物理重启。', () => buildEthernetInitCommand(ethernet))"><Save :size="14" /> 原子保存网络配置</button>
+            <small v-if="!ethernetSnapshotReady" class="warning-text">请先查询 Ethernet，读取完整 SAVED_IP、SAVED_MASK、SAVED_GW 与 SAVED_PORT 后才能保存。</small>
           </div>
           <div class="snapshot-card">
             <h3>RUN / SAVED 对照</h3>
@@ -916,6 +921,7 @@ select, input { min-height: 30px; border: 1px solid #aebcc7; border-radius: 4px;
 .info-box, .warning-box, .critical-box { padding: 8px 9px; border-radius: 4px; font-size: 10px; line-height: 1.55; }
 .info-box { color: #28536a; background: #edf6fb; border: 1px solid #b9d7e7; }
 .warning-box { color: #7a4b13; background: #fff8e9; border: 1px solid #dfc38f; }
+.warning-text { display: block; margin-top: 7px; color: #8b5a16; font-size: 9px; line-height: 1.45; }
 .critical-box { color: #942a32; background: #fff0f1; border: 1px solid #d99ba0; }
 dl { margin: 0; }
 dl div { min-height: 32px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #dce3e7; }

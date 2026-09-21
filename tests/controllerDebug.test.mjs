@@ -1344,3 +1344,28 @@ test('KZ3 Ethernet 复连只从已校验的单一 SAVED 候选生成 HTTP 地址
     /连续掩码/
   )
 })
+
+test('KZ3 Ethernet INIT 原子提交预先拒绝固件会拒绝的候选网络', () => {
+  const candidate = {
+    ip: '192.168.30.66',
+    mask: '255.255.255.0',
+    gateway: '192.168.30.1',
+    port: '8080'
+  }
+  assert.equal(
+    protocol.buildEthernetInitCommand(candidate),
+    '@CFG,ETH,INIT,192.168.30.66,255.255.255.0,192.168.30.1,8080'
+  )
+  assert.throws(
+    () => protocol.buildEthernetInitCommand({ ...candidate, gateway: '192.168.1.1' }),
+    /同一子网/
+  )
+  assert.throws(
+    () => protocol.buildEthernetInitCommand({ ...candidate, ip: '192.168.30.0' }),
+    /网络地址/
+  )
+  assert.throws(
+    () => protocol.buildEthernetInitCommand({ ...candidate, port: '502' }),
+    /Modbus TCP/
+  )
+})

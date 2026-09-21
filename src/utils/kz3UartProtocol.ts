@@ -192,6 +192,16 @@ function normalizeNetmask(value: string): string {
   return octets.join('.')
 }
 
+function ipv4ToUint(value: string, fieldName: string): number {
+  return parseIpv4(value, fieldName).reduce((result, octet) => result * 256 + octet, 0)
+}
+
+function isUnicastHostInSubnet(address: number, mask: number): boolean {
+  const network = (address & mask) >>> 0
+  const broadcast = (network | ((~mask) >>> 0)) >>> 0
+  return address !== network && address !== broadcast
+}
+
 function normalizeUint(value: string, minimum: number, maximum: number, name: string): string {
   const text = value.trim()
   if (!/^\d+$/.test(text)) throw new Error(`${name} 必须是十进制整数`)
@@ -237,17 +247,42 @@ export function buildIdentityCommand(serialNumber: string): string {
   return validateKz3Command(`@CFG,SYS,SN,${value}`)
 }
 
-export function buildEthernetCommands(candidate: Kz3EthernetCandidate): string[] {
+function normalizeEthernetCandidate(candidate: Kz3EthernetCandidate): Kz3EthernetCandidate {
   const ip = normalizeIpv4(candidate.ip, 'IP')
   const mask = normalizeNetmask(candidate.mask)
   const gateway = normalizeIpv4(candidate.gateway, '网关')
   const port = normalizeUint(candidate.port, 1, 65535, 'HTTP 端口')
-  return [
-    validateKz3Command(`@CFG,ETH,IP,${ip}`),
-    validateKz3Command(`@CFG,ETH,MASK,${mask}`),
-    validateKz3Command(`@CFG,ETH,GW,${gateway}`),
-    validateKz3Command(`@CFG,ETH,PORT,${port}`),
-  ]
+  const ipValue = ipv4ToUint(ip, 'IP')
+  const maskValue = ipv4ToUint(mask, '子网掩码')
+  const gatewayValue = ipv4ToUint(gateway, '网关')
+
+  if (!isUnicastHostInSubnet(ipValue, maskValue)) {
+    throw new Error('IP 不能是当前子网的网络地址或广播地址')
+  }
+  if (!isUnicastHostInSubnet(gatewayValue, maskValue)) {
+    throw new Error('网关不能是当前子网的网络地址或广播地址')
+  }
+  if (ipValue === gatewayValue) {
+    throw new Error('IP 与网关不能相同')
+  }
+  if ((ipValue & maskValue) !== (gatewayValue & maskValue)) {
+    throw new Error('IP 与网关必须处于同一子网；请同时填写完整 IP、掩码和网关')
+  }
+  if (port === '502') {
+    throw new Error('HTTP 端口不能使用 502；该端口固定保留给 Modbus TCP')
+  }
+  return { ip, mask, gateway, port }
+}
+
+/**
+ * Ethernet 保存使用固件的 INIT 原子事务，避免逐项修改时临时候选
+ * 与旧网关/掩码不匹配而被完整网络校验拒绝。
+ */
+export function buildEthernetInitCommand(candidate: Kz3EthernetCandidate): string {
+  const normalized = normalizeEthernetCandidate(candidate)
+  return validateKz3Command(
+    `@CFG,ETH,INIT,${normalized.ip},${normalized.mask},${normalized.gateway},${normalized.port}`
+  )
 }
 
 /**
@@ -264,10 +299,8 @@ export function buildEdgeTcpCommand(candidate: Kz3EdgeTcpCandidate): string {
  * 只由已通过 UART1 Ethernet 字段校验的候选值生成 HTTP 目标，不承担网段发现或扫描职责。
  */
 export function buildKz3HttpBaseUrl(candidate: Kz3EthernetCandidate): string {
-  const commands = buildEthernetCommands(candidate)
-  const ip = commands[0].split(',')[3]
-  const port = commands[3].split(',')[3]
-  return `http://${ip}:${port}`
+  const normalized = normalizeEthernetCandidate(candidate)
+  return `http://${normalized.ip}:${normalized.port}`
 }
 
 function normalizeSleName(value: string): string {
