@@ -1,6 +1,6 @@
 [package]
 name = "desktop"
-version = "1.0.6"
+version = "1.0.7"
 description = "NP-Tools Hardware Debugging Platform"
 authors = ["you"]
 edition = "2021"

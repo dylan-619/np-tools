@@ -1369,3 +1369,16 @@ test('KZ3 Ethernet INIT 原子提交预先拒绝固件会拒绝的候选网络',
     /Modbus TCP/
   )
 })
+
+test('KZ3 身份查询兼容可选的逻辑代码块版本字段', () => {
+  const legacy = protocol.parseKz3ProtocolLine(
+    'OK,SYS,SN=020325090118,TYPE=203,ADDR=1,VALID=1'
+  )
+  const current = protocol.parseKz3ProtocolLine(
+    'OK,SYS,SN=020325090118,TYPE=203,ADDR=1,VALID=1,LOGIC_VER=1.2.3'
+  )
+
+  assert.equal(legacy?.fields.SN, '020325090118')
+  assert.equal(legacy?.fields.LOGIC_VER, undefined)
+  assert.equal(current?.fields.LOGIC_VER, '1.2.3')
+})

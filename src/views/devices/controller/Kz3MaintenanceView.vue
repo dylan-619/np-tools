@@ -167,6 +167,9 @@ const savedHttpUrl = computed(() => {
 const latestNetworkRecovery = computed(
   () => maintenance.networkRecoveryAttempts[maintenance.networkRecoveryAttempts.length - 1]
 )
+const logicSoftwareVersion = computed(
+  () => maintenance.snapshots.system?.fields.LOGIC_VER?.trim() || ''
+)
 const ethernetSnapshotReady = computed(() => {
   const fields = maintenance.snapshots.ethernet?.fields
   return Boolean(fields?.SAVED_IP && fields.SAVED_MASK && fields.SAVED_GW && fields.SAVED_PORT)
@@ -653,6 +656,11 @@ onMounted(() => {
                 {{ !hasSnapshot('edge') ? '尚未查询' : isOne('edge', 'REBOOT_REQUIRED') ? '保存值待重启' : isOne('edge', 'ONLINE') ? '客户端 ONLINE' : '客户端未上线' }}
               </small>
             </button>
+            <div v-if="logicSoftwareVersion" class="summary-card software-version-card">
+              <div class="card-top"><TerminalSquare :size="18" /><span>软件版本</span></div>
+              <strong class="mono" :title="logicSoftwareVersion">{{ logicSoftwareVersion }}</strong>
+              <small>逻辑代码块版本</small>
+            </div>
           </div>
 
           <div class="status-matrix">
@@ -895,6 +903,8 @@ select, input { min-height: 30px; border: 1px solid #aebcc7; border-radius: 4px;
 .summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
 .summary-card { min-height: 112px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 11px; border: 1px solid #c6d0d8; border-radius: 5px; background: linear-gradient(145deg,#fff,#f5f8fa); color: #17212b; text-align: left; cursor: pointer; box-shadow: 0 1px 2px rgba(27,45,58,.05); }
 .summary-card:hover { border-color: #83aac4; transform: translateY(-1px); }
+.summary-card.software-version-card { cursor: default; }
+.summary-card.software-version-card:hover { border-color: #c6d0d8; transform: none; }
 .card-top { width: 100%; display: flex; align-items: center; gap: 7px; color: #486675; font-size: 10px; font-weight: 700; }
 .summary-card > strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .summary-card small { margin-top: auto; font-size: 9px; }
