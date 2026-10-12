@@ -317,7 +317,9 @@ async function confirmWrite() {
       }
     }
     showMessage(
-      action.commands.length > 1
+      action.commands.length === 1 && action.commands[0] === '@RST'
+        ? '设备已接受软重启指令 @RST；请等待设备重新启动'
+        : action.commands.length > 1
         ? `${action.commands.length} 项配置已逐条写入，每条均完成回包与 SHOW 复核；请继续检查生效层级`
         : '设备已接受写入，并已执行对应 SHOW 复核；请继续检查生效层级'
     )

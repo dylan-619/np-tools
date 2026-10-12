@@ -516,6 +516,7 @@ export function getCommandGroup(command: string): Kz3ConfigGroup {
 }
 
 export function getFollowUpQuery(command: string): string | null {
+  if (command === '@RST') return null
   if (Object.values(KZ3_QUERY_COMMANDS).includes(command)) return null
   return KZ3_QUERY_COMMANDS[getCommandGroup(command)]
 }
