@@ -1,4 +1,4 @@
-# NP-Tools 工业硬件产品调试与配置平台 (v1.0.4)
+# NP-Tools 工业硬件产品调试与配置平台 (v1.0.8)
 
 > 基于 **Tauri v2 + Rust + Vue 3 (Vite + TypeScript) + Pinia + ECharts** 构建的高性能、跨平台（Windows / macOS）现代化工业硬件调试与产线生产配置工具。
 
@@ -111,7 +111,7 @@ pnpm tauri build
 
 #### 打包输出产物路径：
 编译完成后，可在以下路径获取独立的 Windows 安装程序：
-- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.0.4_x64-setup.exe`
+- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.0.8_x64-setup.exe`
 - **单文件便携可执行程序**：`src-tauri\target\release\np-tools.exe`
 
 ---
