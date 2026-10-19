@@ -1,3 +1,14 @@
+export const RS485_BAUD_RATES = [9600, 19200, 38400, 57600, 115200] as const
+export type Rs485BaudRate = typeof RS485_BAUD_RATES[number]
+export interface Rs485BaudResponse {
+  event: 'CONFIG' | 'SAVED' | 'ERROR'
+  status: 'OK' | 'ERROR'
+  activeBaud: Rs485BaudRate | 'UNKNOWN'
+  savedBaud: Rs485BaudRate | 'UNSET' | 'INVALID' | 'UNKNOWN'
+  pendingRestart: 'YES' | 'NO' | 'UNKNOWN'
+  code?: string
+}
+
 export interface ModbusPointConfig {
   slaveAddr: number      // 1 ~ 247
   funcCode: number       // 1: 01H, 2: 02H, 3: 03H, 4: 04H

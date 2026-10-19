@@ -125,6 +125,17 @@ sequenceDiagram
 
 ### 模块四：Modbus RTU 扩展从站管理 (Modbus Manager)
 
+#### 全局采集波特率
+
+Modbus 页面提供一个整条 UART3 总线共享的波特率下拉框，支持 9600/19200/38400/57600/115200，固定 8N1。电脑连接 UART1 保持 115200。
+
+- `RS485:LIST`：实际读回 EEPROM，分别显示运行值、保存值及待重启状态；未设置使用默认 9600。
+- `RS485:BAUD:<波特率>`：保存，必须收到 `RS485:SAVED,status=OK` 后再执行 LIST 并确认保存值一致；不能将保存成功显示为已经切换。
+- `RS485:BAUD:DEFAULT`：保存 9600，只恢复波特率，不清空点表。
+- `@RST`：用户确认后仅发送重启指令，启动后再次读取确认运行值；不自动重启、不自动重发写入。
+
+查询回显使用 `RS485:CONFIG`，包含 `active_baud、saved_baud、default_baud、pending_restart`。保存值还可能是 `UNSET / INVALID / UNKNOWN`；错误回显以 status=ERROR 和 code 明确给出。旧固件回复不支持时禁用保存入口，原有点表与 DEBUG 功能继续使用原协议。公共串口指令库也提供查询、设置 115200 和恢复 9600 的入口。
+
 #### 4.1 表格化点位维护界面
 支持最多 **16 个点位**，以响应式数据表格（Data Grid）呈现：
 

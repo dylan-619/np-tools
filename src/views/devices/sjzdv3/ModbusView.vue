@@ -19,6 +19,7 @@ import {
 import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
 import {
+  RS485_BAUD_RATES,
   MODBUS_FUNC_OPTIONS,
   MODBUS_DATA_TYPE_OPTIONS,
   MODBUS_BYTE_ORDER_OPTIONS,
@@ -36,6 +37,22 @@ import CustomSelect from '../../../components/common/CustomSelect.vue'
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
 const MAX_MODBUS_POINTS = 100
+const selectedBaud = ref<number>(9600)
+const baudOptions = RS485_BAUD_RATES.map((value) => ({ value, label: `${value} bps` }))
+const showBaudRestartModal = ref(false)
+watch(() => serial.connectedPort, () => {
+  showBaudRestartModal.value = false
+  selectedBaud.value = 9600
+})
+const baudValueLabels: Record<string, string> = { UNSET: '未设置（默认 9600）', INVALID: '保存值无效', UNKNOWN: '未知' }
+function baudLabel(value: number | string | undefined) {
+  return value === undefined ? '尚未读取' : baudValueLabels[String(value)] || `${value} bps`
+}
+watch(() => sjzd.rs485BaudConfig, (config) => {
+  if (!config) return
+  if (typeof config.savedBaud === 'number') selectedBaud.value = config.savedBaud
+  else if (typeof config.activeBaud === 'number') selectedBaud.value = config.activeBaud
+})
 
 const showResetModal = ref(false)
 // Keep the capture console out of the way until a test starts or the user opens it.
@@ -417,6 +434,7 @@ onMounted(() => {
       const bridge = await sjzd.queryWlanBridge()
       if (!bridge || bridge.active) return
       await sjzd.queryModbusPoints()
+      await sjzd.queryRs485Baud()
     })()
   } else {
     sjzd.modbusPoints = []
@@ -532,6 +550,40 @@ onMounted(() => {
         </div>
       </div>
     </header>
+
+    <section class="baud-card" aria-label="RS485 总线波特率">
+      <div class="baud-heading">
+        <strong>RS485 采集波特率</strong>
+        <span>全总线统一 · 8N1 · 默认 9600 · 保存后重启生效</span>
+      </div>
+      <div class="baud-controls">
+        <div class="baud-select">
+          <CustomSelect v-model="selectedBaud" :options="baudOptions" size="sm"
+            :disabled="!serial.connectedPort || sjzd.isBusy || sjzd.rs485BaudSupported !== true" />
+        </div>
+        <button class="btn btn-secondary" :disabled="!serial.connectedPort || sjzd.wlanBridgeStatus?.active || sjzd.isBusy"
+          @click="sjzd.queryRs485Baud" title="RS485:LIST：实际读回 EEPROM">读取</button>
+        <button class="btn btn-primary" :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.rs485BaudSupported !== true"
+          @click="sjzd.saveRs485Baud(selectedBaud)" title="RS485:BAUD:波特率">保存</button>
+        <button class="btn btn-secondary" :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.rs485BaudSupported !== true"
+          @click="sjzd.saveRs485Baud('DEFAULT')" title="RS485:BAUD:DEFAULT">恢复 9600</button>
+        <button v-if="sjzd.rs485BaudConfig?.pendingRestart === 'YES'" class="btn btn-secondary"
+          :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy" @click="showBaudRestartModal = true">重启设备</button>
+      </div>
+      <div class="baud-status" aria-live="polite">
+        <span>运行值：{{ baudLabel(sjzd.rs485BaudConfig?.activeBaud) }}</span>
+        <span>EEPROM：{{ baudLabel(sjzd.rs485BaudConfig?.savedBaud) }}</span>
+        <strong v-if="sjzd.rs485BaudConfig?.pendingRestart === 'YES'">待重启生效</strong>
+        <span v-else-if="sjzd.rs485BaudConfig?.pendingRestart === 'NO'">无需重启</span>
+        <span v-if="sjzd.rs485BaudConfig?.code" class="baud-error">{{ sjzd.rs485BaudConfig.code }}</span>
+      </div>
+      <p v-if="sjzd.rs485BaudSupported === false" class="baud-error">当前固件不支持波特率配置，请升级固件。</p>
+      <p class="baud-hint">电脑连接 UART1 仍使用 115200；所有从站须使用相同采集波特率。重启后请再次读取确认。</p>
+    </section>
+    <ConfirmModal :visible="showBaudRestartModal" title="重启设备使采集波特率生效"
+      message="重启会暂时中断采集和无线连接。启动后请再次读取波特率，确认实际运行值。"
+      confirm-text="重启设备" danger-level="high"
+      @confirm="showBaudRestartModal = false; sjzd.resetSystem()" @cancel="showBaudRestartModal = false" />
 
     <!-- Main Content: Data Grid -->
     <div class="table-card">
@@ -813,6 +865,20 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.baud-card {
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle, #d5dde4);
+  border-radius: var(--radius-sm, 5px);
+  background: var(--color-surface-1, #ffffff);
+}
+.baud-heading, .baud-controls, .baud-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.baud-heading { margin-bottom: 10px; }
+.baud-heading span, .baud-status, .baud-hint { font-size: 0.76rem; color: var(--text-muted, #40515f); }
+.baud-select { width: 150px; }
+.baud-status { margin-top: 10px; }
+.baud-status strong { color: #9a5b00; }
+.baud-hint { margin: 8px 0 0; }
+.baud-error { color: #b42318; font-size: 0.76rem; }
 .view-container {
   padding: var(--page-gutter, 12px);
   display: flex;

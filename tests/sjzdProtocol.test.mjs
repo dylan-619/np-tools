@@ -5,7 +5,7 @@ import { createServer } from 'vite'
 // 复用 Vite 的 TypeScript 加载器；仅验证桌面工具对 SJZDV3 结构化串口协议的判定。
 const server = await createServer({
   configFile: false,
-  server: { middlewareMode: true, watch: null, hmr: false },
+  server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   optimizeDeps: { noDiscovery: true, include: [] },
   appType: 'custom',
 })
@@ -13,6 +13,7 @@ after(() => server.close())
 
 const configProtocol = await server.ssrLoadModule('/src/utils/sjzdConsoleProtocol.ts')
 const debugProtocol = await server.ssrLoadModule('/src/utils/sjzdModbusDebug.ts')
+const baudProtocol = await server.ssrLoadModule('/src/utils/sjzdRs485Baud.ts')
 
 function completeSnapshot(feature, lines) {
   const collector = new configProtocol.SjzdConfigSnapshotCollector(feature)
@@ -195,4 +196,120 @@ test('SJZ Modbus DEBUG 保留同一 ID 的异常与 BUSY 终态，不接受其�
     wrongEndLines
   )
   assert.equal(wrongEnd.status, 'protocol_error')
+})
+
+
+
+test('SJZ 全局波特率严格构造命令，默认恢复不清点表', () => {
+  for (const baud of [9600, 19200, 38400, 57600, 115200]) {
+    assert.equal(baudProtocol.buildRs485BaudCommand(baud), `RS485:BAUD:${baud}`)
+  }
+  assert.equal(baudProtocol.buildRs485BaudCommand('DEFAULT'), 'RS485:BAUD:DEFAULT')
+  for (const baud of [0, -1, 4800, 9600.5, NaN, Infinity, '9600junk']) {
+    assert.throws(() => baudProtocol.buildRs485BaudCommand(baud))
+  }
+})
+
+test('SJZ 波特率区分未设置、已保存待重启、重启运行值及 EEPROM 读取失败', () => {
+  const parse = baudProtocol.parseRs485BaudResponse
+  assert.equal(parse('RS485:CONFIG,status=OK,active_baud=9600,saved_baud=UNSET,default_baud=9600,pending_restart=NO')?.savedBaud, 'UNSET')
+  const saved = parse('RS485:SAVED,status=OK,active_baud=9600,saved_baud=115200,pending_restart=YES')
+  assert.equal(saved?.event, 'SAVED')
+  assert.equal(saved?.activeBaud, 9600)
+  assert.equal(saved?.savedBaud, 115200)
+  assert.equal(saved?.pendingRestart, 'YES')
+  assert.equal(parse('RS485:CONFIG,status=OK,active_baud=115200,saved_baud=115200,default_baud=9600,pending_restart=NO')?.activeBaud, 115200)
+  assert.equal(parse('RS485:CONFIG,status=ERROR,code=STORAGE_READ,active_baud=9600,saved_baud=UNKNOWN,default_baud=9600,pending_restart=UNKNOWN')?.savedBaud, 'UNKNOWN')
+  assert.equal(parse('RS485:CONFIG,status=ERROR,code=UART_INIT_FAILED,active_baud=UNKNOWN,saved_baud=9600,default_baud=9600,pending_restart=UNKNOWN')?.activeBaud, 'UNKNOWN')
+})
+
+test('SJZ 波特率拒绝不完整回执、非法数值、重复字段及伪造的已生效状态', () => {
+  for (const line of [
+    'RS485:SAVED,status=OK,active_baud=9600,saved_baud=115200,pending_restart=NO',
+    'RS485:SAVED,status=OK,active_baud=9600,saved_baud=UNSET,pending_restart=NO',
+    'RS485:CONFIG,status=OK,active_baud=9600,saved_baud=115200,pending_restart=YES',
+    'RS485:CONFIG,status=OK,active_baud=4800,saved_baud=9600,default_baud=9600,pending_restart=YES',
+    'RS485:CONFIG,status=OK,active_baud=9600,saved_baud=UNKNOWN,default_baud=9600,pending_restart=UNKNOWN',
+    'RS485:CONFIG,status=OK,active_baud=9600,saved_baud=INVALID,default_baud=9600,pending_restart=NO',
+    'RS485:ERROR,status=ERROR,active_baud=9600,saved_baud=UNKNOWN,pending_restart=UNKNOWN',
+    'RS485:SAVED,status=OK,status=OK,active_baud=9600,saved_baud=9600,pending_restart=NO',
+    'RS485_CONFIG:BEGIN,id=1,version=1,revision=1',
+    'MB_DEBUG:RESULT,id=1,status=OK',
+    'RS485 UART3: baud=115200, 8N1, frame_idle_ms=10',
+  ]) assert.equal(baudProtocol.parseRs485BaudResponse(line), undefined, line)
+})
+
+test('SJZ 波特率 store 实际执行设置后 LIST 复核，重启仅发送 @RST，旧固件禁止保存', async () => {
+  globalThis.window = { setTimeout, clearTimeout }
+  const { createPinia, setActivePinia } = await import('pinia')
+  const { nextTick } = await import('vue')
+  setActivePinia(createPinia())
+  const { useSerialStore } = await server.ssrLoadModule('/src/stores/serialStore.ts')
+  const serial = useSerialStore()
+  const listeners = new Map()
+  serial.registerLineListener = (id, callback) => listeners.set(id, callback)
+  serial.unregisterLineListener = (id) => listeners.delete(id)
+  const { useSjzdStore } = await server.ssrLoadModule('/src/stores/sjzdStore.ts')
+  const store = useSjzdStore()
+  serial.connectedPort = 'mock-rs485-baud'
+  await nextTick()
+  const sent = []
+  let savedBaud = 'UNSET'
+  let mode = 'normal'
+  window.__TAURI_INTERNALS__ = {
+    invoke: async (name, args) => {
+      assert.equal(name, 'sjzd_send_raw_command')
+      assert.equal(args.path, 'mock-rs485-baud')
+      sent.push(args.text)
+      let reply
+      if (args.text === 'SLE_BRIDGE:LIST') {
+        reply = 'SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=MCU,wireless=SLE,status=OK'
+      } else if (mode === 'unsupported') {
+        reply = '[ERROR] Command not support.'
+      } else if (args.text === 'RS485:LIST') {
+        const baud = mode === 'mismatch' ? '19200' : savedBaud
+        reply = `RS485:CONFIG,status=OK,active_baud=9600,saved_baud=${baud},default_baud=9600,pending_restart=${baud === 'UNSET' || baud === '9600' ? 'NO' : 'YES'}`
+      } else if (args.text.startsWith('RS485:BAUD:')) {
+        savedBaud = args.text.split(':')[2] === 'DEFAULT' ? '9600' : args.text.split(':')[2]
+        reply = mode === 'write-error'
+          ? 'RS485:ERROR,status=ERROR,code=STORAGE_VERIFY,active_baud=9600,saved_baud=UNKNOWN,pending_restart=UNKNOWN'
+          : `RS485:SAVED,status=OK,active_baud=9600,saved_baud=${savedBaud},pending_restart=${savedBaud === '9600' ? 'NO' : 'YES'}`
+      } else assert.equal(args.text, '@RST')
+      if (reply) queueMicrotask(() => { for (const listener of [...listeners.values()]) listener(reply) })
+      return args.text
+    },
+  }
+  await store.queryRs485Baud()
+  assert.equal(store.rs485BaudConfig.savedBaud, 'UNSET')
+  sent.length = 0
+  await store.saveRs485Baud(115200)
+  assert.deepEqual(sent, ['RS485:BAUD:115200', 'RS485:LIST'])
+  assert.equal(store.rs485BaudConfig.activeBaud, 9600)
+  assert.equal(store.rs485BaudConfig.savedBaud, 115200)
+  assert.equal(store.rs485BaudConfig.pendingRestart, 'YES')
+  mode = 'mismatch'
+  await store.saveRs485Baud(57600)
+  assert.equal(store.rs485BaudConfig, null)
+  assert.equal(store.lastOpMessage.success, false)
+  mode = 'write-error'
+  sent.length = 0
+  await store.saveRs485Baud(38400)
+  assert.deepEqual(sent, ['RS485:BAUD:38400'])
+  assert.equal(store.rs485BaudConfig, null)
+  assert.equal(store.lastOpMessage.success, false)
+  mode = 'normal'
+  await store.queryRs485Baud()
+  sent.length = 0
+  await store.resetSystem()
+  assert.deepEqual(sent, ['@RST'])
+  assert.equal(store.rs485BaudConfig, null)
+  assert.equal(store.rs485BaudSupported, null)
+  mode = 'unsupported'
+  await store.queryRs485Baud()
+  assert.equal(store.rs485BaudSupported, false)
+  sent.length = 0
+  await store.saveRs485Baud(115200)
+  assert.deepEqual(sent, [])
+  assert.equal(store.isBusy, false)
+  delete globalThis.window
 })

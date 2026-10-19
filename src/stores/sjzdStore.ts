@@ -43,7 +43,8 @@ import type {
   SjzdConfigSaveReceipt,
   SjzdConfigSnapshotEvidence,
 } from '../types/sjzd'
-import { FOUR_G_EMPTY_CONFIG } from '../types/sjzd'
+import { FOUR_G_EMPTY_CONFIG, type Rs485BaudResponse } from '../types/sjzd'
+import { buildRs485BaudCommand, parseRs485BaudResponse } from '../utils/sjzdRs485Baud'
 import {
   buildModbusDebugReport,
   parseModbusDebugProtocolLine,
@@ -76,6 +77,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
   const wlanBridgeEnabled = ref(false)
   const wlanBridgeStatus = ref<SjzdBridgeStatus | null>(null)
   const modbusPoints = ref<ModbusPointConfig[]>([])
+  const rs485BaudConfig = ref<Rs485BaudResponse | null>(null)
+  const rs485BaudSupported = ref<boolean | null>(null)
   const modbusConfigSnapshot = ref<SjzdConfigSnapshotEvidence | null>(null)
   // 多行 RS485DEV:LIST 事务期间禁止通用流解析器写入半截点位表。
   let isCollectingModbusReadback = false
@@ -163,6 +166,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
     fourGLogs.value = []
     modbusPoints.value = []
     modbusConfigSnapshot.value = null
+    rs485BaudConfig.value = null
+    rs485BaudSupported.value = null
     isCollectingModbusReadback = false
     isCollectingSleReadback = false
     isCollectingFourGReadback = false
@@ -666,6 +671,16 @@ export const useSjzdStore = defineStore('sjzd', () => {
       const bridgeAck = parseSjzdBridgeAck(line)
       if (bridgeAck?.status === 'OK' && bridgeAck.active === bridgeAck.requested) {
         applyBridgeStatus(bridgeAck)
+      }
+
+      const baudResponse = parseRs485BaudResponse(line)
+      if (baudResponse) {
+        rs485BaudSupported.value = true
+        rs485BaudConfig.value = baudResponse.event === 'CONFIG' ? baudResponse : null
+      }
+      if (line.includes('Application Running.')) {
+        rs485BaudConfig.value = null
+        rs485BaudSupported.value = null
       }
 
       // 2. Check for DEVINFO responses
@@ -1460,6 +1475,86 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
   }
 
+  function inspectRs485BaudLine(line: string, event: 'CONFIG' | 'SAVED'): SerialTransactionDecision<Rs485BaudResponse> {
+    const response = parseRs485BaudResponse(line)
+    if (response) {
+      if (response.event === 'ERROR') return { error: `设备拒绝波特率操作：${response.code}` }
+      if (response.event !== event) return undefined
+      if (response.status !== 'OK') return { error: `波特率读回异常：${response.code}` }
+      return { value: response }
+    }
+    if (line.includes('Command not support')) {
+      rs485BaudSupported.value = false
+      rs485BaudConfig.value = null
+      return { error: '当前固件不支持采集波特率配置，请升级固件' }
+    }
+    if (/^RS485:(CONFIG|SAVED|ERROR),/.test(line.trim())) return { error: '波特率回执格式或状态不一致' }
+    return undefined
+  }
+
+  async function readRs485BaudOnce(): Promise<Rs485BaudResponse> {
+    const port = serialStore.connectedPort
+    if (!port) throw new Error('请先连接串口')
+    await ensureMcuConsoleAvailable('RS485:LIST')
+    if (serialStore.connectedPort !== port) throw new Error('串口已切换，请重新读取')
+    return await runSerialTransaction('读取采集波特率',
+      () => sjzdSendRawCommand(port, 'RS485:LIST', false),
+      (line) => serialStore.connectedPort !== port
+        ? { error: '串口已切换，请重新读取' } : inspectRs485BaudLine(line, 'CONFIG'))
+  }
+
+  async function queryRs485Baud() {
+    if (!serialStore.connectedPort || isBusy.value) return
+    isBusy.value = true
+    rs485BaudConfig.value = null
+    try {
+      const config = await readRs485BaudOnce()
+      rs485BaudConfig.value = config
+      rs485BaudSupported.value = true
+      showMessage(config.pendingRestart === 'YES' ? '已读回采集波特率，保存值待重启生效' : '已从 EEPROM 读回采集波特率')
+      return config
+    } catch (error) {
+      showMessage(`读取采集波特率失败：${String(error)}`, false)
+    } finally {
+      isBusy.value = false
+    }
+  }
+
+  async function saveRs485Baud(baud: number | 'DEFAULT') {
+    if (!serialStore.connectedPort || isBusy.value) return
+    if (rs485BaudSupported.value !== true) {
+      showMessage('请先读取并确认固件支持采集波特率配置', false)
+      return
+    }
+    isBusy.value = true
+    try {
+      const port = serialStore.connectedPort
+      const command = buildRs485BaudCommand(baud)
+      const target = baud === 'DEFAULT' ? 9600 : baud
+      await ensureMcuConsoleAvailable(command)
+      if (serialStore.connectedPort !== port) throw new Error('串口已切换，请重新读取')
+      rs485BaudConfig.value = null
+      const receipt = await runSerialTransaction('保存采集波特率',
+        () => sjzdSendRawCommand(port, command, false),
+        (line) => serialStore.connectedPort !== port
+          ? { error: '串口已切换，请重新读取' } : inspectRs485BaudLine(line, 'SAVED'))
+      if (serialStore.connectedPort !== port) throw new Error('串口已切换，请重新读取')
+      if (receipt.savedBaud !== target) throw new Error('保存回执与目标波特率不一致')
+      const readback = await readRs485BaudOnce()
+      if (readback.savedBaud !== target) throw new Error('EEPROM 读回与目标波特率不一致')
+      rs485BaudConfig.value = readback
+      showMessage(readback.pendingRestart === 'YES'
+        ? `已保存并读回 ${target}，待重启生效`
+        : `已保存并读回 ${target}，与当前运行值一致`)
+      return readback
+    } catch (error) {
+      rs485BaudConfig.value = null
+      showMessage(`保存采集波特率失败：${String(error)}；请重新读取确认`, false)
+    } finally {
+      isBusy.value = false
+    }
+  }
+
   // Modbus Actions
   async function queryModbusPoints() {
     if (!serialStore.connectedPort) {
@@ -1719,6 +1814,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
       await sjzdSendRawCommand(serialStore.connectedPort, '@RST', false)
       wlanBridgeStatus.value = null
       wlanBridgeEnabled.value = false
+      rs485BaudConfig.value = null
+      rs485BaudSupported.value = null
       showMessage('已触发系统软复位重启 (@RST)')
     } catch (e: any) {
       showMessage(`重启指令失败: ${e}`, false)
@@ -2135,6 +2232,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
     fourGLogs,
     modbusPoints,
     modbusConfigSnapshot,
+    rs485BaudConfig,
+    rs485BaudSupported,
     isSamplingAi,
     aiHistory,
     currentAi,
@@ -2173,6 +2272,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
     resetFourGConfig,
     generateTopicsFromSn,
     saveAllFourGParams,
+    queryRs485Baud,
+    saveRs485Baud,
     queryModbusPoints,
     saveModbusPoints,
     debugModbusPoint,
