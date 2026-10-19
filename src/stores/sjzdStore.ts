@@ -688,6 +688,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
         line.includes('SN:') ||
         line.includes('DEVINFO') ||
         line.includes('DevInfo') ||
+        line.includes('AppVersion:') ||
         line.includes('HW:') ||
         line.includes('PwrOnCnt') ||
         line.includes('TotRunTim') ||
@@ -708,7 +709,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
             deviceType: typeM ? typeM[1] : deviceInfo.value?.deviceType,
             deviceAddr: addrM ? addrM[1] : deviceInfo.value?.deviceAddr,
             hwVersion: hwM ? hwM[1] : deviceInfo.value?.hwVersion || (typeM ? `SJZDV3-${typeM[1]}` : undefined),
-            fwVersion: fwM ? fwM[1] : deviceInfo.value?.fwVersion,
+            // 完整 DEVINFO 缺少版本时清空旧值，避免将新固件缓存带给旧固件。
+            fwVersion: fwM ? fwM[1] : /DevInfo:/i.test(line) ? undefined : deviceInfo.value?.fwVersion,
             bootCount: bootM ? parseInt(bootM[1], 10) : deviceInfo.value?.bootCount,
             uptimeSec: uptimeM ? parseInt(uptimeM[1], 10) : deviceInfo.value?.uptimeSec,
             reportFreqSec: freqM ? parseInt(freqM[1], 10) : deviceInfo.value?.reportFreqSec,

@@ -220,8 +220,20 @@ onMounted(() => {
             {{
               sjzd.deviceInfo?.deviceType
                 ? `型号 ${sjzd.deviceInfo.deviceType} | 地址 ${sjzd.deviceInfo.deviceAddr || '默认'}`
-                : (sjzd.deviceInfo?.hwVersion || sjzd.deviceInfo?.fwVersion || '--')
+                : (sjzd.deviceInfo?.hwVersion || '--')
             }}
+          </span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon blue">
+          <Cpu :size="20" />
+        </div>
+        <div class="metric-content">
+          <span class="metric-label">固件版本</span>
+          <span class="metric-value">
+            {{ sjzd.deviceInfo?.fwVersion || (sjzd.deviceInfo?.sn ? '固件未返回' : '--') }}
           </span>
         </div>
       </div>
@@ -298,6 +310,10 @@ onMounted(() => {
           <div class="breakdown-item">
             <span class="b-label">设备现场地址 (Addr)：</span>
             <span class="b-value mono-text">{{ sjzd.deviceInfo.deviceAddr || '--' }}</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="b-label">固件版本：</span>
+            <span class="b-value mono-text">{{ sjzd.deviceInfo.fwVersion || '固件未返回' }}</span>
           </div>
           <div class="breakdown-item">
             <span class="b-label">累计开机次数 (PwrOnCnt)：</span>

@@ -313,3 +313,63 @@ test('SJZ 波特率 store 实际执行设置后 LIST 复核，重启仅发送 @R
   assert.equal(store.isBusy, false)
   delete globalThis.window
 })
+
+
+test('SJZ DEVINFO 与 VERSION 回读显示实际固件版本，旧响应清空版本缓存', async () => {
+  globalThis.window = { setTimeout, clearTimeout }
+  try {
+    const { createPinia, setActivePinia } = await import('pinia')
+    const { nextTick } = await import('vue')
+    setActivePinia(createPinia())
+    const { useSerialStore } = await server.ssrLoadModule('/src/stores/serialStore.ts')
+    const serial = useSerialStore()
+    const listeners = new Map()
+    serial.registerLineListener = (id, callback) => listeners.set(id, callback)
+    serial.unregisterLineListener = (id) => listeners.delete(id)
+    const { useSjzdStore } = await server.ssrLoadModule('/src/stores/sjzdStore.ts')
+    const store = useSjzdStore()
+    serial.connectedPort = 'mock-firmware-version'
+    await nextTick()
+    const emit = (line) => { for (const listener of [...listeners.values()]) listener(line) }
+    const sent = []
+    const legacy = 'DevInfo: SN=430120260001, Type=4301, Addr=1, PwrOnCnt=7, TotRunTim=123s, RptFreq=2s'
+    window.__TAURI_INTERNALS__ = {
+      invoke: async (name, args) => {
+        assert.equal(name, 'sjzd_send_raw_command')
+        assert.equal(args.path, 'mock-firmware-version')
+        sent.push(args.text)
+        if (args.text === 'SLE_BRIDGE:LIST') {
+          queueMicrotask(() => emit('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=MCU,wireless=SLE,status=OK'))
+        } else {
+          assert.equal(args.text, 'DEVINFO')
+          queueMicrotask(() => emit(`${legacy}, FwVer=SJZD_V2.0`))
+        }
+        return args.text
+      },
+    }
+    await store.queryDeviceInfo()
+    assert.deepEqual(sent, ['SLE_BRIDGE:LIST', 'DEVINFO'])
+    assert.equal(store.deviceInfo.sn, '430120260001')
+    assert.equal(store.deviceInfo.fwVersion, 'SJZD_V2.0')
+    assert.equal(store.deviceInfo.bootCount, 7)
+    assert.equal(store.deviceInfo.uptimeSec, 123)
+    assert.equal(store.deviceInfo.reportFreqSec, 2)
+
+    emit('[1.000] userMain.c[255]: AppVersion:SJZD_V2.1')
+    assert.equal(store.deviceInfo.fwVersion, 'SJZD_V2.1')
+    assert.equal(store.deviceInfo.sn, '430120260001')
+    emit('[1.001] userMain.c[4412]: Hardware Version:3')
+    assert.equal(store.deviceInfo.fwVersion, 'SJZD_V2.1')
+
+    emit(legacy)
+    assert.equal(store.deviceInfo.fwVersion, undefined)
+    assert.equal(store.deviceInfo.deviceType, '4301')
+    emit('AppVersion:DC_V1.0.2')
+    assert.equal(store.deviceInfo.fwVersion, 'DC_V1.0.2')
+    emit('[2.000] userMain.c[1220]: ' + legacy)
+    assert.equal(store.deviceInfo.fwVersion, undefined)
+    assert.equal(store.deviceInfo.bootCount, 7)
+  } finally {
+    delete globalThis.window
+  }
+})
