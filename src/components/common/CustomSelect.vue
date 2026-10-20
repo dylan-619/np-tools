@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { ChevronDown, Check } from 'lucide-vue-next'
 
 export interface SelectOption {
@@ -38,6 +38,7 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = ref(false)
+const selectId = useId()
 const triggerRef = ref<HTMLElement | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const highlightedIndex = ref(-1)
@@ -260,6 +261,12 @@ onBeforeUnmount(() => {
       },
     ]"
     tabindex="0"
+    role="combobox"
+    aria-haspopup="listbox"
+    :aria-expanded="isOpen"
+    :aria-disabled="disabled"
+    :aria-controls="`${selectId}-listbox`"
+    :aria-activedescendant="isOpen && highlightedIndex >= 0 ? `${selectId}-option-${highlightedIndex}` : undefined"
     @click="toggleDropdown"
     @keydown="onKeydown"
   >
@@ -283,6 +290,8 @@ onBeforeUnmount(() => {
           v-if="isOpen"
           ref="dropdownRef"
           class="custom-select-dropdown"
+          :id="`${selectId}-listbox`"
+          role="listbox"
           :class="[`size-${size}`, { 'is-mono': mono }]"
           :style="dropdownStyle"
         >
@@ -294,6 +303,10 @@ onBeforeUnmount(() => {
             v-for="(opt, idx) in normalizedOptions"
             :key="opt.value"
             class="custom-select-option"
+            :id="`${selectId}-option-${idx}`"
+            role="option"
+            :aria-selected="opt.value === modelValue"
+            :aria-disabled="opt.disabled"
             :class="{
               'is-active': opt.value === modelValue,
               'is-highlighted': idx === highlightedIndex,

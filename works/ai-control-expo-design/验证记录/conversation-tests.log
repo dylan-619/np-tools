@@ -1,0 +1,25 @@
+✔ historical camel-case summaries become Chinese Markdown without changing machine data (5.468ms)
+✔ streamed configuration is hidden before its schema or closing fence arrives (0.340542ms)
+✔ assistant markup cannot inject HTML, load images or navigate the desktop webview (1.95375ms)
+✔ a completed proposal offers the next action inside the conversation (7.623625ms)
+✔ partial, busy or failed replies never offer a premature proposal confirmation (3.21925ms)
+✔ current validated configuration becomes a Chinese in-chat form requiring explicit confirmation (1.748708ms)
+✔ restored unconfirmed configuration requires a fresh request instead of automatic adoption (1.9205ms)
+✔ generated artifact receipt uses real version, fields and confirmed parameters (1.152709ms)
+✔ questions, permission requests and real generation activity remain in the message flow (3.757042ms)
+✔ only complete JSON code blocks can produce a candidate (1.167042ms)
+✔ case identity, fixed wiring, integer ranges and labels are enforced (0.476917ms)
+✔ HMI cannot bind a different revision, writable physical output or unknown point (0.314041ms)
+✔ water station requires its own 15 bindings and bounded process parameters (0.502417ms)
+✔ three-pump finite parameters, ordered levels and engineering units are enforced (0.469959ms)
+✔ three-pump conversation uses its own analog roles, PI rules and current identity (36.683875ms)
+✔ restore does not adopt old model output; only a fresh request can create a candidate (3.084208ms)
+✔ water process context and model config stay isolated from the legacy case (1.516ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 823.006375

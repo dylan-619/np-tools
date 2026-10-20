@@ -1,0 +1,38 @@
+schema: kz3-modbus-profile/v1
+
+profile:
+  name: sp4055_703
+  legacy_type: 703
+  description: 8DO 扩展模块
+  qualification: software_qualified
+
+  read_blocks:
+    - name: do_feedback
+      function: read_coils
+      pdu_address: 16
+      count: 8
+
+  write_groups:
+    - name: do
+      function: write_multiple_coils
+      pdu_address: 16
+      count: 8
+      default_safe_value: false
+
+  channels:
+    - kind: digital_feedback
+      names: [do01_feedback, do02_feedback, do03_feedback, do04_feedback,
+              do05_feedback, do06_feedback, do07_feedback, do08_feedback]
+      source: {block: do_feedback, first_bit: 0}
+
+    - kind: digital_output
+      names: [do01, do02, do03, do04, do05, do06, do07, do08]
+      target: {group: do, first_bit: 0}
+      feedback:
+        names: [do01_feedback, do02_feedback, do03_feedback, do04_feedback,
+                do05_feedback, do06_feedback, do07_feedback, do08_feedback]
+
+  evidence:
+    protocol_source: legacy_source_golden_vector
+    hardware_hil: pending
+    note: 软件请求/响应格式已有基线，实际端子输出和回读仍待验证。

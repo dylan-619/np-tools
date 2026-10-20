@@ -1,0 +1,10 @@
+{
+  "workspaceId": "18e01f709bb7beb0",
+  "caseId": "three-pump-level-control",
+  "projectVersion": "1.0.0",
+  "hostStatus": "HOST_PASS",
+  "northboundFields": 74,
+  "targetLevelM": 0.8,
+  "confirmedParametersPersisted": true,
+  "sourceSha256": "e7078548872aead262b9f4764ef9323649a41ffd71f5277b02920fdb64996141"
+}

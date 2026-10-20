@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "model": "deepseek/deepseek-flash",
+  "elapsedSeconds": 7.7,
+  "session": "ses_eac98d091ffe1ZN435nZGqI8tF",
+  "config": {
+    "schema": "np-tools-expo-case-config/v1",
+    "caseId": "two-device-output-sequence",
+    "caseVersion": "1.0.0",
+    "projectId": "expo_sequence_demo",
+    "projectVersion": "1.0.1",
+    "bindings": {
+      "startButton": "board.di01",
+      "stopButton": "board.di02",
+      "runPermit": "board.di03",
+      "downstreamOutput": "board.do01",
+      "upstreamOutput": "board.do02"
+    },
+    "parameters": {
+      "startDelayMs": 2000,
+      "clearDelayMs": 5000
+    },
+    "labels": {
+      "downstream": "后级输送设备",
+      "upstream": "前级输送设备"
+    }
+  }
+}

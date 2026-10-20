@@ -1,0 +1,20 @@
+{
+  "schema": "np-tools-lab-plant/v1",
+  "scope": "LAB_ONLY",
+  "name": "三泵集水井固定软件模型",
+  "levelRangeM": [0, 3],
+  "initialLevelM": 1.15,
+  "tankAreaM2": 0.8,
+  "inflowM3s": [0, 0.025, 0.07, 0.11],
+  "vfdDrainM3s": "max(0, (actualHz - 16.666667) * 0.0015)",
+  "fixedPumpDrainM3s": 0.04,
+  "startFeedbackMs": 600,
+  "stopFeedbackMs": 400,
+  "vfdSlewHzPerSecond": 15,
+  "measurementNoise": "none",
+  "levelScaling": "4–20mA = 0–3m",
+  "frequencyScaling": "4–20mA = 0–50Hz",
+  "pidGainUnit": {"kp": "mA/m", "ki": "mA/(m*s)"},
+  "gains": {"kp": 24, "ki": 0.6},
+  "releaseBoundary": "仅为该软件模型整定；真实泵与变频器必须重新校核和整定"
+}

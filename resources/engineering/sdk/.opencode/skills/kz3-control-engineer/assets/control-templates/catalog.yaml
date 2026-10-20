@@ -1,0 +1,78 @@
+schema: kz3-standard-logic-templates/v1
+
+templates:
+  - id: T01_SINGLE_PUMP_SUPERVISOR
+    status: certified
+    kind: device_supervisor
+    implementation: application/case_center/standard_templates/single_pump_control.h
+    guide: application/case_center/standard_templates/single_pump_control.md
+    tests:
+      - tests/standard_single_pump_template_test.c
+    invariants:
+      - stop_command 高于 start_command
+      - 质量、安全许可或设备故障异常时输出当扫描为 false
+      - reset 只清故障且不产生启动
+      - 启动、运行和停机反馈分别有超时边界
+      - 安全恢复后必须 reset 加新的 start，不自动重启
+
+  - id: T02_MUTUAL_INTERLOCK
+    status: certified
+    kind: interlock_supervisor
+    implementation: application/case_center/standard_templates/mutual_interlock_control.h
+    guide: application/case_center/standard_templates/mutual_interlock_control.md
+    tests:
+      - tests/standard_mutual_interlock_template_test.c
+    invariants:
+      - A/B 输出永不同时为 true
+      - 换向必须先撤销旧输出并确认旧反馈 false
+      - 旧反馈确认后仍必须经过全关死区
+      - 双请求、双反馈和坏质量均进入安全锁存
+      - reset 不产生方向输出
+
+  - id: T03_PID_LOOP_GUARD
+    status: certified
+    kind: pid_guard
+    implementation: application/case_center/standard_templates/pid_loop_guard.h
+    guide: application/case_center/standard_templates/pid_loop_guard.md
+    tests:
+      - tests/standard_pid_guard_template_test.c
+      - tests/logic_manager_test.c
+    invariants:
+      - 许可或测量质量失效时不调用 PID 且输出安全值
+      - NaN、Inf、测量越界和执行输出越界不能下发
+      - PID 方向、采样、限幅和整定必须来自冻结 YAML
+      - 手自动切换和执行器失去 owner 时必须明确 tracking 策略
+      - PID_STEP 失败必须使项目扫描失败并进入框架故障安全
+
+  - id: T04_EDGE_TIMER_USAGE
+    status: certified
+    kind: atomic_usage
+    implementation: application/logic.h
+    guide: application/case_center/standard_templates/edge_timer_usage.md
+    tests:
+      - tests/logic_block_api_compile_test.c
+      - application/projects/开发测试工程/全IO逻辑块综合HIL测试/logic_project_test.c
+    invariants:
+      - 每个有状态实例每扫描最多调用一次且只服务一个语义
+      - R_TRIG 与 F_TRIG 使用不同 edge ID
+      - one-shot command 直接消费，不再叠加边沿块
+      - 质量失效不得伪造业务上升沿或下降沿
+      - 定时器覆盖阈值前一拍、到时、后一拍和 uint32 回绕
+
+  - id: T05_RUNTIME_COUNTER_USAGE
+    status: certified
+    kind: platform_usage
+    implementation: application/case_center/standard_templates/runtime_counter_fixture/project_io.yaml
+    guide: application/case_center/standard_templates/runtime_counter_usage.md
+    tests:
+      - tests/standard_runtime_counter_template_test.c
+      - tests/test_point_config_gen.py
+      - tests/logic_runtime_store_test.c
+    invariants:
+      - 项目只声明 trigger 且不得在 logic.c 手写第二份运行累计
+      - 真实运行反馈优先且输入 trigger 只在质量 GOOD 时累计
+      - 首拍只建基线、重复 tick 不重计、uint32 tick 回绕正确且秒数饱和
+      - STOP、FAULT_SAFE 和 reset 暂停累计且恢复时不补记停机间隔
+      - clear 以 clear_pending 完成并保留请求后的新运行时间
+      - 已投产 runtime 只允许尾部追加且改名、删除、重排按 EEPROM schema 变更评审
+      - 设备检查点当前为 5 分钟并在有效运行转停止时保存，寿命与掉电边界必须单独验收

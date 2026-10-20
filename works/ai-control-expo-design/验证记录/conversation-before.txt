@@ -1,0 +1,137 @@
+Window: "NP-Tools 硬件调试平台", App: NP-Tools.
+0 standard window NP-Tools 硬件调试平台, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering
+			3 container
+				4 text 工作区
+				5 button 折叠导航栏
+				6 button 设备调试导航, Help: 设备调试导航：按固件产品线选择正确入口
+				7 button AI辅助工作台, Help: AI辅助工作台：点位、需求、仿真与设备部署
+				8 button (collapsed) KZ3 F427 控制器, Secondary Actions: Expand
+				9 button (collapsed) 双星闪协调器, Secondary Actions: Expand
+				10 button (collapsed) SJZDV3 采集终端, Secondary Actions: Expand
+				11 button (collapsed) 通用调试工具, Secondary Actions: Expand
+				12 button (collapsed) 交付与设置, Secondary Actions: Expand
+				13 text 串口未连接 115200 8N1
+				14 button 展开参数配置
+				15 button 刷新串口列表
+				16 combo box (collapsed, settable) Secondary Actions: Expand, Value: cu.wlan-debug
+
+					17 text cu.wlan-debug
+				18 button 连接, Help: 打开串口
+			19 container
+				20 heading AI 辅助工作台, Value: 1
+					21 text AI 辅助工作台
+				22 text 现场实施协作工程师 软件联调 OpenCode 1.19.2
+				23 button 全屏展示
+				24 container 工程流程
+					25 button 点位配置
+					26 button 2 工艺需求
+					27 button (disabled) 3 控制程序
+					28 button (disabled) 4 仿真运行
+					29 button (disabled) 5 工艺调试
+					30 button (disabled) 6 烧录物理设备
+				31 text 工程资料
+				32 heading 点位已核对, Value: 3
+					33 text 点位已核对
+				34 text 三泵集水井液位控制 原始点表完整保存。 DI1 P101独立运行反馈 DI2 P101故障接点 DI3 P101远程自动许可 DI4 P102独立运行反馈 DI5 P102故障接点 DI6 P102远程自动许可 DI7 P103独立运行反馈 DI8 P103故障接点 DI9 P103远程自动许可 DI10 独立低水位许可 DI11 独立高高位报警 DI12 泵组运行许可 AI1 集水井连续液位 AI2 P101实际频率反馈 DO1 P101启动命令 DO2 P102启动命令 DO3 P103启动命令 AO1 P101频率给定 DO4 泵组综合报警
+				35 button 查看原始点表
+				36 text SHA-256 ce449deae869… 工艺规则 停泵、启变频、启工频三个液位等级；P101跟踪目标液位，实际满频且高位持续不下降时投入工频增援；P102故障由P103停稳接替，正常最多两台运行。 现场实施协作工程师 OpenCode 服务
+				37 text field (settable) OpenCode服务地址, Value: http://127.0.0.1:4096
+				38 button 重新连接
+				39 button 认证
+				40 text 会话模型
+				41 combo box (collapsed, settable) 会话模型, Secondary Actions: Expand, Value: deepseek/deepseek-flash
+
+					42 text deepseek/deepseek-flash
+				43 container
+					44 text 现场需求 三台排水泵，一台变频、两台工频，其中一台备用。设置停泵、启变频、启工频三个液位；变频泵满频仍降不下液位时投入工频泵，故障后备用接替。
+				45 container
+					46 text 现场实施协作工程师 ## 方案理解（与模板能力一致）
+
+您描述的三泵集水井排水，与现有已验证工艺模板完全吻合：**P101 固定变频主调，P102 工频增援，P103 工频备用，正常运行最多两台**。下面把未在您描述中展开、但现场必须明确的规则补全，请逐项确认。
+
+### 1. 三个液位等级（不是四级）
+
+| 顺序 | 参数 | 默认 | 作用 |
+|---|---|---|---|
+| ① 停泵 | stopLevelM | 0.40 m | 低于此值停全部自动泵 |
+| ② 启变频 | vfdStartLevelM | 1.00 m | 连续 startConfirmMs（2 s）起 P101 |
+| ③ 启工频 | assistStartLevelM | 1.80 m | 增援判断用；自身不是直接启泵条件 |
+
+目标液位 targetLevelM（默认 0.80 m）只是 PI 调节目标，位于停泵与启变频之间，**不是第四个液位等级**。参数必须满足 stopLevelM < targetLevelM < vfdStartLevelM < assistStartLevelM，非法参数组禁止投入，且只允许在停止状态下修改，下
+				47 text entry area (settable) 控制需求, Value: [text entry area: 控制需求], Placeholder: 描述工艺要求，或继续调整联锁与时序参数…
+					48 text 描述工艺要求，或继续调整联锁与时序参数…
+				49 text 按已验证工艺模板生成控制工程。
+				50 button (disabled) 发送
+				51 text 方案与配置
+				52 heading 等待 AI 整理需求, Value: 3
+					53 text 等待 AI 整理需求
+				54 text 三泵集水井液位控制 核对设备角色、联锁与时序。
+				55 button 采用方案，整理工程配置
+				56 text 当前目标版本 1.0.0 超出案例能力时说明限制，不现场重写控制算法。
+				57 container (expanded) Secondary Actions: Collapse
+					58 summary 执行记录 25, Value: on
+						59 text 执行记录 
+						60 text 25
+					61 text 11:33:47
+					62 text OpenCode 1.19.2 已连接
+					63 text 11:33:40
+					64 text 点表核对通过：三泵集水井液位控制，创建独立工程
+					65 text 11:32:04
+					66 text environment {"name":"inflow","value":3}
+					67 text 11:26:29
+					68 text environment {"name":"inflow","value":2}
+					69 text 10:59:34
+					70 text environment {"name":"inflow","value":1}
+					71 text 10:59:24
+					72 text command "P1_RST"
+					73 text 10:59:13
+					74 text command "DEG_STA"
+					75 text 10:59:11
+					76 text command "P3_RST"
+					77 text 10:59:10
+					78 text command "P2_RST"
+					79 text 10:59:04
+					80 text command "DEG_STA"
+					81 text 10:59:03
+					82 text condition {"name":"pump3Fault","value":false}
+					83 text 10:58:59
+					84 text command "DEG_STA"
+					85 text 10:58:53
+					86 text condition {"name":"pump1Fault","value":false}
+					87 text 10:58:52
+					88 text condition {"name":"pump2Fault","value":false}
+					89 text 10:58:45
+					90 text condition {"name":"pump3Fault","value":true}
+					91 text 10:58:43
+					92 text condition {"name":"pump2Fault","value":true}
+					93 text 10:58:26
+					94 text condition {"name":"pump1Fault","value":true}
+					95 text 10:57:08
+					96 text OpenCode 1.19.2 已连接
+					97 text 10:57:03
+					98 text command "P2_RST"
+					99 text 10:57:02
+					100 text condition {"name":"pump2Fault","value":false}
+					101 text 10:56:44
+					102 text condition {"name":"pump2Fault","value":true}
+					103 text 10:55:44
+					104 text environment {"name":"inflow","value":2}
+					105 text 10:55:27
+					106 text command "SYS_STA"
+					107 text 10:55:18
+					108 text 本次程序已部署；DI全部关闭，等待许可和新启动
+					109 text 10:55:10
+					110 text 已恢复上次工程；运行保持停止，需要重新连接AI或部署程序
+	111 close button
+	112 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	113 minimize button
+	114 text NP-Tools 硬件调试平台
+115 menu bar
+	116 NP-Tools
+	117 File
+	118 Edit
+	119 View
+	120 Window
+	121 Help

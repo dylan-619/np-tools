@@ -1,0 +1,263 @@
+schema: kz3-project-io/v3
+project:
+  name: 三泵集水井液位控制
+  id: three_pump_level_control
+  version: 1.0.0
+  board: kz3_f427_standard
+  required_profiles: []
+  scan_period_ms: 10
+  features:
+    pid: true
+    counter: false
+    retained: false
+  devices: []
+  points:
+    inputs:
+    - {name: pump1_run_fb, source: board.di01, description: P101独立运行反馈，true为成立}
+    - {name: pump1_fault, source: board.di02, description: P101故障接点，true为成立}
+    - {name: pump1_remote, source: board.di03, description: P101远程自动许可，true为成立}
+    - {name: pump2_run_fb, source: board.di04, description: P102独立运行反馈，true为成立}
+    - {name: pump2_fault, source: board.di05, description: P102故障接点，true为成立}
+    - {name: pump2_remote, source: board.di06, description: P102远程自动许可，true为成立}
+    - {name: pump3_run_fb, source: board.di07, description: P103独立运行反馈，true为成立}
+    - {name: pump3_fault, source: board.di08, description: P103故障接点，true为成立}
+    - {name: pump3_remote, source: board.di09, description: P103远程自动许可，true为成立}
+    - {name: water_available, source: board.di10, description: 独立低水位许可，true为成立}
+    - {name: high_high, source: board.di11, description: 独立高高位报警，true为成立}
+    - {name: run_permit, source: board.di12, description: 泵组运行许可，true为成立}
+    - {name: level_current, source: board.ai01, c_type: float, description: 集水井连续液位，4–20mA对应0–3m}
+    - {name: frequency_current, source: board.ai02, c_type: float, description: P101实际频率反馈，4–20mA对应0–50Hz}
+    outputs:
+    - {name: pump1_output, source: board.do01, description: P101启动命令}
+    - {name: pump2_output, source: board.do02, description: P102启动命令}
+    - {name: pump3_output, source: board.do03, description: P103启动命令}
+    - {name: speed_output, source: board.ao01, c_type: float, description: P101频率给定，4–20mA对应0–50Hz；停止0mA}
+    - {name: alarm_output, source: board.do04, description: 泵组综合报警}
+  application_variables:
+    parameters:
+    - {name: stop_level_m, c_type: float, default: 0.4, min: 0.1, max: 0.8, unit: m, persistent: false, description: 停泵液位，软件模型参数；停止时修改后重新投入}
+    - {name: target_level_m, c_type: float, default: 0.8, min: 0.2, max: 1.5, unit: m, persistent: false, description: 调节目标液位，软件模型参数；停止时修改后重新投入}
+    - {name: vfd_start_level_m, c_type: float, default: 1.0, min: 0.3, max: 1.7, unit: m, persistent: false, description: 启变频液位，软件模型参数；停止时修改后重新投入}
+    - {name: assist_start_level_m, c_type: float, default: 1.8, min: 1.2, max: 2.4, unit: m, persistent: false, description: 启工频液位，软件模型参数；停止时修改后重新投入}
+    - {name: pid_kp, c_type: float, default: 24.0, min: 0.0, max: 30.0, unit: mA/m, persistent: false, description: 液位比例增益，软件模型参数；停止时修改后重新投入}
+    - {name: pid_ki, c_type: float, default: 0.6, min: 0.0, max: 5.0, unit: mA/(m·s), persistent: false, description: 液位积分增益，软件模型参数；停止时修改后重新投入}
+    - {name: start_confirm_ms, c_type: u32, default: 2000, min: 500, max: 5000, unit: ms, persistent: false, description: 启变频连续确认，软件模型参数；停止时修改后重新投入}
+    - {name: stage_confirm_ms, c_type: u32, default: 5000, min: 1000, max: 30000, unit: ms, persistent: false, description: 加减泵连续确认，软件模型参数；停止时修改后重新投入}
+    - {name: pump_start_timeout_ms, c_type: u32, default: 5000, min: 1000, max: 10000, unit: ms, persistent: false, description: 泵启动反馈时限，软件模型参数；停止时修改后重新投入}
+    - {name: pump_stop_timeout_ms, c_type: u32, default: 5000, min: 1000, max: 10000, unit: ms, persistent: false, description: 泵停止反馈时限，软件模型参数；停止时修改后重新投入}
+    commands:
+    - {name: system_start, c_type: bool}
+    - {name: system_stop, c_type: bool}
+    - {name: system_trip, c_type: bool, effect: protective}
+    - {name: degraded_start, c_type: bool}
+    - {name: pump1_reset_faults, c_type: bool}
+    - {name: pump2_reset_faults, c_type: bool}
+    - {name: pump3_reset_faults, c_type: bool}
+    states:
+    - {name: automatic, c_type: bool, default: false}
+    - {name: degraded, c_type: bool, default: false}
+    - {name: level_valid, c_type: bool, default: false}
+    - {name: frequency_valid, c_type: bool, default: false}
+    - {name: config_ready, c_type: bool, default: false}
+    - {name: level_m, c_type: float, default: 0.0}
+    - {name: frequency_hz, c_type: float, default: 0.0}
+    - {name: set_hz, c_type: float, default: 0.0}
+    - {name: system_status, c_type: u32, default: 0}
+    - {name: block_reason, c_type: u32, default: 0}
+    - {name: remain_ms, c_type: u32, default: 0}
+    - {name: occupied, c_type: u32, default: 0}
+    - {name: alarm, c_type: bool, default: false}
+    - {name: pi_running, c_type: bool, default: false}
+    - {name: selected_aux, c_type: u32, default: 0}
+    - {name: lead_pump, c_type: u32, default: 0}
+    - {name: start_since, c_type: u32, default: 0}
+    - {name: high_since, c_type: u32, default: 0}
+    - {name: confirm_since, c_type: u32, default: 0}
+    - {name: remove_since, c_type: u32, default: 0}
+    - {name: last_start_ms, c_type: u32, default: 0}
+    - {name: stage_changed_ms, c_type: u32, default: 0}
+    - {name: sampled, c_type: bool, default: false}
+    - {name: blocked_previous, c_type: bool, default: false}
+    - {name: start_timing, c_type: bool, default: false}
+    - {name: high_timing, c_type: bool, default: false}
+    - {name: add_timing, c_type: bool, default: false}
+    - {name: remove_timing, c_type: bool, default: false}
+    - {name: start_recorded, c_type: bool, default: false}
+    - {name: cycling, c_type: bool, default: false}
+    - {name: aux_demand, c_type: bool, default: false}
+    - {name: trend_level, c_type: float, default: 0.0}
+    - {name: ao_current, c_type: float, default: 0.0}
+    - {name: last_scan_ms, c_type: u32, default: 0}
+    - {name: saved_stop_level_m, c_type: float, default: 0.4}
+    - {name: saved_target_level_m, c_type: float, default: 0.8}
+    - {name: saved_vfd_start_level_m, c_type: float, default: 1.0}
+    - {name: saved_assist_start_level_m, c_type: float, default: 1.8}
+    - {name: saved_pid_kp, c_type: float, default: 24.0}
+    - {name: saved_pid_ki, c_type: float, default: 0.6}
+    - {name: saved_start_confirm_ms, c_type: u32, default: 2000}
+    - {name: saved_stage_confirm_ms, c_type: u32, default: 5000}
+    - {name: saved_pump_start_timeout_ms, c_type: u32, default: 5000}
+    - {name: saved_pump_stop_timeout_ms, c_type: u32, default: 5000}
+    - {name: pump1_status, c_type: u32, default: 0}
+    - {name: pump1_fault_code, c_type: u32, default: 0}
+    - {name: pump1_total_fault, c_type: bool, default: false}
+    - {name: pump1_device_fault, c_type: bool, default: false}
+    - {name: pump1_start_fault, c_type: bool, default: false}
+    - {name: pump1_stop_fault, c_type: bool, default: false}
+    - {name: pump1_loss_fault, c_type: bool, default: false}
+    - {name: pump1_since_ms, c_type: u32, default: 0}
+    - {name: pump1_stop_since_ms, c_type: u32, default: 0}
+    - {name: pump1_off_since_ms, c_type: u32, default: 0}
+    - {name: pump1_loss_since_ms, c_type: u32, default: 0}
+    - {name: pump1_run_since_ms, c_type: u32, default: 0}
+    - {name: pump1_command, c_type: bool, default: false}
+    - {name: pump1_stopping, c_type: bool, default: false}
+    - {name: pump1_loss_timing, c_type: bool, default: false}
+    - {name: pump1_last_good, c_type: bool, default: false}
+    - {name: pump2_status, c_type: u32, default: 0}
+    - {name: pump2_fault_code, c_type: u32, default: 0}
+    - {name: pump2_total_fault, c_type: bool, default: false}
+    - {name: pump2_device_fault, c_type: bool, default: false}
+    - {name: pump2_start_fault, c_type: bool, default: false}
+    - {name: pump2_stop_fault, c_type: bool, default: false}
+    - {name: pump2_loss_fault, c_type: bool, default: false}
+    - {name: pump2_since_ms, c_type: u32, default: 0}
+    - {name: pump2_stop_since_ms, c_type: u32, default: 0}
+    - {name: pump2_off_since_ms, c_type: u32, default: 0}
+    - {name: pump2_loss_since_ms, c_type: u32, default: 0}
+    - {name: pump2_run_since_ms, c_type: u32, default: 0}
+    - {name: pump2_command, c_type: bool, default: false}
+    - {name: pump2_stopping, c_type: bool, default: false}
+    - {name: pump2_loss_timing, c_type: bool, default: false}
+    - {name: pump2_last_good, c_type: bool, default: false}
+    - {name: pump3_status, c_type: u32, default: 0}
+    - {name: pump3_fault_code, c_type: u32, default: 0}
+    - {name: pump3_total_fault, c_type: bool, default: false}
+    - {name: pump3_device_fault, c_type: bool, default: false}
+    - {name: pump3_start_fault, c_type: bool, default: false}
+    - {name: pump3_stop_fault, c_type: bool, default: false}
+    - {name: pump3_loss_fault, c_type: bool, default: false}
+    - {name: pump3_since_ms, c_type: u32, default: 0}
+    - {name: pump3_stop_since_ms, c_type: u32, default: 0}
+    - {name: pump3_off_since_ms, c_type: u32, default: 0}
+    - {name: pump3_loss_since_ms, c_type: u32, default: 0}
+    - {name: pump3_run_since_ms, c_type: u32, default: 0}
+    - {name: pump3_command, c_type: bool, default: false}
+    - {name: pump3_stopping, c_type: bool, default: false}
+    - {name: pump3_loss_timing, c_type: bool, default: false}
+    - {name: pump3_last_good, c_type: bool, default: false}
+  pids:
+  - name: level_loop
+    measurement: state.level_m
+    setpoint: parameter.target_level_m
+    output: point.speed_output
+    sample_period_ms: 100
+    direction: reverse
+    kp: 0.0
+    ki: 0.0
+    kd: 0.0
+    derivative_filter_ms: 0
+    output_min: 12.0
+    output_max: 20.0
+    enabled: false
+  runtime_counters:
+  - name: pump1
+    description: P101独立反馈累计
+    trigger:
+      bind: point.pump1_run_fb
+      active_value: true
+      quality: good
+  - name: pump2
+    description: P102独立反馈累计
+    trigger:
+      bind: point.pump2_run_fb
+      active_value: true
+      quality: good
+  - name: pump3
+    description: P103独立反馈累计
+    trigger:
+      bind: point.pump3_run_fb
+      active_value: true
+      quality: good
+  northbound:
+    protocols:
+    - http
+    - modbus_tcp
+    modbus_tcp:
+      address_style: modicon_5_digit
+      word_order_32: abcd
+    fields:
+    - {name: P1_RUN, bind: point.pump1_run_fb, c_type: bool, access: read, reference: '10001', description: P101独立运行反馈}
+    - {name: P1_FLT, bind: point.pump1_fault, c_type: bool, access: read, reference: '10002', description: P101故障接点}
+    - {name: P1_REM, bind: point.pump1_remote, c_type: bool, access: read, reference: '10003', description: P101远程自动许可}
+    - {name: P1_DO, bind: point.pump1_output, c_type: bool, access: read, reference: '10004', description: P101启动 DO输出}
+    - {name: P2_RUN, bind: point.pump2_run_fb, c_type: bool, access: read, reference: '10005', description: P102独立运行反馈}
+    - {name: P2_FLT, bind: point.pump2_fault, c_type: bool, access: read, reference: '10006', description: P102故障接点}
+    - {name: P2_REM, bind: point.pump2_remote, c_type: bool, access: read, reference: '10007', description: P102远程自动许可}
+    - {name: P2_DO, bind: point.pump2_output, c_type: bool, access: read, reference: '10008', description: P102启动 DO输出}
+    - {name: P3_RUN, bind: point.pump3_run_fb, c_type: bool, access: read, reference: '10009', description: P103独立运行反馈}
+    - {name: P3_FLT, bind: point.pump3_fault, c_type: bool, access: read, reference: '10010', description: P103故障接点}
+    - {name: P3_REM, bind: point.pump3_remote, c_type: bool, access: read, reference: '10011', description: P103远程自动许可}
+    - {name: P3_DO, bind: point.pump3_output, c_type: bool, access: read, reference: '10012', description: P103启动 DO输出}
+    - {name: WATER_OK, bind: point.water_available, c_type: bool, access: read, reference: '10013', description: 独立低水位许可}
+    - {name: LEVEL_HH, bind: point.high_high, c_type: bool, access: read, reference: '10014', description: 独立高高位报警}
+    - {name: RUN_PERMIT, bind: point.run_permit, c_type: bool, access: read, reference: '10015', description: 泵组运行许可}
+    - {name: ALARM_DO, bind: point.alarm_output, c_type: bool, access: read, reference: '10016', description: 泵组综合报警 DO输出}
+    - {name: L_STOP_M, bind: parameter.stop_level_m, c_type: float, access: read_write, reference: '40001', description: 停泵液位}
+    - {name: L_SP_M, bind: parameter.target_level_m, c_type: float, access: read_write, reference: '40003', description: 调节目标液位}
+    - {name: L_VFD_M, bind: parameter.vfd_start_level_m, c_type: float, access: read_write, reference: '40005', description: 启变频液位}
+    - {name: L_AUX_M, bind: parameter.assist_start_level_m, c_type: float, access: read_write, reference: '40007', description: 启工频液位}
+    - {name: PID_KP, bind: parameter.pid_kp, c_type: float, access: read_write, reference: '40009', description: 液位比例增益}
+    - {name: PID_KI, bind: parameter.pid_ki, c_type: float, access: read_write, reference: '40011', description: 液位积分增益}
+    - {name: START_MS, bind: parameter.start_confirm_ms, c_type: u32, access: read_write, reference: '40013', description: 启变频连续确认}
+    - {name: STAGE_MS, bind: parameter.stage_confirm_ms, c_type: u32, access: read_write, reference: '40015', description: 加减泵连续确认}
+    - {name: P_START_MS, bind: parameter.pump_start_timeout_ms, c_type: u32, access: read_write, reference: '40017', description: 泵启动反馈时限}
+    - {name: P_STOP_MS, bind: parameter.pump_stop_timeout_ms, c_type: u32, access: read_write, reference: '40019', description: 泵停止反馈时限}
+    - {name: SYS_STA, bind: command.system_start, c_type: bool, access: read_write, reference: '00001', description: 投入液位自动}
+    - {name: SYS_STP, bind: command.system_stop, c_type: bool, access: read_write, reference: '00002', description: 正常停止}
+    - {name: SYS_TRIP, bind: command.system_trip, c_type: bool, access: read_write, reference: '00003', description: 立即停止}
+    - {name: DEG_STA, bind: command.degraded_start, c_type: bool, access: read_write, reference: '00004', description: 投入工频降级排水}
+    - {name: P1_RST, bind: command.pump1_reset_faults, c_type: bool, access: read_write, reference: '00005', description: P101故障复位}
+    - {name: P1_RT_S, bind: runtime.pump1.seconds, c_type: u32, access: read, reference: '30001', description: P101运行累计秒数}
+    - {name: P1_RT_CLR, bind: runtime.pump1.clear, c_type: bool, access: read_write, reference: '00006', description: P101运行累计清零}
+    - {name: P2_RST, bind: command.pump2_reset_faults, c_type: bool, access: read_write, reference: '00007', description: P102故障复位}
+    - {name: P2_RT_S, bind: runtime.pump2.seconds, c_type: u32, access: read, reference: '30003', description: P102运行累计秒数}
+    - {name: P2_RT_CLR, bind: runtime.pump2.clear, c_type: bool, access: read_write, reference: 00008, description: P102运行累计清零}
+    - {name: P3_RST, bind: command.pump3_reset_faults, c_type: bool, access: read_write, reference: 00009, description: P103故障复位}
+    - {name: P3_RT_S, bind: runtime.pump3.seconds, c_type: u32, access: read, reference: '30005', description: P103运行累计秒数}
+    - {name: P3_RT_CLR, bind: runtime.pump3.clear, c_type: bool, access: read_write, reference: '00010', description: P103运行累计清零}
+    - {name: SYS_AUTO, bind: state.automatic, c_type: bool, access: read, reference: '10017', description: 液位自动已投入}
+    - {name: SYS_DEG, bind: state.degraded, c_type: bool, access: read, reference: '10018', description: 工频降级已投入}
+    - {name: LEVEL_OK, bind: state.level_valid, c_type: bool, access: read, reference: '10019', description: 液位测量有效}
+    - {name: FREQ_OK, bind: state.frequency_valid, c_type: bool, access: read, reference: '10020', description: 实际频率测量有效}
+    - {name: CONFIG_OK, bind: state.config_ready, c_type: bool, access: read, reference: '10021', description: 控制参数有效}
+    - {name: LEVEL_M, bind: state.level_m, c_type: float, access: read, reference: '30007', description: 集水井液位 m}
+    - {name: F_ACT_HZ, bind: state.frequency_hz, c_type: float, access: read, reference: '30009', description: P101实际频率 Hz}
+    - {name: F_SET_HZ, bind: state.set_hz, c_type: float, access: read, reference: '30011', description: P101频率给定 Hz}
+    - {name: SYS_STATUS, bind: state.system_status, c_type: u32, access: read, reference: '30013', description: 泵组当前运行阶段}
+    - {name: BLOCK_REASON, bind: state.block_reason, c_type: u32, access: read, reference: '30015', description: 泵组等待或禁止原因}
+    - {name: REMAIN_MS, bind: state.remain_ms, c_type: u32, access: read, reference: '30017', description: 当前等待剩余毫秒}
+    - {name: OCCUPIED, bind: state.occupied, c_type: u32, access: read, reference: '30019', description: 当前已占用泵台数}
+    - {name: SYS_ALARM, bind: state.alarm, c_type: bool, access: read, reference: '10022', description: 泵组综合报警}
+    - {name: PI_RUN, bind: state.pi_running, c_type: bool, access: read, reference: '10023', description: 液位调节运行中}
+    - {name: P1_STATUS, bind: state.pump1_status, c_type: u32, access: read, reference: '30021', description: P101设备运行阶段}
+    - {name: P1_FAULT, bind: state.pump1_fault_code, c_type: u32, access: read, reference: '30023', description: P101当前故障原因}
+    - {name: P1_F_L, bind: state.pump1_total_fault, c_type: bool, access: read, reference: '10024', description: P101总故障}
+    - {name: P1_F_DEV, bind: state.pump1_device_fault, c_type: bool, access: read, reference: '10025', description: P101设备故障记录}
+    - {name: P1_F_STA, bind: state.pump1_start_fault, c_type: bool, access: read, reference: '10026', description: P101启动反馈超时}
+    - {name: P1_F_STP, bind: state.pump1_stop_fault, c_type: bool, access: read, reference: '10027', description: P101停止反馈超时}
+    - {name: P1_F_RUN, bind: state.pump1_loss_fault, c_type: bool, access: read, reference: '10028', description: P101运行反馈丢失}
+    - {name: P2_STATUS, bind: state.pump2_status, c_type: u32, access: read, reference: '30025', description: P102设备运行阶段}
+    - {name: P2_FAULT, bind: state.pump2_fault_code, c_type: u32, access: read, reference: '30027', description: P102当前故障原因}
+    - {name: P2_F_L, bind: state.pump2_total_fault, c_type: bool, access: read, reference: '10029', description: P102总故障}
+    - {name: P2_F_DEV, bind: state.pump2_device_fault, c_type: bool, access: read, reference: '10030', description: P102设备故障记录}
+    - {name: P2_F_STA, bind: state.pump2_start_fault, c_type: bool, access: read, reference: '10031', description: P102启动反馈超时}
+    - {name: P2_F_STP, bind: state.pump2_stop_fault, c_type: bool, access: read, reference: '10032', description: P102停止反馈超时}
+    - {name: P2_F_RUN, bind: state.pump2_loss_fault, c_type: bool, access: read, reference: '10033', description: P102运行反馈丢失}
+    - {name: P3_STATUS, bind: state.pump3_status, c_type: u32, access: read, reference: '30029', description: P103设备运行阶段}
+    - {name: P3_FAULT, bind: state.pump3_fault_code, c_type: u32, access: read, reference: '30031', description: P103当前故障原因}
+    - {name: P3_F_L, bind: state.pump3_total_fault, c_type: bool, access: read, reference: '10034', description: P103总故障}
+    - {name: P3_F_DEV, bind: state.pump3_device_fault, c_type: bool, access: read, reference: '10035', description: P103设备故障记录}
+    - {name: P3_F_STA, bind: state.pump3_start_fault, c_type: bool, access: read, reference: '10036', description: P103启动反馈超时}
+    - {name: P3_F_STP, bind: state.pump3_stop_fault, c_type: bool, access: read, reference: '10037', description: P103停止反馈超时}
+    - {name: P3_F_RUN, bind: state.pump3_loss_fault, c_type: bool, access: read, reference: '10038', description: P103运行反馈丢失}

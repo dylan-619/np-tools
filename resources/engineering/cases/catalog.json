@@ -1,0 +1,390 @@
+[
+  {
+    "id": "two-device-output-sequence",
+    "directory": "case",
+    "name": "两设备顺序启停",
+    "projectId": "expo_sequence_demo",
+    "bindings": {
+      "startButton": "board.di01",
+      "stopButton": "board.di02",
+      "runPermit": "board.di03",
+      "downstreamOutput": "board.do01",
+      "upstreamOutput": "board.do02"
+    },
+    "parameters": {
+      "startDelayMs": {
+        "name": "start_delay_ms",
+        "field": "START_DELAY_MS",
+        "label": "启动间隔",
+        "default": 2000,
+        "min": 1000,
+        "max": 10000
+      },
+      "clearDelayMs": {
+        "name": "clear_delay_ms",
+        "field": "CLEAR_DELAY_MS",
+        "label": "停止延时",
+        "default": 5000,
+        "min": 1000,
+        "max": 10000
+      }
+    },
+    "labels": {
+      "downstream": "后级设备",
+      "upstream": "前级设备"
+    },
+    "description": "先启后级、延时启前级；停止顺序相反。许可撤销立即断开，恢复后需重新启动。"
+  },
+  {
+    "id": "water-supply-station",
+    "directory": "cases/water-supply-station",
+    "name": "清水箱补水与双泵供水",
+    "projectId": "water_supply_station",
+    "bindings": {
+      "tankLow": "board.di01",
+      "tankHigh": "board.di02",
+      "sourceAvailable": "board.di03",
+      "supplyDemand": "board.di04",
+      "pump1Run": "board.di05",
+      "pump1Fault": "board.di06",
+      "pump2Run": "board.di07",
+      "pump2Fault": "board.di08",
+      "valveOpenLimit": "board.di09",
+      "valveCloseLimit": "board.di10",
+      "runPermit": "board.di11",
+      "pump1Output": "board.do01",
+      "pump2Output": "board.do02",
+      "valveOpenOutput": "board.do03",
+      "valveCloseOutput": "board.do04"
+    },
+    "parameters": {
+      "pumpStartTimeoutMs": {
+        "name": "pump_start_timeout_ms",
+        "field": "P_START_MS",
+        "label": "泵启动确认时间",
+        "default": 5000,
+        "min": 1000,
+        "max": 10000
+      },
+      "pumpStopTimeoutMs": {
+        "name": "pump_stop_timeout_ms",
+        "field": "P_STOP_MS",
+        "label": "泵停止确认时间",
+        "default": 5000,
+        "min": 1000,
+        "max": 10000
+      },
+      "valveTravelTimeoutMs": {
+        "name": "valve_travel_timeout_ms",
+        "field": "V_TRAVEL_MS",
+        "label": "阀门行程时间",
+        "default": 8000,
+        "min": 4000,
+        "max": 15000
+      },
+      "switchDelayMs": {
+        "name": "switch_delay_ms",
+        "field": "SWITCH_MS",
+        "label": "主备切换间隔",
+        "default": 2000,
+        "min": 2000,
+        "max": 5000
+      }
+    },
+    "labels": {
+      "tank": "清水箱 TK101",
+      "pump1": "主供泵 P101",
+      "pump2": "备用泵 P102",
+      "valve": "进水阀 XV101"
+    },
+    "description": "低位补水、高位关阀；有供水需求且水位允许时主泵供水；主泵故障经停机确认与切换间隔后投入备用泵。双向阀具备到位检查、超时报警和2秒换向保护。"
+  },
+  {
+    "id": "three-pump-level-control",
+    "directory": "cases/three-pump-level-control",
+    "name": "三泵集水井液位控制",
+    "projectId": "three_pump_level_control",
+    "bindings": {
+      "pump1Run": "board.di01",
+      "pump1Fault": "board.di02",
+      "pump1Auto": "board.di03",
+      "pump1Output": "board.do01",
+      "pump2Run": "board.di04",
+      "pump2Fault": "board.di05",
+      "pump2Auto": "board.di06",
+      "pump2Output": "board.do02",
+      "pump3Run": "board.di07",
+      "pump3Fault": "board.di08",
+      "pump3Auto": "board.di09",
+      "pump3Output": "board.do03",
+      "waterAvailable": "board.di10",
+      "highHigh": "board.di11",
+      "runPermit": "board.di12",
+      "levelInput": "board.ai01",
+      "frequencyInput": "board.ai02",
+      "speedOutput": "board.ao01",
+      "alarmOutput": "board.do04"
+    },
+    "parameters": {
+      "stopLevelM": {
+        "name": "stop_level_m",
+        "field": "L_STOP_M",
+        "label": "停泵液位",
+        "default": 0.4,
+        "min": 0.1,
+        "max": 0.8,
+        "type": "float",
+        "unit": "m",
+        "step": 0.01
+      },
+      "targetLevelM": {
+        "name": "target_level_m",
+        "field": "L_SP_M",
+        "label": "调节目标液位",
+        "default": 0.8,
+        "min": 0.2,
+        "max": 1.5,
+        "type": "float",
+        "unit": "m",
+        "step": 0.01
+      },
+      "vfdStartLevelM": {
+        "name": "vfd_start_level_m",
+        "field": "L_VFD_M",
+        "label": "启变频液位",
+        "default": 1.0,
+        "min": 0.3,
+        "max": 1.7,
+        "type": "float",
+        "unit": "m",
+        "step": 0.01
+      },
+      "assistStartLevelM": {
+        "name": "assist_start_level_m",
+        "field": "L_AUX_M",
+        "label": "启工频液位",
+        "default": 1.8,
+        "min": 1.2,
+        "max": 2.4,
+        "type": "float",
+        "unit": "m",
+        "step": 0.01
+      },
+      "pidKp": {
+        "name": "pid_kp",
+        "field": "PID_KP",
+        "label": "液位比例增益",
+        "default": 24.0,
+        "min": 0.0,
+        "max": 30.0,
+        "type": "float",
+        "unit": "mA/m",
+        "step": 0.01
+      },
+      "pidKi": {
+        "name": "pid_ki",
+        "field": "PID_KI",
+        "label": "液位积分增益",
+        "default": 0.6,
+        "min": 0.0,
+        "max": 5.0,
+        "type": "float",
+        "unit": "mA/(m·s)",
+        "step": 0.01
+      },
+      "startConfirmMs": {
+        "name": "start_confirm_ms",
+        "field": "START_MS",
+        "label": "启变频连续确认",
+        "default": 2000,
+        "min": 500,
+        "max": 5000,
+        "type": "u32",
+        "unit": "ms",
+        "step": 100
+      },
+      "stageConfirmMs": {
+        "name": "stage_confirm_ms",
+        "field": "STAGE_MS",
+        "label": "加减泵连续确认",
+        "default": 5000,
+        "min": 1000,
+        "max": 30000,
+        "type": "u32",
+        "unit": "ms",
+        "step": 100
+      },
+      "pumpStartTimeoutMs": {
+        "name": "pump_start_timeout_ms",
+        "field": "P_START_MS",
+        "label": "泵启动反馈时限",
+        "default": 5000,
+        "min": 1000,
+        "max": 10000,
+        "type": "u32",
+        "unit": "ms",
+        "step": 100
+      },
+      "pumpStopTimeoutMs": {
+        "name": "pump_stop_timeout_ms",
+        "field": "P_STOP_MS",
+        "label": "泵停止反馈时限",
+        "default": 5000,
+        "min": 1000,
+        "max": 10000,
+        "type": "u32",
+        "unit": "ms",
+        "step": 100
+      }
+    },
+    "labels": {
+      "tank": "集水井 TK101",
+      "pump1": "变频泵 P101",
+      "pump2": "工频泵 P102",
+      "pump3": "备用泵 P103"
+    },
+    "description": "停泵、启变频、启工频三个液位等级；P101跟踪目标液位，实际满频且高位持续不下降时投入工频增援；P102故障由P103停稳接替，正常最多两台运行。",
+    "intro": "一台变频泵调节液位，工频泵按需增援，备用泵故障接替。将点位、控制程序与泵站画面连成完整工程。",
+    "ioSummary": "12 DI / 4 DO / 2 AI / 1 AO",
+    "exampleRequirement": "三台排水泵，一台变频、两台工频，其中一台备用。设置停泵、启变频、启工频三个液位；变频泵满频仍降不下液位时投入工频泵，故障后备用接替。",
+    "highlights": [
+      "三级液位联动",
+      "变频调节 · 工频增援 · 故障接替"
+    ],
+    "terminals": [
+      {
+        "terminal": "DI1",
+        "source": "board.di01",
+        "name": "P101独立运行反馈",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI2",
+        "source": "board.di02",
+        "name": "P101故障接点",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI3",
+        "source": "board.di03",
+        "name": "P101远程自动许可",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI4",
+        "source": "board.di04",
+        "name": "P102独立运行反馈",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI5",
+        "source": "board.di05",
+        "name": "P102故障接点",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI6",
+        "source": "board.di06",
+        "name": "P102远程自动许可",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI7",
+        "source": "board.di07",
+        "name": "P103独立运行反馈",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI8",
+        "source": "board.di08",
+        "name": "P103故障接点",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI9",
+        "source": "board.di09",
+        "name": "P103远程自动许可",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI10",
+        "source": "board.di10",
+        "name": "独立低水位许可",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI11",
+        "source": "board.di11",
+        "name": "独立高高位报警",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "DI12",
+        "source": "board.di12",
+        "name": "泵组运行许可",
+        "kind": "输入",
+        "detail": "反馈与联锁"
+      },
+      {
+        "terminal": "AI1",
+        "source": "board.ai01",
+        "name": "集水井连续液位",
+        "kind": "输入",
+        "detail": "连续测量"
+      },
+      {
+        "terminal": "AI2",
+        "source": "board.ai02",
+        "name": "P101实际频率反馈",
+        "kind": "输入",
+        "detail": "连续测量"
+      },
+      {
+        "terminal": "DO1",
+        "source": "board.do01",
+        "name": "P101启动命令",
+        "kind": "输出",
+        "detail": "设备命令"
+      },
+      {
+        "terminal": "DO2",
+        "source": "board.do02",
+        "name": "P102启动命令",
+        "kind": "输出",
+        "detail": "设备命令"
+      },
+      {
+        "terminal": "DO3",
+        "source": "board.do03",
+        "name": "P103启动命令",
+        "kind": "输出",
+        "detail": "设备命令"
+      },
+      {
+        "terminal": "AO1",
+        "source": "board.ao01",
+        "name": "P101频率给定",
+        "kind": "输出",
+        "detail": "频率给定"
+      },
+      {
+        "terminal": "DO4",
+        "source": "board.do04",
+        "name": "泵组综合报警",
+        "kind": "输出",
+        "detail": "设备命令"
+      }
+    ]
+  }
+]

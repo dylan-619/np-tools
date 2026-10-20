@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "archive": "NP-Tools演示工程.zip",
+  "sha256": "a4903392f66c0144bd223294c2f854019231f9f25741fe70cef5077bc30ac701",
+  "files": 24,
+  "projectVersion": "1.0.0",
+  "scope": "host-only"
+}

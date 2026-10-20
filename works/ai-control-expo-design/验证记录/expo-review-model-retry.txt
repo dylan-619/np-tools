@@ -1,0 +1,108 @@
+Window: "NP-Tools 硬件调试平台", App: NP-Tools.
+0 standard window NP-Tools 硬件调试平台, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering
+			3 container
+				4 text 工作区
+				5 button 折叠导航栏
+				6 button 设备调试导航, Help: 设备调试导航：按固件产品线选择正确入口
+				7 button AI辅助工作台, Help: AI辅助工作台：点位、需求、仿真与设备部署
+				8 button (collapsed) KZ3 F427 控制器, Secondary Actions: Expand
+				9 button (collapsed) 双星闪协调器, Secondary Actions: Expand
+				10 button (collapsed) SJZDV3 采集终端, Secondary Actions: Expand
+				11 button (collapsed) 通用调试工具, Secondary Actions: Expand
+				12 button (collapsed) 交付与设置, Secondary Actions: Expand
+				13 text 串口未连接 115200 8N1
+				14 button 展开参数配置
+				15 button 刷新串口列表
+				16 combo box (collapsed, settable) Secondary Actions: Expand, Value: cu.wlan-debug
+
+					17 text cu.wlan-debug
+				18 button 连接, Help: 打开串口
+			19 container
+				20 heading AI 辅助工作台, Value: 1
+					21 text AI 辅助工作台
+				22 text 从现场需求到控制工程，让设计与运行相互验证 软件联调 OpenCode 1.19.2
+				23 button 全屏展示
+				24 container 工程流程
+					25 button (disabled) 点表核对, Help: 导入点表，核对信号类型与工艺角色。
+					26 button (disabled) 2 需求设计, Help: 与 AI 明确设备分工、启停条件和保护规则。
+					27 button (disabled) 3 工程生成, Help: 查看控制程序、点位说明与实际验证记录。
+					28 button (disabled) 4 仿真运行, Help: 把当前版本部署到本机设备模型。
+					29 button (disabled) 5 HMI 联调, Help: 改变工况，观察控制程序的实际响应。
+					30 button (disabled) 6 实板烧录, Help: 准备匹配固件，再进入设备写入与校验。
+				31 text 工程资料
+				32 heading 点表结构已核对, Value: 3
+					33 text 点表结构已核对
+				34 text 三泵集水井液位控制 下一步结合需求确认设备角色与控制条件。
+				35 container (expanded) Secondary Actions: Collapse
+					36 summary 需求核对范围, Value: on
+						37 text 需求核对范围
+					38 content list
+						39 container 设备分工与控制目标
+							40 list marker •
+							41 text 设备分工与控制目标
+						42 container 启停条件与联动时序
+							43 list marker •
+							44 text 启停条件与联动时序
+						45 container 故障接替与恢复方式
+							46 list marker •
+							47 text 故障接替与恢复方式
+						48 container 参数、画面与联调要求
+							49 list marker •
+							50 text 参数、画面与联调要求
+				51 summary 已导入 19 个点位, Value: off
+					52 text 已导入 19 个点位
+				53 button 查看原始点表
+				54 text SHA-256 ce449deae869… 案例控制边界 停泵、启变频、启工频三个液位等级；P101跟踪目标液位，实际满频且高位持续不下降时投入工频增援；P102故障由P103停稳接替，正常最多两台运行。
+				55 container 工艺需求对话
+					56 heading 现场实施协作工程师, Value: 2
+						57 text 现场实施协作工程师
+					58 text 三泵集水井液位控制 · 19 个点位结构已核对
+					59 text 服务已连接
+					60 button (collapsed) 智能服务设置, Secondary Actions: Expand
+					61 container 需求沟通记录
+						62 container
+							63 text 现场需求 请设计三泵集水井液位控制，用于本机软件联调。
+
+【控制目标】在来水变化和单泵故障下，协调排水能力与集水井液位。
+
+【设备分工】P101 变频主调，P102 工频增援，P103 工频备用；正常最多两台同时运行。
+
+【启停与联动】低位停泵，到启变频液位先启 P101；实际满频且高位持续不下降，再投入 P102。负荷回落后减泵，P103 仅在需要接替时投入。
+
+【建议参数】停泵液位 0.4 米；调节目标液位 0.8 米；启变频液位 1 米；启工频液位 1.8 米。其余时序与调节参数请按已验证案例列出建议值，供我确认。
+
+【故障与保护】P102 故障须确认停稳后由 P103 接替；P101 故障退出正常调节，工频降级由操作员明确投入。许可或有效液位丢失退出自动，恢复后重新投入。
+
+【联调与交付】需要控制逻辑、工程点表、北向点位说明；后续生成可操作的工艺画面，观察单泵调节、按需增援、备用接替、减泵停机。
+
+请结合已导入点表，核对设备与信号是否匹配，补全必要的控制边界；区分我已提出的要求、你的建议和仍待确认的事项，先给出方案。
+						64 text 实施协作工程师
+						65 container
+							66 text 现场需求 请按上方已提交的三泵需求继续给出工艺方案。参数使用案例建议值，说明设备分工、启停与联锁、故障接替、待确认项和联调观察点。
+						67 text 实施协作工程师
+						68 container
+							69 text 正在结合点位梳理需求 … 结合本次点表与工艺要求处理
+					70 summary 需求核对提纲, Value: off
+						71 text 需求核对提纲
+					72 text entry area (settable) 控制需求, Value: [text entry area: 控制需求], Placeholder: 说明设备分工、控制目标和启停要求；也可以先填入完整需求示例…
+						73 text 说明设备分工、控制目标和启停要求；也可以先填入完整需求示例…
+					74 button 停止回复
+					75 text 回车发送 · ⇧ 回车换行 沟通需求 → 确认参数 → 生成工程
+				76 summary 执行记录 5, Value: off
+					77 text 执行记录 
+					78 text 5
+	79 close button
+	80 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	81 minimize button
+	82 text NP-Tools 硬件调试平台
+83 menu bar
+	84 NP-Tools
+	85 File
+	86 Edit
+	87 View
+	88 Window
+	89 Help
+
+The focused UI element is 2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering

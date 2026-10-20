@@ -1,0 +1,167 @@
+schema: kz3-project-io/v3
+project:
+  name: 两设备顺序启停仿真
+  id: expo_sequence_demo
+  version: 1.0.0
+  board: kz3_f427_standard
+  required_profiles: []
+  scan_period_ms: 10
+  features:
+    pid: false
+    counter: false
+    retained: false
+  devices: []
+  points:
+    inputs:
+    - name: start_button
+      source: board.di01
+      description: 虚拟启动按钮，true按下，上升沿触发
+    - name: stop_button
+      source: board.di02
+      description: 虚拟正常停止按钮，true请求停止
+    - name: run_permit
+      source: board.di03
+      description: 虚拟运行许可，true允许，恢复不自动启动
+    outputs:
+    - name: downstream_output
+      source: board.do01
+      description: 后级控制输出目标，非运行反馈
+    - name: upstream_output
+      source: board.do02
+      description: 前级控制输出目标，非运行反馈
+  application_variables:
+    parameters:
+    - name: start_delay_ms
+      c_type: u32
+      default: 2000
+      min: 1000
+      max: 10000
+      unit: ms
+      description: 启动间隔，下一启动周期生效
+    - name: clear_delay_ms
+      c_type: u32
+      default: 5000
+      min: 1000
+      max: 10000
+      unit: ms
+      description: 后级停止延时，下一启动周期生效
+    commands:
+    - name: line_start
+      c_type: bool
+    - name: line_stop
+      c_type: bool
+    - name: line_protect_stop
+      c_type: bool
+      effect: protective
+    states:
+    - name: phase
+      c_type: u32
+      default: 0
+    - name: block_reason
+      c_type: u32
+      default: 0
+    - name: remain_ms
+      c_type: u32
+      default: 0
+    - name: entered_ms
+      c_type: u32
+      default: 0
+    - name: cycle_start_ms
+      c_type: u32
+      default: 2000
+    - name: cycle_clear_ms
+      c_type: u32
+      default: 5000
+    - name: previous_start
+      c_type: bool
+      default: true
+    - name: sampled
+      c_type: bool
+      default: false
+  pids: []
+  northbound:
+    protocols:
+    - http
+    - modbus_tcp
+    modbus_tcp:
+      address_style: modicon_5_digit
+      word_order_32: abcd
+    fields:
+    - name: START_BTN
+      bind: point.start_button
+      c_type: bool
+      access: read
+      reference: '10001'
+      description: 虚拟启动按钮
+    - name: STOP_BTN
+      bind: point.stop_button
+      c_type: bool
+      access: read
+      reference: '10002'
+      description: 虚拟停止按钮
+    - name: RUN_PERMIT
+      bind: point.run_permit
+      c_type: bool
+      access: read
+      reference: '10003'
+      description: 运行许可
+    - name: DOWN_OUT
+      bind: point.downstream_output
+      c_type: bool
+      access: read
+      reference: '00001'
+      description: 后级DO输出
+    - name: UP_OUT
+      bind: point.upstream_output
+      c_type: bool
+      access: read
+      reference: '00002'
+      description: 前级DO输出
+    - name: LINE_START
+      bind: command.line_start
+      c_type: bool
+      access: read_write
+      reference: '00003'
+      description: 单次顺序启动
+    - name: LINE_STOP
+      bind: command.line_stop
+      c_type: bool
+      access: read_write
+      reference: '00004'
+      description: 单次正常停止
+    - name: LINE_PROTECT_STOP
+      bind: command.line_protect_stop
+      c_type: bool
+      access: read_write
+      reference: '00005'
+      description: 单次立即停止
+    - name: START_DELAY_MS
+      bind: parameter.start_delay_ms
+      c_type: u32
+      access: read_write
+      reference: '40001'
+      description: 启动间隔ms
+    - name: CLEAR_DELAY_MS
+      bind: parameter.clear_delay_ms
+      c_type: u32
+      access: read_write
+      reference: '40003'
+      description: 停止延时ms
+    - name: LINE_PHASE
+      bind: state.phase
+      c_type: u32
+      access: read
+      reference: '30001'
+      description: 当前步骤
+    - name: LINE_BLOCK_REASON
+      bind: state.block_reason
+      c_type: u32
+      access: read
+      reference: '30003'
+      description: 禁止原因
+    - name: LINE_REMAIN_MS
+      bind: state.remain_ms
+      c_type: u32
+      access: read
+      reference: '30005'
+      description: 等待剩余ms

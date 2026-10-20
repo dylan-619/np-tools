@@ -1,0 +1,54 @@
+schema: kz3-board/v1
+
+board:
+  name: kz3_f427_standard
+  device_type: 203
+  description: KZ3 F427 标准板型
+
+  digital_inputs:
+    # driver_channel 是底层 BoardDriver 的零基通道，不是 Point ID。
+    - {name: di01, terminal: DI1, driver_channel: 0, active: low, debounce_ms: 0}
+    - {name: di02, terminal: DI2, driver_channel: 1, active: low, debounce_ms: 0}
+    - {name: di03, terminal: DI3, driver_channel: 2, active: low, debounce_ms: 0}
+    - {name: di04, terminal: DI4, driver_channel: 3, active: low, debounce_ms: 0}
+    - {name: di05, terminal: DI5, driver_channel: 4, active: low, debounce_ms: 0}
+    - {name: di06, terminal: DI6, driver_channel: 5, active: low, debounce_ms: 0}
+    - {name: di07, terminal: DI7, driver_channel: 6, active: low, debounce_ms: 0}
+    - {name: di08, terminal: DI8, driver_channel: 7, active: low, debounce_ms: 0}
+    - {name: di09, terminal: DI9, driver_channel: 8, active: low, debounce_ms: 0}
+    - {name: di10, terminal: DI10, driver_channel: 9, active: low, debounce_ms: 0}
+    - {name: di11, terminal: DI11, driver_channel: 10, active: low, debounce_ms: 0}
+    - {name: di12, terminal: DI12, driver_channel: 11, active: low, debounce_ms: 0}
+
+  digital_outputs:
+    # safe_value 是上电/停机的软件目标；当前全部仍需板级 HIL 确认物理结果。
+    - {name: do01, terminal: DO1, driver_channel: 0, active: high, safe_value: false}
+    - {name: do02, terminal: DO2, driver_channel: 1, active: high, safe_value: false}
+    - {name: do03, terminal: DO3, driver_channel: 2, active: high, safe_value: false}
+    - {name: do04, terminal: DO4, driver_channel: 3, active: high, safe_value: false}
+    - {name: do05, terminal: DO5, driver_channel: 4, active: high, safe_value: false}
+    - {name: do06, terminal: DO6, driver_channel: 5, active: high, safe_value: false}
+    - {name: do07, terminal: DO7, driver_channel: 6, active: high, safe_value: false}
+    - {name: do08, terminal: DO8, driver_channel: 7, active: high, safe_value: false}
+
+  analog_inputs:
+    - {name: ai01, terminal: AI1, driver_channel: 0, c_type: float, unit: mA,
+       software_min: 0.0, software_max: 20.32, electrical_verified: false}
+    - {name: ai02, terminal: AI2, driver_channel: 1, c_type: float, unit: mA,
+       software_min: 0.0, software_max: 20.32, electrical_verified: false}
+    - {name: ai03, terminal: AI3, driver_channel: 2, c_type: float, unit: mA,
+       software_min: 0.0, software_max: 20.32, electrical_verified: false}
+    - {name: ai04, terminal: AI4, driver_channel: 3, c_type: float, unit: mA,
+       software_min: 0.0, software_max: 20.32, electrical_verified: false}
+
+  analog_outputs:
+    - {name: ao01, terminal: AO1, driver_channel: 0, c_type: float, unit: mA,
+       software_min: 0.0, software_max: 20.0, safe_value: 0.0,
+       electrical_verified: false}
+    - {name: ao02, terminal: AO2, driver_channel: 1, c_type: float, unit: mA,
+       software_min: 0.0, software_max: 20.0, safe_value: 0.0,
+       electrical_verified: false}
+
+  qualification:
+    board_io_hil: pending
+    note: 极性、端子量程、AO 安全电流和物理反馈必须实板确认后才能发布。

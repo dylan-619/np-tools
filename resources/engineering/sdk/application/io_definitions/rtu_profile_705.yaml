@@ -1,0 +1,61 @@
+schema: kz3-modbus-profile/v1
+
+profile:
+  name: sp4024_705
+  legacy_type: 705
+  description: 4DI + 4AO 扩展模块
+  qualification: software_qualified
+
+  read_blocks:
+    - name: di
+      function: read_coils
+      pdu_address: 0
+      count: 4
+
+    - name: ao
+      function: read_holding_registers
+      pdu_address: 0
+      count: 4
+
+  write_groups:
+    - name: ao
+      function: write_multiple_registers
+      pdu_address: 0
+      count: 4
+      wire_type: u16
+      byte_word_order: ab
+      raw_min: 0
+      raw_max: 4095
+      # 原始码 0 的真实电流和现场安全含义仍需 HIL 确认。
+      default_safe_value: 0
+
+  channels:
+    - kind: digital_input
+      names: [di01, di02, di03, di04]
+      source: {block: di, first_bit: 0}
+
+    - kind: analog_output
+      names: [ao01, ao02, ao03, ao04]
+      target: {group: ao, first_register: 0}
+      feedback:
+        names: [ao01_feedback, ao02_feedback, ao03_feedback, ao04_feedback]
+
+  signals:
+    # 手册表只证明原始码为 0..4095；未取得电气映射证据前不换算为 µA。
+    - {name: ao01_feedback, source: {block: ao, register_offset: 0}, wire_type: u16,
+       byte_word_order: ab,
+       engineering: {unit: raw, raw_min: 0, raw_max: 4095, value_min: 0, value_max: 4095}}
+    - {name: ao02_feedback, source: {block: ao, register_offset: 1}, wire_type: u16,
+       byte_word_order: ab,
+       engineering: {unit: raw, raw_min: 0, raw_max: 4095, value_min: 0, value_max: 4095}}
+    - {name: ao03_feedback, source: {block: ao, register_offset: 2}, wire_type: u16,
+       byte_word_order: ab,
+       engineering: {unit: raw, raw_min: 0, raw_max: 4095, value_min: 0, value_max: 4095}}
+    - {name: ao04_feedback, source: {block: ao, register_offset: 3}, wire_type: u16,
+       byte_word_order: ab,
+       engineering: {unit: raw, raw_min: 0, raw_max: 4095, value_min: 0, value_max: 4095}}
+
+  evidence:
+    protocol_source: legacy_source_golden_vector
+    hardware_hil: pending
+    note: 手册表确认 DI/AO 地址、U16 类型和 0..4095 原始范围；电气映射、安全值和实物读写仍待 HIL。

@@ -1,0 +1,16 @@
+✔ only complete JSON code blocks can produce a candidate (1.070583ms)
+✔ case identity, fixed wiring, integer ranges and labels are enforced (0.489084ms)
+✔ HMI cannot bind a different revision, writable physical output or unknown point (0.309708ms)
+✔ water station requires its own 15 bindings and bounded process parameters (0.507416ms)
+✔ three-pump finite parameters, ordered levels and engineering units are enforced (0.472583ms)
+✔ three-pump conversation uses its own analog roles, PI rules and current identity (34.204417ms)
+✔ restore does not adopt old model output; only a fresh request can create a candidate (1.968834ms)
+✔ water process context and model config stay isolated from the legacy case (1.435ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 549.960292

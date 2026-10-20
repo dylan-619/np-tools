@@ -1,0 +1,454 @@
+{
+  "scope": "host-only",
+  "events": [
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.0",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "deployed",
+      "timeMs": 1792400459610
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 1,
+        "phase": [
+          4,
+          1
+        ],
+        "scanSequence": 1
+      },
+      "event": "phase",
+      "timeMs": 1792400459612
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "permit",
+        "value": true
+      },
+      "event": "action",
+      "timeMs": 1792400492164
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 32553,
+        "phase": [
+          0,
+          1
+        ],
+        "scanSequence": 3222
+      },
+      "event": "phase",
+      "timeMs": 1792400492165
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "pulse",
+        "value": 0
+      },
+      "event": "action",
+      "timeMs": 1792400495724
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 36113,
+        "phase": [
+          1,
+          1
+        ],
+        "scanSequence": 3578
+      },
+      "event": "phase",
+      "timeMs": 1792400495725
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 38114,
+        "phase": [
+          2,
+          1
+        ],
+        "scanSequence": 3778
+      },
+      "event": "phase",
+      "timeMs": 1792400497725
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "pulse",
+        "value": 1
+      },
+      "event": "action",
+      "timeMs": 1792400517630
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 58019,
+        "phase": [
+          3,
+          1
+        ],
+        "scanSequence": 5750
+      },
+      "event": "phase",
+      "timeMs": 1792400517631
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 63028,
+        "phase": [
+          0,
+          1
+        ],
+        "scanSequence": 6246
+      },
+      "event": "phase",
+      "timeMs": 1792400522639
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "command",
+        "value": "LINE_START"
+      },
+      "event": "action",
+      "timeMs": 1792400566966
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 107356,
+        "phase": [
+          1,
+          1
+        ],
+        "scanSequence": 10678
+      },
+      "event": "phase",
+      "timeMs": 1792400566968
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 109356,
+        "phase": [
+          2,
+          1
+        ],
+        "scanSequence": 10878
+      },
+      "event": "phase",
+      "timeMs": 1792400568967
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "permit",
+        "value": false
+      },
+      "event": "action",
+      "timeMs": 1792400594421
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 134811,
+        "phase": [
+          4,
+          1
+        ],
+        "scanSequence": 13419
+      },
+      "event": "phase",
+      "timeMs": 1792400594422
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "permit",
+        "value": true
+      },
+      "event": "action",
+      "timeMs": 1792400600328
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 140717,
+        "phase": [
+          0,
+          1
+        ],
+        "scanSequence": 14006
+      },
+      "event": "phase",
+      "timeMs": 1792400600329
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "command",
+        "value": "LINE_START"
+      },
+      "event": "action",
+      "timeMs": 1792400640007
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 180397,
+        "phase": [
+          1,
+          1
+        ],
+        "scanSequence": 17960
+      },
+      "event": "phase",
+      "timeMs": 1792400640008
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 182404,
+        "phase": [
+          2,
+          1
+        ],
+        "scanSequence": 18157
+      },
+      "event": "phase",
+      "timeMs": 1792400642016
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "command",
+        "value": "LINE_PROTECT_STOP"
+      },
+      "event": "action",
+      "timeMs": 1792400644934
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "nowMs": 185324,
+        "phase": [
+          0,
+          1
+        ],
+        "scanSequence": 18449
+      },
+      "event": "phase",
+      "timeMs": 1792400644935
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "parameter",
+        "value": {
+          "name": "START_DELAY_MS",
+          "revision": 0,
+          "value": 3000
+        }
+      },
+      "event": "action",
+      "timeMs": 1792400667967
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "op": "stop",
+        "value": null
+      },
+      "event": "action",
+      "timeMs": 1792400675589
+    },
+    {
+      "run": "18dfe2b8b24d3578",
+      "detail": {
+        "error": null,
+        "identity": {
+          "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+          "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+          "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+          "projectId": "expo_sequence_demo",
+          "projectVersion": "1.0.0",
+          "protocolVersion": 1,
+          "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+        },
+        "runId": "18dfe2b8b24d3578",
+        "status": "stopped",
+        "workspaceId": "18dfe282656a6888"
+      },
+      "event": "ended",
+      "timeMs": 1792400675590
+    },
+    {
+      "run": "18dfe2eafbbb6630",
+      "detail": {
+        "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.0",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "deployed",
+      "timeMs": 1792400675590
+    },
+    {
+      "run": "18dfe2eafbbb6630",
+      "detail": {
+        "nowMs": 1,
+        "phase": [
+          4,
+          1
+        ],
+        "scanSequence": 1
+      },
+      "event": "phase",
+      "timeMs": 1792400675592
+    },
+    {
+      "run": "18dfe2eafbbb6630",
+      "detail": {
+        "op": "stop",
+        "value": null
+      },
+      "event": "action",
+      "timeMs": 1792400697634
+    },
+    {
+      "run": "18dfe2eafbbb6630",
+      "detail": {
+        "error": null,
+        "identity": {
+          "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+          "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+          "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+          "projectId": "expo_sequence_demo",
+          "projectVersion": "1.0.0",
+          "protocolVersion": 1,
+          "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+        },
+        "runId": "18dfe2eafbbb6630",
+        "status": "stopped",
+        "workspaceId": "18dfe282656a6888"
+      },
+      "event": "ended",
+      "timeMs": 1792400697635
+    },
+    {
+      "run": "18dfe2f01db61780",
+      "detail": {
+        "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.0",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "deployed",
+      "timeMs": 1792400697635
+    },
+    {
+      "run": "18dfe2f01db61780",
+      "detail": {
+        "nowMs": 1,
+        "phase": [
+          4,
+          1
+        ],
+        "scanSequence": 1
+      },
+      "event": "phase",
+      "timeMs": 1792400697637
+    },
+    {
+      "run": "18dfe361160c6a40",
+      "detail": {
+        "configSha256": "05aeaaa403e8a08b4a9815e0b43a4fca95de2776e7247640ca214fd349b83a03",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.1",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "deployed",
+      "timeMs": 1792401182838
+    },
+    {
+      "run": "18dfe361160c6a40",
+      "detail": {
+        "nowMs": 1,
+        "phase": [
+          4,
+          1
+        ],
+        "scanSequence": 1
+      },
+      "event": "phase",
+      "timeMs": 1792401182841
+    },
+    {
+      "run": "engineering",
+      "detail": {
+        "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.0",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "generated",
+      "timeMs": 1792400391489
+    },
+    {
+      "run": "engineering",
+      "detail": {
+        "configSha256": "05aeaaa403e8a08b4a9815e0b43a4fca95de2776e7247640ca214fd349b83a03",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.1",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "generated",
+      "timeMs": 1792401143731
+    },
+    {
+      "run": "engineering",
+      "detail": {
+        "configSha256": "c0efcbfadf0436e1131915f2abac8f74a82b8abdf9cb628374829ecb537fc836",
+        "inputSha256": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c",
+        "northboundManifest": "2858fdaf715e78af96522cbefc155b771e6de26bca1aa9faa7250fee70b01d95",
+        "projectId": "expo_sequence_demo",
+        "projectVersion": "1.0.0",
+        "protocolVersion": 1,
+        "sourceSha256": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c"
+      },
+      "event": "selected-history",
+      "timeMs": 1792401241069
+    }
+  ]
+}

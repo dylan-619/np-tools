@@ -1,0 +1,215 @@
+
+/Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/src/components/engineering/ThreePumpPanel.vue
+  237:29  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  241:34  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  242:21  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  243:1   warning  Expected indentation of 12 spaces but found 14 spaces                             vue/html-indent
+  244:1   warning  Expected indentation of 12 spaces but found 14 spaces                             vue/html-indent
+  244:88  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  248:34  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  249:21  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  250:1   warning  Expected indentation of 12 spaces but found 14 spaces                             vue/html-indent
+  251:1   warning  Expected indentation of 12 spaces but found 14 spaces                             vue/html-indent
+  251:73  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  333:35  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  334:51  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  335:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  335:69  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  343:1   warning  Expected indentation of 16 spaces but found 14 spaces                             vue/html-indent
+  344:1   warning  Expected indentation of 16 spaces but found 14 spaces                             vue/html-indent
+  345:1   warning  Expected indentation of 16 spaces but found 14 spaces                             vue/html-indent
+  346:1   warning  Expected indentation of 16 spaces but found 14 spaces                             vue/html-indent
+  347:1   warning  Expected indentation of 16 spaces but found 14 spaces                             vue/html-indent
+  348:1   warning  Expected indentation of 16 spaces but found 14 spaces                             vue/html-indent
+  364:44  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  372:51  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  380:30  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  381:18  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  382:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  383:25  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  420:78  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  424:64  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  425:1   warning  Expected indentation of 12 spaces but found 14 spaces                             vue/html-indent
+  435:17  warning  Disallow self-closing on HTML void elements (<input/>)                            vue/html-self-closing
+  435:48  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  439:1   warning  Expected indentation of 22 spaces but found 20 spaces                             vue/html-indent
+  440:1   warning  Expected indentation of 22 spaces but found 20 spaces                             vue/html-indent
+  441:1   warning  Expected indentation of 22 spaces but found 20 spaces                             vue/html-indent
+  447:28  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  459:37  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  460:1   warning  Expected indentation of 8 spaces but found 10 spaces                              vue/html-indent
+  460:28  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  461:1   warning  Expected indentation of 8 spaces but found 10 spaces                              vue/html-indent
+  462:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  463:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  464:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  465:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  466:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  469:16  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  470:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  471:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  472:1   warning  Expected indentation of 12 spaces but found 14 spaces                             vue/html-indent
+  473:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  473:29  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  495:38  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  532:37  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  537:17  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  538:1   warning  Expected indentation of 10 spaces but found 12 spaces                             vue/html-indent
+  539:61  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+  541:66  warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found  vue/multiline-html-element-content-newline
+  541:74  warning  Expected no line breaks before closing bracket, but 1 line break found            vue/html-closing-bracket-newline
+
+/Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/src/views/engineering/AiEngineeringView.vue
+  324:80   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  326:92   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  328:16   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  328:24   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  335:55   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  336:1    warning  Expected indentation of 6 spaces but found 8 spaces                                 vue/html-indent
+  336:10   warning  Expected 1 line break after opening tag (`<template>`), but no line breaks found    vue/multiline-html-element-content-newline
+  337:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  338:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  339:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  340:1    warning  Expected indentation of 6 spaces but found 8 spaces                                 vue/html-indent
+  341:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  341:16   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  342:1    warning  Expected indentation of 8 spaces but found 12 spaces                                vue/html-indent
+  342:101  warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  343:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  343:22   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  343:30   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  344:1    warning  Expected indentation of 6 spaces but found 8 spaces                                 vue/html-indent
+  344:81   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  345:9    warning  Expected 1 line break before closing tag (`</template>`), but no line breaks found  vue/multiline-html-element-content-newline
+  348:36   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  365:22   warning  Disallow self-closing on HTML void elements (<br/>)                                 vue/html-self-closing
+  378:43   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  378:51   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  383:40   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  384:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  384:76   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  385:16   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  386:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  386:49   warning  Disallow self-closing on HTML void elements (<br/>)                                 vue/html-self-closing
+  387:23   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  407:45   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  415:19   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  418:1    warning  Expected indentation of 14 spaces but found 12 spaces                               vue/html-indent
+  428:45   warning  Disallow self-closing on HTML void elements (<br/>)                                 vue/html-self-closing
+  430:33   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  449:17   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  450:1    warning  Expected indentation of 10 spaces but found 12 spaces                               vue/html-indent
+  451:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  452:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  453:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  454:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  454:54   warning  Expected 1 line break before closing bracket, but no line breaks found              vue/html-closing-bracket-newline
+  454:55   warning  Disallow self-closing on HTML void elements (<input/>)                              vue/html-self-closing
+  454:64   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  459:69   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  459:77   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  460:86   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  461:66   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  462:1    warning  Expected indentation of 10 spaces but found 12 spaces                               vue/html-indent
+  463:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  464:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  465:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  466:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  467:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  470:82   warning  Disallow self-closing on HTML void elements (<input/>)                              vue/html-self-closing
+  476:13   warning  Disallow self-closing on HTML void elements (<input/>)                              vue/html-self-closing
+  503:39   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  504:1    warning  Expected indentation of 10 spaces but found 12 spaces                               vue/html-indent
+  504:14   warning  Expected 1 line break after opening tag (`<template>`), but no line breaks found    vue/multiline-html-element-content-newline
+  505:1    warning  Expected indentation of 13 spaces but found 14 spaces                               vue/html-indent
+  505:47   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  506:1    warning  Expected indentation of 13 spaces but found 14 spaces                               vue/html-indent
+  507:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  508:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  509:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  510:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  511:1    warning  Expected indentation of 13 spaces but found 14 spaces                               vue/html-indent
+  512:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  512:35   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  512:43   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  513:1    warning  Expected indentation of 13 spaces but found 14 spaces                               vue/html-indent
+  514:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  515:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  516:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  517:1    warning  Expected indentation of 15 spaces but found 16 spaces                               vue/html-indent
+  518:1    warning  Expected indentation of 13 spaces but found 14 spaces                               vue/html-indent
+  518:15   warning  Disallow self-closing on HTML void elements (<input/>)                              vue/html-self-closing
+  519:1    warning  Expected indentation of 11 spaces but found 12 spaces                               vue/html-indent
+  520:87   warning  Expected 1 line break before closing tag (`</template>`), but no line breaks found  vue/multiline-html-element-content-newline
+  520:97   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  521:28   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  522:1    warning  Expected indentation of 10 spaces but found 12 spaces                               vue/html-indent
+  522:14   warning  Expected 1 line break after opening tag (`<template>`), but no line breaks found    vue/multiline-html-element-content-newline
+  524:74   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  525:75   warning  Expected 1 line break before closing tag (`</template>`), but no line breaks found  vue/multiline-html-element-content-newline
+  525:85   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  537:42   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  539:40   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  539:48   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  554:45   warning  Disallow self-closing on HTML void elements (<br/>)                                 vue/html-self-closing
+  557:41   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  558:21   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  559:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  560:1    warning  Expected indentation of 12 spaces but found 14 spaces                               vue/html-indent
+  560:95   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  565:37   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  566:1    warning  Expected indentation of 10 spaces but found 12 spaces                               vue/html-indent
+  566:63   warning  Disallow self-closing on HTML void elements (<input/>)                              vue/html-self-closing
+  566:85   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  573:20   warning  Expected 1 line break before closing tag (`</template>`), but no line breaks found  vue/multiline-html-element-content-newline
+  573:30   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  585:45   warning  Disallow self-closing on HTML void elements (<br/>)                                 vue/html-self-closing
+  593:39   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  594:1    warning  Expected indentation of 10 spaces but found 12 spaces                               vue/html-indent
+  594:78   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  604:14   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  605:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  605:91   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  606:60   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  621:23   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  621:31   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  647:45   warning  'v-html' directive can lead to XSS attack                                           vue/no-v-html
+  653:37   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  654:1    warning  Expected indentation of 8 spaces but found 10 spaces                                vue/html-indent
+  654:74   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  660:23   warning  Disallow self-closing on HTML void elements (<br/>)                                 vue/html-self-closing
+  681:1    warning  Expected indentation of 18 spaces but found 20 spaces                               vue/html-indent
+  682:1    warning  Expected indentation of 18 spaces but found 20 spaces                               vue/html-indent
+  683:1    warning  Expected indentation of 16 spaces but found 18 spaces                               vue/html-indent
+  686:82   warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  686:90   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  687:59   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  709:43   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  710:1    warning  Expected indentation of 4 spaces but found 6 spaces                                 vue/html-indent
+  710:8    warning  Expected 1 line break after opening tag (`<template>`), but no line breaks found    vue/multiline-html-element-content-newline
+  711:1    warning  Expected indentation of 7 spaces but found 8 spaces                                 vue/html-indent
+  712:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  713:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  714:1    warning  Expected indentation of 7 spaces but found 8 spaces                                 vue/html-indent
+  715:1    warning  Expected indentation of 7 spaces but found 8 spaces                                 vue/html-indent
+  716:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  717:1    warning  Expected indentation of 11 spaces but found 12 spaces                               vue/html-indent
+  718:1    warning  Expected indentation of 11 spaces but found 12 spaces                               vue/html-indent
+  719:1    warning  Expected indentation of 11 spaces but found 12 spaces                               vue/html-indent
+  720:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  721:1    warning  Expected indentation of 11 spaces but found 12 spaces                               vue/html-indent
+  722:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  723:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  724:1    warning  Expected indentation of 11 spaces but found 12 spaces                               vue/html-indent
+  725:1    warning  Expected indentation of 9 spaces but found 10 spaces                                vue/html-indent
+  726:1    warning  Expected indentation of 7 spaces but found 8 spaces                                 vue/html-indent
+  727:1    warning  Expected indentation of 5 spaces but found 6 spaces                                 vue/html-indent
+  730:69   warning  Expected 1 line break before closing bracket, but no line breaks found              vue/html-closing-bracket-newline
+  730:95   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+  731:1    warning  Expected indentation of 6 spaces but found 4 spaces                                 vue/html-indent
+  731:7    warning  Expected 1 line break before closing tag (`</template>`), but no line breaks found  vue/multiline-html-element-content-newline
+  742:33   warning  Expected no line breaks before closing bracket, but 1 line break found              vue/html-closing-bracket-newline
+
+✖ 207 problems (0 errors, 207 warnings)
+  0 errors and 206 warnings potentially fixable with the `--fix` option.
+

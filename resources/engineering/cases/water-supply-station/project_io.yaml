@@ -1,0 +1,485 @@
+schema: kz3-project-io/v3
+project:
+  name: 清水箱补水与双泵供水
+  id: water_supply_station
+  version: 1.0.0
+  board: kz3_f427_standard
+  required_profiles: []
+  scan_period_ms: 10
+  features:
+    pid: false
+    counter: false
+    retained: false
+  devices: []
+  points:
+    inputs:
+    - name: tank_low
+      source: board.di01
+      description: 清水箱低液位开关，true表示水位高于低位
+    - name: tank_high
+      source: board.di02
+      description: 清水箱高液位开关，true表示到达高位
+    - name: source_available
+      source: board.di03
+      description: 上游水源允许补水，true可用
+    - name: supply_demand
+      source: board.di04
+      description: 下游供水需求，true需要供水
+    - name: pump1_run_fb
+      source: board.di05
+      description: P101主供泵独立运行反馈，true运行
+    - name: pump1_fault
+      source: board.di06
+      description: P101主供泵故障接点，true故障
+    - name: pump2_run_fb
+      source: board.di07
+      description: P102备用泵独立运行反馈，true运行
+    - name: pump2_fault
+      source: board.di08
+      description: P102备用泵故障接点，true故障
+    - name: valve_open_limit
+      source: board.di09
+      description: XV101进水阀开到位，true到位
+    - name: valve_close_limit
+      source: board.di10
+      description: XV101进水阀关到位，true到位
+    - name: run_permit
+      source: board.di11
+      description: 设备运行许可，true允许；撤销后恢复需重新投入
+    outputs:
+    - name: pump1_output
+      source: board.do01
+      description: P101主供泵启动命令
+    - name: pump2_output
+      source: board.do02
+      description: P102备用泵启动命令
+    - name: valve_open_output
+      source: board.do03
+      description: XV101进水阀开向驱动
+    - name: valve_close_output
+      source: board.do04
+      description: XV101进水阀关向驱动
+  application_variables:
+    parameters:
+    - name: pump_start_timeout_ms
+      c_type: u32
+      default: 5000
+      min: 1000
+      max: 10000
+      unit: ms
+      description: 泵启动确认时间，下一次投入自动运行生效
+    - name: pump_stop_timeout_ms
+      c_type: u32
+      default: 5000
+      min: 1000
+      max: 10000
+      unit: ms
+      description: 泵停止确认时间，下一次投入自动运行生效
+    - name: valve_travel_timeout_ms
+      c_type: u32
+      default: 8000
+      min: 4000
+      max: 15000
+      unit: ms
+      description: 阀门行程时间，下一次投入自动运行生效
+    - name: switch_delay_ms
+      c_type: u32
+      default: 2000
+      min: 2000
+      max: 5000
+      unit: ms
+      description: 主备切换间隔，下一次投入自动运行生效
+    commands:
+    - name: system_start
+      c_type: bool
+    - name: system_stop
+      c_type: bool
+    - name: system_trip
+      c_type: bool
+      effect: protective
+    - name: pump1_reset_faults
+      c_type: bool
+    - name: pump2_reset_faults
+      c_type: bool
+    - name: valve_reset_faults
+      c_type: bool
+    states:
+    - name: automatic
+      c_type: bool
+      default: false
+    - name: fill_request
+      c_type: bool
+      default: false
+    - name: blocked_previous
+      c_type: bool
+      default: false
+    - name: sampled
+      c_type: bool
+      default: false
+    - name: system_status
+      c_type: u32
+      default: 0
+    - name: block_reason
+      c_type: u32
+      default: 0
+    - name: selected_pump
+      c_type: u32
+      default: 0
+    - name: off_since_ms
+      c_type: u32
+      default: 0
+    - name: valve_direction
+      c_type: u32
+      default: 0
+    - name: valve_last_direction
+      c_type: u32
+      default: 0
+    - name: valve_off_since_ms
+      c_type: u32
+      default: 0
+    - name: valve_since_ms
+      c_type: u32
+      default: 0
+    - name: valve_status
+      c_type: u32
+      default: 0
+    - name: valve_fault_code
+      c_type: u32
+      default: 0
+    - name: remain_ms
+      c_type: u32
+      default: 0
+    - name: valve_fault_latched
+      c_type: bool
+      default: false
+    - name: cycle_pump_start_timeout_ms
+      c_type: u32
+      default: 5000
+    - name: cycle_pump_stop_timeout_ms
+      c_type: u32
+      default: 5000
+    - name: cycle_valve_travel_timeout_ms
+      c_type: u32
+      default: 8000
+    - name: cycle_switch_delay_ms
+      c_type: u32
+      default: 2000
+    - name: pump1_status
+      c_type: u32
+      default: 0
+    - name: pump1_fault_code
+      c_type: u32
+      default: 0
+    - name: pump1_since_ms
+      c_type: u32
+      default: 0
+    - name: pump1_stop_since_ms
+      c_type: u32
+      default: 0
+    - name: pump1_command
+      c_type: bool
+      default: false
+    - name: pump1_fault_latched
+      c_type: bool
+      default: false
+    - name: pump1_stopping
+      c_type: bool
+      default: false
+    - name: pump2_status
+      c_type: u32
+      default: 0
+    - name: pump2_fault_code
+      c_type: u32
+      default: 0
+    - name: pump2_since_ms
+      c_type: u32
+      default: 0
+    - name: pump2_stop_since_ms
+      c_type: u32
+      default: 0
+    - name: pump2_command
+      c_type: bool
+      default: false
+    - name: pump2_fault_latched
+      c_type: bool
+      default: false
+    - name: pump2_stopping
+      c_type: bool
+      default: false
+    - name: close_request
+      c_type: bool
+      default: false
+  pids: []
+  runtime_counters:
+  - name: pump1
+    description: 独立运行反馈累计秒数
+    trigger:
+      bind: point.pump1_run_fb
+      active_value: true
+      quality: good
+  - name: pump2
+    description: 独立运行反馈累计秒数
+    trigger:
+      bind: point.pump2_run_fb
+      active_value: true
+      quality: good
+  northbound:
+    protocols:
+    - http
+    - modbus_tcp
+    modbus_tcp:
+      address_style: modicon_5_digit
+      word_order_32: abcd
+    fields:
+    - name: TK_LOW
+      bind: point.tank_low
+      c_type: bool
+      access: read
+      reference: '10001'
+      description: 清水箱低液位开关，true表示水位高于低位
+    - name: TK_HIGH
+      bind: point.tank_high
+      c_type: bool
+      access: read
+      reference: '10002'
+      description: 清水箱高液位开关，true表示到达高位
+    - name: SOURCE_OK
+      bind: point.source_available
+      c_type: bool
+      access: read
+      reference: '10003'
+      description: 上游水源允许补水，true可用
+    - name: DEMAND
+      bind: point.supply_demand
+      c_type: bool
+      access: read
+      reference: '10004'
+      description: 下游供水需求，true需要供水
+    - name: P1_RUN
+      bind: point.pump1_run_fb
+      c_type: bool
+      access: read
+      reference: '10005'
+      description: P101主供泵独立运行反馈，true运行
+    - name: P1_FLT
+      bind: point.pump1_fault
+      c_type: bool
+      access: read
+      reference: '10006'
+      description: P101主供泵故障接点，true故障
+    - name: P2_RUN
+      bind: point.pump2_run_fb
+      c_type: bool
+      access: read
+      reference: '10007'
+      description: P102备用泵独立运行反馈，true运行
+    - name: P2_FLT
+      bind: point.pump2_fault
+      c_type: bool
+      access: read
+      reference: '10008'
+      description: P102备用泵故障接点，true故障
+    - name: XV_OPEN
+      bind: point.valve_open_limit
+      c_type: bool
+      access: read
+      reference: '10009'
+      description: XV101进水阀开到位，true到位
+    - name: XV_CLOSED
+      bind: point.valve_close_limit
+      c_type: bool
+      access: read
+      reference: '10010'
+      description: XV101进水阀关到位，true到位
+    - name: RUN_PERMIT
+      bind: point.run_permit
+      c_type: bool
+      access: read
+      reference: '10011'
+      description: 设备运行许可，true允许；撤销后恢复需重新投入
+    - name: P1_DO
+      bind: point.pump1_output
+      c_type: bool
+      access: read
+      reference: '00001'
+      description: P101主供泵启动命令 DO输出
+    - name: P2_DO
+      bind: point.pump2_output
+      c_type: bool
+      access: read
+      reference: '00002'
+      description: P102备用泵启动命令 DO输出
+    - name: XV_OPEN_DO
+      bind: point.valve_open_output
+      c_type: bool
+      access: read
+      reference: '00003'
+      description: XV101进水阀开向驱动 DO输出
+    - name: XV_CLOSE_DO
+      bind: point.valve_close_output
+      c_type: bool
+      access: read
+      reference: '00004'
+      description: XV101进水阀关向驱动 DO输出
+    - name: SYS_STA
+      bind: command.system_start
+      c_type: bool
+      access: read_write
+      reference: '00005'
+      description: 投入自动运行
+    - name: SYS_STP
+      bind: command.system_stop
+      c_type: bool
+      access: read_write
+      reference: '00006'
+      description: 正常停止
+    - name: SYS_TRIP
+      bind: command.system_trip
+      c_type: bool
+      access: read_write
+      reference: '00007'
+      description: 立即停止
+    - name: P1_RST
+      bind: command.pump1_reset_faults
+      c_type: bool
+      access: read_write
+      reference: 00008
+      description: 独立设备故障复位
+    - name: P2_RST
+      bind: command.pump2_reset_faults
+      c_type: bool
+      access: read_write
+      reference: 00009
+      description: 独立设备故障复位
+    - name: XV_RST
+      bind: command.valve_reset_faults
+      c_type: bool
+      access: read_write
+      reference: '00010'
+      description: 独立设备故障复位
+    - name: P1_RT_CLR
+      bind: runtime.pump1.clear
+      c_type: bool
+      access: read_write
+      reference: '00011'
+      description: 累计运行时间清零
+    - name: P2_RT_CLR
+      bind: runtime.pump2.clear
+      c_type: bool
+      access: read_write
+      reference: '00012'
+      description: 累计运行时间清零
+    - name: P_START_MS
+      bind: parameter.pump_start_timeout_ms
+      c_type: u32
+      access: read_write
+      reference: '40001'
+      description: 泵启动确认时间 ms
+    - name: P_STOP_MS
+      bind: parameter.pump_stop_timeout_ms
+      c_type: u32
+      access: read_write
+      reference: '40003'
+      description: 泵停止确认时间 ms
+    - name: V_TRAVEL_MS
+      bind: parameter.valve_travel_timeout_ms
+      c_type: u32
+      access: read_write
+      reference: '40005'
+      description: 阀门行程时间 ms
+    - name: SWITCH_MS
+      bind: parameter.switch_delay_ms
+      c_type: u32
+      access: read_write
+      reference: '40007'
+      description: 主备切换间隔 ms
+    - name: SYS_AUTO
+      bind: state.automatic
+      c_type: bool
+      access: read
+      reference: '10012'
+      description: 自动运行已投入
+    - name: SYS_STATUS
+      bind: state.system_status
+      c_type: u32
+      access: read
+      reference: '30002'
+      description: 工艺运行状态
+    - name: BLOCK_REASON
+      bind: state.block_reason
+      c_type: u32
+      access: read
+      reference: '30004'
+      description: 联锁条件
+    - name: P1_STATUS
+      bind: state.pump1_status
+      c_type: u32
+      access: read
+      reference: '30006'
+      description: 主供泵状态
+    - name: P2_STATUS
+      bind: state.pump2_status
+      c_type: u32
+      access: read
+      reference: '30008'
+      description: 备用泵状态
+    - name: P1_F_L
+      bind: state.pump1_fault_latched
+      c_type: bool
+      access: read
+      reference: '10013'
+      description: 主供泵总故障
+    - name: P2_F_L
+      bind: state.pump2_fault_latched
+      c_type: bool
+      access: read
+      reference: '10014'
+      description: 备用泵总故障
+    - name: XV_F_L
+      bind: state.valve_fault_latched
+      c_type: bool
+      access: read
+      reference: '10015'
+      description: 进水阀总故障
+    - name: P1_FAULT
+      bind: state.pump1_fault_code
+      c_type: u32
+      access: read
+      reference: '30013'
+      description: 主供泵故障原因
+    - name: P2_FAULT
+      bind: state.pump2_fault_code
+      c_type: u32
+      access: read
+      reference: '30015'
+      description: 备用泵故障原因
+    - name: XV_FAULT
+      bind: state.valve_fault_code
+      c_type: u32
+      access: read
+      reference: '30017'
+      description: 进水阀故障原因
+    - name: XV_STATUS
+      bind: state.valve_status
+      c_type: u32
+      access: read
+      reference: '30019'
+      description: 进水阀状态
+    - name: REMAIN_MS
+      bind: state.remain_ms
+      c_type: u32
+      access: read
+      reference: '30021'
+      description: 切换或换向等待剩余毫秒
+    - name: P1_RT_S
+      bind: runtime.pump1.seconds
+      c_type: u32
+      access: read
+      reference: '30023'
+      description: 独立运行反馈累计时间，秒
+    - name: P2_RT_S
+      bind: runtime.pump2.seconds
+      c_type: u32
+      access: read
+      reference: '30025'
+      description: 独立运行反馈累计时间，秒

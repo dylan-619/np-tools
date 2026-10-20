@@ -1,0 +1,30 @@
+{
+  "schema": "np-tools-expo-case/v1",
+  "id": "two-device-output-sequence",
+  "version": "1.0.0",
+  "scope": "host_simulation",
+  "sourceBindings": {
+    "startButton": "board.di01",
+    "stopButton": "board.di02",
+    "runPermit": "board.di03",
+    "downstreamOutput": "board.do01",
+    "upstreamOutput": "board.do02"
+  },
+  "parameters": {
+    "startDelayMs": {
+      "min": 1000,
+      "max": 10000,
+      "default": 2000
+    },
+    "clearDelayMs": {
+      "min": 1000,
+      "max": 10000,
+      "default": 5000
+    }
+  },
+  "files": {
+    "logic.c": "377db2f067161d18a88f91b3bb2142f5c5b8de7c338ebe07477f42a9edc2834c",
+    "logic_project_test.c": "5dfe93866582dd890a9d4c820a6b087d4b1775a9217f50e5d8ce441089b139d9",
+    "project_io.yaml": "41fd8e5c02258c19b58a9e887d3f7bf356fde068cc20e18f8890ac228b71448c"
+  }
+}

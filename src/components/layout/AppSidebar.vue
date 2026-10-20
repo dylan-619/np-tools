@@ -111,6 +111,10 @@ function groupIsCollapsed(group: ProductGroup) {
         <span v-if="!isCompact" class="home-badge">总览</span>
       </button>
 
+      <button class="nav-item" :class="{ active: route.path.startsWith('/ai-engineering') }" aria-label="AI辅助工作台" title="AI辅助工作台：点位、需求、仿真与设备部署" @click="navigateTo('/ai-engineering')">
+        <MessageSquareText :size="16" class="nav-icon" />
+        <span v-if="!isCompact" class="nav-text">AI 辅助工作台</span>
+      </button>
       <!-- Section 1: KZ3 controller -->
       <div class="nav-group" :class="{ folded: groupIsCollapsed('controller') }">
         <button

@@ -1,0 +1,31 @@
+schema: kz3-modbus-profile/v1
+
+# 这是格式示例，不代表仓库已经支持某个真实第三方型号。
+profile:
+  name: generic_level_f32_example
+  description: 示例液位设备，Holding 40001 起始的 CDAB float
+  qualification: example_only
+
+  read_blocks:
+    - name: measurements
+      function: read_holding_registers
+      pdu_address: 0
+      manual_address: 40001
+      count: 2
+
+  signals:
+    - name: level
+      source: {block: measurements, register_offset: 0}
+      wire_type: f32
+      byte_word_order: cdab
+      scale: {multiply: 1.0, add: 0.0}
+      unit: percent
+      valid_range: {min: 0.0, max: 100.0}
+
+  write_groups: []
+  outputs: []
+
+  evidence:
+    protocol_source: example_only
+    hardware_hil: not_applicable
+    note: 接入真实型号时必须替换为手册样例、原始帧和实物验证结果。

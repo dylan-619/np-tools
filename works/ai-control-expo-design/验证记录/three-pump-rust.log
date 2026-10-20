@@ -1,0 +1,32 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.02s
+     Running unittests src/lib.rs (target/debug/deps/desktop_lib-4c7b285ff3f52a75)
+
+running 25 tests
+test engineering::engineering_clock_tests::lab_float_parameters_are_bounded_and_encoded_without_truncation ... ok
+test kz3_http::tests::固定诊断资源采用白名单 ... ok
+test engineering::engineering_clock_tests::software_process_clock_does_not_jump_across_host_pause ... ok
+test kz3_http::tests::仅允许受控北向写入报文形状 ... ok
+test kz3_http::tests::点位名拒绝路径穿透和超长输入 ... ok
+test modbus_tcp::tests::解析正常和异常响应 ... ok
+test modbus_tcp::tests::构建读请求包含正确_mbap ... ok
+test modbus_tcp::tests::请求仅允许明确且有限的读操作 ... ok
+test mqtt::tests::client_id_cannot_impersonate_a_device_serial_number ... ok
+test mqtt::tests::payload_limit_is_measured_in_utf8_bytes ... ok
+test mqtt::tests::subscription_wildcards_must_occupy_a_complete_topic_level ... ok
+test kz3_http::tests::base_url_只允许_http_根地址 ... ok
+test kz3_http::tests::点位分页_url_固定_offset_和_limit ... ok
+test opencode::tests::local_only ... ok
+test ssh_sftp::tests::远端临时上传文件与目标保持同一目录 ... ok
+test ssh_sftp::tests::非默认端口使用带端口的_known_hosts_名字 ... ok
+test ssh_sftp::tests::ssh_profile_校验主机和认证资料但允许空密码 ... ok
+test ssh_sftp::tests::前端驼峰连接资料可以映射到后端认证字段 ... ok
+test gateway_excel::tests::rejects_type_function_code_mismatch_and_duplicate_key ... ok
+test workspace::tests::reject_serial_number_path_traversal ... ok
+test workspace::tests::activates_controller_directory_before_any_config_is_imported ... ok
+test modbus_tcp::tests::客户端执行一次受限的本地_tcp_读事务 ... ok
+test workspace::tests::stores_and_loads_controller_config_by_serial_number ... ok
+test gateway_excel::tests::sjzd_push_keeps_plc_address_and_rejects_duplicate_json_key ... ok
+test gateway_excel::tests::creates_gateway_compatible_xlsx_container ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

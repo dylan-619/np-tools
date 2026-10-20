@@ -1,0 +1,80 @@
+Window: "NP-Tools 硬件调试平台", App: NP-Tools.
+0 standard window NP-Tools 硬件调试平台, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering
+			3 container
+				4 text 工作区
+				5 button 折叠导航栏
+				6 button 设备调试导航, Help: 设备调试导航：按固件产品线选择正确入口
+				7 button AI辅助工作台, Help: AI辅助工作台：点位、需求、仿真与设备部署
+				8 button (collapsed) KZ3 F427 控制器, Secondary Actions: Expand
+				9 button (collapsed) 双星闪协调器, Secondary Actions: Expand
+				10 button (collapsed) SJZDV3 采集终端, Secondary Actions: Expand
+				11 button (collapsed) 通用调试工具, Secondary Actions: Expand
+				12 button (collapsed) 交付与设置, Secondary Actions: Expand
+				13 text 串口未连接 115200 8N1
+				14 button 展开参数配置
+				15 button 刷新串口列表
+				16 combo box (collapsed, settable) Secondary Actions: Expand, Value: cu.wlan-debug
+
+					17 text cu.wlan-debug
+				18 button 连接, Help: 打开串口
+			19 container
+				20 heading AI 辅助工作台, Value: 1
+					21 text AI 辅助工作台
+				22 text 现场实施协作工程师 实板部署 OpenCode 1.19.2
+				23 button 导出工程包
+				24 button 全屏展示
+				25 container 工程流程
+					26 button 点位配置
+					27 button 工艺需求
+					28 button 控制程序
+					29 button 仿真运行
+					30 button 工艺调试
+					31 button 6 烧录物理设备
+				32 text 工程交付 · KZ3 F427
+				33 heading 将控制工程交付到设备, Value: 2
+					34 text 将控制工程交付到设备
+				35 text 准备应用固件，连接控制器，在工具内完成写入与校验。 待准备固件
+				36 button 打开设备烧录
+				37 image KZ3 F427 控制器示意图
+				38 text KZ3 F427 控制器 通过 ST-Link 写入应用固件 当前控制工程
+				39 heading 三泵集水井液位控制, Value: 3
+					40 text 三泵集水井液位控制
+				41 description list
+					42 text 工程
+					43 text three_pump_level_control
+					44 text 版本
+					45 text 1.0.0
+					46 text 北向点位
+					47 text 74 个
+					48 text 主机检查
+					49 text 已通过
+				50 heading 01 准备固件, Value: 3
+					51 text 01 准备固件
+				52 text 将本工程的点位配置、控制逻辑与运行框架构建为 KZ3 应用 HEX。
+				53 text 待导入匹配固件
+				54 heading 02 连接控制器, Value: 3
+					55 text 02 连接控制器
+				56 text 连接 ST-Link 与目标设备，在烧录页核对探针和 MCU 身份。
+				57 text 待核验设备
+				58 heading 03 写入与校验, Value: 3
+					59 text 03 写入与校验
+				60 text 通过固件地址与目标预检后执行写入，依据实际记录确认结果。
+				61 text 待执行 当前工程已生成主机运行程序。实板烧录需要另行构建匹配的 ARM 应用固件；软件联调结果与实板运行记录分别保留。
+				62 button 返回工艺调试
+				63 button 导出控制工程
+				64 summary 执行记录 8, Value: off
+					65 text 执行记录 
+					66 text 8
+	67 close button
+	68 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	69 minimize button
+	70 text NP-Tools 硬件调试平台
+71 menu bar
+	72 NP-Tools
+	73 File
+	74 Edit
+	75 View
+	76 Window
+	77 Help

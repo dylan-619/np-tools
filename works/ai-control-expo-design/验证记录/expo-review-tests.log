@@ -1,0 +1,64 @@
+
+> np-tools@1.0.8 test:engineering /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools
+> python3 tests/engineering_host_test.py && python3 tests/waterStation.test.py && python3 tests/threePump.test.py && node --test tests/engineeringContract.test.mjs tests/engineeringStore.test.mjs tests/engineeringChat.test.mjs
+
+test_bad_quality_output_safe (__main__.HostTests.test_bad_quality_output_safe) ... ok
+test_cas_range_and_cycle_guard (__main__.HostTests.test_cas_range_and_cycle_guard) ... ok
+test_config_closed_and_bounded (__main__.HostTests.test_config_closed_and_bounded) ... ok
+test_eof_releases_process (__main__.HostTests.test_eof_releases_process) ... ok
+test_export_contains_original_and_no_absolute_workspace (__main__.HostTests.test_export_contains_original_and_no_absolute_workspace) ... ok
+test_host_exception_does_not_relax_hardware_scope (__main__.HostTests.test_host_exception_does_not_relax_hardware_scope) ... ok
+test_identity_and_initial_state (__main__.HostTests.test_identity_and_initial_state) ... ok
+test_malformed_protocol_and_unknown_fields (__main__.HostTests.test_malformed_protocol_and_unknown_fields) ... ok
+test_materialization_deterministic_and_version_conflict (__main__.HostTests.test_materialization_deterministic_and_version_conflict) ... ok
+test_original_extensions_and_aliases_survive_materialization (__main__.HostTests.test_original_extensions_and_aliases_survive_materialization) ... ok
+test_randomized_scan_output_invariant (__main__.HostTests.test_randomized_scan_output_invariant) ... ok
+test_real_configured_timing_and_stop (__main__.HostTests.test_real_configured_timing_and_stop) ... ok
+test_real_di_edges_and_permission (__main__.HostTests.test_real_di_edges_and_permission) ... ok
+test_stale_request_rejected_without_replay (__main__.HostTests.test_stale_request_rejected_without_replay) ... ok
+test_strict_execution_evidence (__main__.HostTests.test_strict_execution_evidence) ... ok
+test_tampered_delivery_and_sdk_rejected (__main__.HostTests.test_tampered_delivery_and_sdk_rejected) ... ok
+test_yaml_rejects_ambiguity_preserves_unknown (__main__.HostTests.test_yaml_rejects_ambiguity_preserves_unknown) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 7.989s
+
+OK
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 3.929s
+
+OK
+................
+----------------------------------------------------------------------
+Ran 16 tests in 21.114s
+
+OK
+✔ historical camel-case summaries become Chinese Markdown without changing machine data (5.277667ms)
+✔ streamed configuration is hidden before its schema or closing fence arrives (0.359334ms)
+✔ assistant markup cannot inject HTML, load images or navigate the desktop webview (1.938333ms)
+✔ a completed proposal offers the next action inside the conversation (7.969458ms)
+✔ partial, busy or failed replies never offer a premature proposal confirmation (3.206958ms)
+✔ current validated configuration becomes a Chinese in-chat form requiring explicit confirmation (1.830833ms)
+✔ restored unconfirmed configuration requires a fresh request instead of automatic adoption (1.800667ms)
+✔ generated artifact receipt uses real version, fields and confirmed parameters (1.186834ms)
+✔ questions, permission requests and real generation activity remain in the message flow (3.904125ms)
+✔ requirement outline covers operating and failure boundaries with actual recipe defaults (0.552167ms)
+✔ workflow completion depends on real evidence, not visiting later pages (0.446ms)
+✔ new conversations provide a complete requirement entry and existing ones retain a checklist (1.205083ms)
+✔ only complete JSON code blocks can produce a candidate (1.129125ms)
+✔ case identity, fixed wiring, integer ranges and labels are enforced (0.510375ms)
+✔ HMI cannot bind a different revision, writable physical output or unknown point (0.312375ms)
+✔ water station requires its own 15 bindings and bounded process parameters (0.773666ms)
+✔ three-pump finite parameters, ordered levels and engineering units are enforced (0.533167ms)
+✔ three-pump conversation uses its own analog roles, PI rules and current identity (31.180792ms)
+✔ restore does not adopt old model output; only a fresh request can create a candidate (2.074083ms)
+✔ water process context and model config stay isolated from the legacy case (1.494417ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 810.416042

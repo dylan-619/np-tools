@@ -1,0 +1,105 @@
+schema: kz3-modbus-profile/v1
+
+profile:
+  name: et703
+  description: ET703 三相电力测控仪，只读电压、电流和功率测量
+  qualification: pending_hil
+
+  # 用户提供的点表覆盖 0xA700..0xA731，共 50 个连续 16-bit 寄存器。
+  # 其中 0xA706、0xA714、0xA716、0xA718 起始的双寄存器位置为保留区，
+  # 不生成信号，但保留在连续读取块内以减少轮询请求数。
+  # 功能码未在点表中注明，暂按 FC03；首次联调须用设备响应确认。
+  read_blocks:
+    - name: electrical_measurements
+      function: read_holding_registers
+      pdu_address: 0xA700
+      manual_address: 0xA700
+      count: 50
+
+  write_groups: []
+  outputs: []
+
+  signals:
+    # 每个信号字段说明：
+    # - name：固件和 project_io.yaml 使用的稳定英文标识符。
+    # - source.block：信号所属的连续读取块，对应上面的 electrical_measurements。
+    # - source.register_offset：相对读取块起始地址 0xA700 的 16-bit 寄存器偏移。
+    # - wire_type：设备线上数据类型；f32 表示 IEEE-754 单精度浮点数，占 2 个寄存器。
+    # - byte_word_order：4 字节解析顺序；abcd 表示按 A、B、C、D 顺序传送。
+    # - unit：解析后工程值的物理单位。
+    #
+    # ET703 手册说明 Modbus 地址和数据采用 Big-Endian，32-bit 示例
+    # 0x12345678 的发送顺序为 0x12、0x34、0x56、0x78。因此按 ABCD
+    # （高 16-bit 寄存器在前、寄存器内高字节在前）解码。
+    # 0xA700：A 相电压，单位 V，只读。
+    - {name: phase_a_voltage, source: {block: electrical_measurements, register_offset: 0},
+       wire_type: f32, byte_word_order: abcd, unit: V}
+    # 0xA702：B 相电压，单位 V，只读。
+    - {name: phase_b_voltage, source: {block: electrical_measurements, register_offset: 2},
+       wire_type: f32, byte_word_order: abcd, unit: V}
+    # 0xA704：C 相电压，单位 V，只读。
+    - {name: phase_c_voltage, source: {block: electrical_measurements, register_offset: 4},
+       wire_type: f32, byte_word_order: abcd, unit: V}
+    # 0xA708：AB 线电压，单位 V，只读。
+    - {name: line_ab_voltage, source: {block: electrical_measurements, register_offset: 8},
+       wire_type: f32, byte_word_order: abcd, unit: V}
+    # 0xA70A：BC 线电压，单位 V，只读。
+    - {name: line_bc_voltage, source: {block: electrical_measurements, register_offset: 10},
+       wire_type: f32, byte_word_order: abcd, unit: V}
+    # 0xA70C：CA 线电压，单位 V，只读。
+    - {name: line_ca_voltage, source: {block: electrical_measurements, register_offset: 12},
+       wire_type: f32, byte_word_order: abcd, unit: V}
+
+    # 0xA70E：A 相电流，单位 A，只读。
+    - {name: phase_a_current, source: {block: electrical_measurements, register_offset: 14},
+       wire_type: f32, byte_word_order: abcd, unit: A}
+    # 0xA710：B 相电流，单位 A，只读。
+    - {name: phase_b_current, source: {block: electrical_measurements, register_offset: 16},
+       wire_type: f32, byte_word_order: abcd, unit: A}
+    # 0xA712：C 相电流，单位 A，只读。
+    - {name: phase_c_current, source: {block: electrical_measurements, register_offset: 18},
+       wire_type: f32, byte_word_order: abcd, unit: A}
+
+    # 0xA71A：三相有功总功率，单位 kW，只读。
+    - {name: total_active_power, source: {block: electrical_measurements, register_offset: 26},
+       wire_type: f32, byte_word_order: abcd, unit: kW}
+    # 0xA71C：A 相有功功率，单位 kW，只读。
+    - {name: phase_a_active_power, source: {block: electrical_measurements, register_offset: 28},
+       wire_type: f32, byte_word_order: abcd, unit: kW}
+    # 0xA71E：B 相有功功率，单位 kW，只读。
+    - {name: phase_b_active_power, source: {block: electrical_measurements, register_offset: 30},
+       wire_type: f32, byte_word_order: abcd, unit: kW}
+    # 0xA720：C 相有功功率，单位 kW，只读。
+    - {name: phase_c_active_power, source: {block: electrical_measurements, register_offset: 32},
+       wire_type: f32, byte_word_order: abcd, unit: kW}
+
+    # 0xA722：三相无功总功率，单位 kvar，只读。
+    - {name: total_reactive_power, source: {block: electrical_measurements, register_offset: 34},
+       wire_type: f32, byte_word_order: abcd, unit: kvar}
+    # 0xA724：A 相无功功率，单位 kvar，只读。
+    - {name: phase_a_reactive_power, source: {block: electrical_measurements, register_offset: 36},
+       wire_type: f32, byte_word_order: abcd, unit: kvar}
+    # 0xA726：B 相无功功率，单位 kvar，只读。
+    - {name: phase_b_reactive_power, source: {block: electrical_measurements, register_offset: 38},
+       wire_type: f32, byte_word_order: abcd, unit: kvar}
+    # 0xA728：C 相无功功率，单位 kvar，只读。
+    - {name: phase_c_reactive_power, source: {block: electrical_measurements, register_offset: 40},
+       wire_type: f32, byte_word_order: abcd, unit: kvar}
+
+    # 0xA72A：三相总视在功率，单位 kVA，只读。
+    - {name: total_apparent_power, source: {block: electrical_measurements, register_offset: 42},
+       wire_type: f32, byte_word_order: abcd, unit: kVA}
+    # 0xA72C：A 相视在功率，单位 kVA，只读。
+    - {name: phase_a_apparent_power, source: {block: electrical_measurements, register_offset: 44},
+       wire_type: f32, byte_word_order: abcd, unit: kVA}
+    # 0xA72E：B 相视在功率，单位 kVA，只读。
+    - {name: phase_b_apparent_power, source: {block: electrical_measurements, register_offset: 46},
+       wire_type: f32, byte_word_order: abcd, unit: kVA}
+    # 0xA730：C 相视在功率，单位 kVA，只读。
+    - {name: phase_c_apparent_power, source: {block: electrical_measurements, register_offset: 48},
+       wire_type: f32, byte_word_order: abcd, unit: kVA}
+
+  evidence:
+    protocol_source: user_supplied_register_table_2026_09_10
+    hardware_hil: rs485_2_fc03_response_confirmed_2026_09_10
+    note: 地址、名称、单位、只读属性和 F32 宽度来自用户点表；ABCD 字节序由用户补充的 ET703 Big-Endian 说明确认；实板已确认站号 3 使用 FC03 连续读取 0xA700 起 50 个寄存器并稳定返回 105 字节响应。仪表显示值人工对照和异常工况仍待验证。

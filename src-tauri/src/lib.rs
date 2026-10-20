@@ -11,10 +11,12 @@ use serial_core::list_ports;
 use std::sync::Arc;
 use tauri::{ipc::Channel, Emitter};
 
+mod engineering;
 mod gateway_excel;
 mod kz3_http;
 mod modbus_tcp;
 mod mqtt;
+mod opencode;
 mod ssh_sftp;
 mod workspace;
 
@@ -367,6 +369,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(engineering::EngineeringState::default())
+        .manage(opencode::OpenCodeState::default())
         .manage(ConnectionManager::new())
         .manage(kz3_http::Kz3HttpClient::new())
         .manage(modbus_tcp::ModbusTcpClient::new())
@@ -374,6 +378,23 @@ pub fn run() {
         .manage(flash_mgr)
         .invoke_handler(tauri::generate_handler![
             greet,
+            engineering::engineering_import,
+            engineering::engineering_restore,
+            engineering::engineering_sample,
+            engineering::engineering_pick_file,
+            engineering::engineering_generate,
+            engineering::engineering_scene,
+            engineering::engineering_preflight,
+            engineering::engineering_cancel,
+            engineering::engineering_export,
+            engineering::engineering_history,
+            engineering::engineering_select_version,
+            engineering::simulation_deploy,
+            engineering::simulation_action,
+            engineering::simulation_snapshot,
+            opencode::opencode_connect,
+            opencode::opencode_request,
+            opencode::opencode_subscribe,
             serial_list_ports,
             serial_open,
             serial_close,
@@ -431,6 +452,11 @@ pub fn run() {
             app_save_file,
             app_open_file
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                engineering::shutdown_groups();
+            }
+        });
 }

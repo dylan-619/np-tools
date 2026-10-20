@@ -1,0 +1,754 @@
+Window: "NP-Tools 硬件调试平台", App: NP-Tools.
+0 standard window NP-Tools 硬件调试平台, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering
+			3 container
+				4 text 工作区
+				5 button 折叠导航栏
+				6 button 设备调试导航, Help: 设备调试导航：按固件产品线选择正确入口
+				7 button AI辅助工作台, Help: AI辅助工作台：点位、需求、仿真与设备部署
+				8 button (collapsed) KZ3 F427 控制器, Secondary Actions: Expand
+				9 button (collapsed) 双星闪协调器, Secondary Actions: Expand
+				10 button (collapsed) SJZDV3 采集终端, Secondary Actions: Expand
+				11 button (collapsed) 通用调试工具, Secondary Actions: Expand
+				12 button (collapsed) 交付与设置, Secondary Actions: Expand
+				13 text 串口未连接 115200 8N1
+				14 button 展开参数配置
+				15 button 刷新串口列表
+				16 combo box (collapsed, settable) Secondary Actions: Expand, Value: cu.wlan-debug
+
+					17 text cu.wlan-debug
+				18 button 连接, Help: 打开串口
+			19 container
+				20 heading AI 辅助工作台, Value: 1
+					21 text AI 辅助工作台
+				22 text 现场实施协作工程师 软件联调 OpenCode 1.19.2
+				23 button 全屏展示
+				24 container 工程流程
+					25 button 点位配置
+					26 button 2 工艺需求
+					27 button (disabled) 3 控制程序
+					28 button (disabled) 4 仿真运行
+					29 button (disabled) 5 工艺调试
+					30 button (disabled) 6 烧录物理设备
+				31 text 工程资料
+				32 heading 点位已核对, Value: 3
+					33 text 点位已核对
+				34 text 三泵集水井液位控制 原始点表完整保存。 DI1 P101独立运行反馈 DI2 P101故障接点 DI3 P101远程自动许可 DI4 P102独立运行反馈 DI5 P102故障接点 DI6 P102远程自动许可 DI7 P103独立运行反馈 DI8 P103故障接点 DI9 P103远程自动许可 DI10 独立低水位许可 DI11 独立高高位报警 DI12 泵组运行许可 AI1 集水井连续液位 AI2 P101实际频率反馈 DO1 P101启动命令 DO2 P102启动命令 DO3 P103启动命令 AO1 P101频率给定 DO4 泵组综合报警
+				35 button 查看原始点表
+				36 text SHA-256 ce449deae869… 工艺规则 停泵、启变频、启工频三个液位等级；P101跟踪目标液位，实际满频且高位持续不下降时投入工频增援；P102故障由P103停稳接替，正常最多两台运行。
+				37 container 工艺需求对话
+					38 heading 现场实施协作工程师, Value: 2
+						39 text 现场实施协作工程师
+					40 text 三泵集水井液位控制 · 19 个点位已核对
+					41 text 服务已连接
+					42 button (collapsed) 智能服务设置, Secondary Actions: Expand
+					43 container 需求沟通记录
+						44 container
+							45 text 现场需求 三台排水泵，一台变频、两台工频，其中一台备用。设置停泵、启变频、启工频三个液位；变频泵满频仍降不下液位时投入工频泵，故障后备用接替。
+						46 container
+							47 text 实施协作工程师
+							48 heading 方案理解（与模板能力一致）, Value: 2
+								49 text 方案理解（与模板能力一致）
+							50 text 您描述的三泵集水井排水，与现有已验证工艺模板完全吻合： P101 固定变频主调，P102 工频增援，P103 工频备用，正常运行最多两台 。下面把未在您描述中展开、但现场必须明确的规则补全，请逐项确认。
+							51 heading 1. 三个液位等级（不是四级）, Value: 3
+								52 text 1. 三个液位等级（不是四级）
+							53 table
+								54 row (selectable) 顺序
+参数
+默认
+作用
+								55 row (selectable)
+									56 cell (selectable) ① 停泵
+									57 cell (selectable) 停泵液位
+									58 cell (selectable) 0.40 米
+									59 cell (selectable) 低于此值停全部自动泵
+								60 row (selectable)
+									61 cell (selectable) ② 启变频
+									62 cell (selectable) 启变频液位
+									63 cell (selectable) 1.00 米
+									64 cell (selectable) 连续 启变频连续确认（2 秒）起 P101
+								65 row (selectable)
+									66 cell (selectable) ③ 启工频
+									67 cell (selectable) 启工频液位
+									68 cell (selectable) 1.80 米
+									69 cell (selectable) 增援判断用；自身不是直接启泵条件
+							70 text 目标液位 调节目标液位（默认 0.80 米）只是 比例积分调节 调节目标，位于停泵与启变频之间， 不是第四个液位等级 。参数必须满足 停泵液位 < 调节目标液位 < 启变频液位 < 启工频液位，非法参数组禁止投入，且只允许在停止状态下修改，下次投入时取快照。
+							71 heading 2. 启停与增减泵, Value: 3
+								72 text 2. 启停与增减泵
+							73 content list
+								74 container 启变频：液位到启变频级并连续满足 2 秒，启动 P101，由 KZ3 单一 比例积分调节 跟踪目标液位。排水工况下液位上升对应加大频率。
+									75 list marker •
+									76 container
+										77 text 启变频 ：液位到启变频级并连续满足 2 秒，启动 P101，由 KZ3 单一 比例积分调节 跟踪目标液位。排水工况下液位上升对应加大频率。
+								78 container 加工频增援（三个条件同时满足）： 满足后投入 P102，给定 50 赫兹。
+									79 list marker •
+									80 container
+										81 text 加工频增援 （三个条件同时满足）：
+									82 content list
+										83 container P101 实际频率 ≥ 49.5 赫兹（不是给定量 50 赫兹）；
+											84 list marker 1
+											85 text P101  实际频率  ≥ 49.5 赫兹（不是给定量 50 赫兹）；
+										86 container 液位高于启工频级，且连续 10 秒 未下降 2 cm；
+											87 list marker 2
+											88 text 液位高于启工频级，且连续 10 秒 未下降 2 cm；
+										89 container 再连续满足 加减泵连续确认（5 秒）。
+											90 list marker 3
+											91 text 再连续满足 加减泵连续确认（5 秒）。
+									92 text 满足后投入 P102，给定 50 赫兹。
+								93 container 减工频：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续满足 加减泵连续确认，退出工频泵，回到 P101 单泵调节。
+									94 list marker •
+									95 container
+										96 text 减工频 ：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续满足 加减泵连续确认，退出工频泵，回到 P101 单泵调节。
+								97 container 停泵：液位低于停泵级，停所有自动泵（P101 输出 0 毫安，工频泵停机）。
+									98 list marker •
+									99 container
+										100 text 停泵 ：液位低于停泵级，停所有自动泵（P101 输出 0 毫安，工频泵停机）。
+							101 heading 3. 故障与接替（现场最容易出问题的部分）, Value: 3
+								102 text 3. 故障与接替（现场最容易出问题的部分）
+							103 content list
+								104 container P102 故障：P101 继续运行；须等 P102 运行反馈停止满 2 秒后，P103 才接替工频增援角色。若 P102 停止反馈未确认或状态未知，仍占容量，不得起第三台——防止两台以上同时运行。
+									105 list marker •
+									106 text P102 故障 ：P101 继续运行；须等 P102 运行反馈 停止满 2 秒 后，P103 才接替工频增援角色。若 P102 停止反馈未确认或状态未知， 仍占容量 ，不得起第三台——防止两台以上同时运行。
+								107 container P101 故障默认退出（不自动降级）。只有现场人员明确投入 投入工频降级 后才进入工频降级排水：P103 按液位分级排水，高位由 P102 增援，此时不再承诺恒液位控制。
+									108 list marker •
+									109 text P101 故障默认退出 （不自动降级）。只有现场人员 明确投入 投入工频降级  后才进入工频降级排水：P103 按液位分级排水，高位由 P102 增援，此时 不再承诺恒液位控制 。
+								110 container 每泵独立复位与运行累计；已被接替的角色不抢回（P103 接替期间 P102 恢复也不自动回切）。
+									111 list marker •
+									112 text 每泵独立复位与运行累计 ；已被接替的角色不抢回（P103 接替期间 P102 恢复也不自动回切）。
+							113 heading 4. 联锁与质量, Value: 3
+								114 text 4. 联锁与质量
+							115 content list
+								116 container 独立低水位许可、泵组运行许可 或液位质量丢失：全部退出，须重新投入，不自恢复。
+									117 list marker •
+									118 text 独立低水位许可、泵组运行许可 或液位质量丢失：全部退出， 须重新投入 ，不自恢复。
+								119 container 频率反馈坏质量：禁止正常 比例积分调节 调节，也禁止“满频加泵”判断（不能凭坏值判满频）。
+									120 list marker •
+									121 text 频率反馈坏质量：禁止正常 比例积分调节 调节，也禁止“满频加泵”判断（不能凭坏值判满频）。
+								122 container 泵远程许可（pumpNAuto）不满足或故障接点成立，该泵不参与自动。
+									123 list marker •
+									124 text 泵远程许可（pumpNAuto）不满足或故障接点成立，该泵不参与自动。
+								125 container 启停反馈超时（各 5 秒）报综合报警，进入异常处理，不反复启停。
+									126 list marker •
+									127 text 启停反馈超时（各 5 秒）报综合报警，进入异常处理，不反复启停。
+								128 container 独立高高位报警 只做报警与综合报警输出，不改变上述液位分级逻辑。
+									129 list marker •
+									130 text 独立高高位报警 只做报警与综合报警输出，不改变上述液位分级逻辑。
+							131 heading 5. 参数整定说明, Value: 3
+								132 text 5. 参数整定说明
+							133 text 液位比例增益=24 毫安/米、液位积分增益=0.6 毫安/(米·秒) 是 软件模型的固定整定值 （输出单位为 AO 电流 毫安），现场物理工程须重新整定。未明确要求修改时保留默认值。
+							134 heading 6. 差异说明, Value: 3
+								135 text 6. 差异说明
+							136 text 您的描述未出现与模板角色冲突的内容，无需裁剪或替换设备。运行环境为宿主软件仿真，AI/DI 与泵反馈均由软件模型产生，不需要实板，也不再重复生成底层算法。
+							137 heading 待您确认的默认参数, Value: 3
+								138 text 待您确认的默认参数
+							139 text 停泵液位 0.40 / 调节目标液位 0.80 / 启变频液位 1.00 / 启工频液位 1.80（米） 液位比例增益 24 / 液位积分增益 0.6 启变频连续确认 2000 / 加减泵连续确认 5000 泵启动反馈时限 5000 / 泵停止反馈时限 5000 设备名：集水井 TK101、变频泵 P101、工频泵 P102、备用泵 P103 请在下方核对方案参数 （或指出要调整的参数/设备名称），我再输出完整的 
+							140 text 工程参数表
+							141 text  配置；若还需要在界面上操作这些液位、泵状态和报警，请一并告知，我按 操作界面 请求格式给您。
+						142 container
+							143 text 现场需求 采用当前工艺方案，请整理中文参数确认表；需要调整的事项继续在对话中确认。
+						144 container
+							145 text 实施协作工程师
+							146 heading 方案概括, Value: 2
+								147 text 方案概括
+							148 text 三泵集水井排水按三档液位分级：低位停泵、到启变频级启动 P101 变频主调、P101 实际满频且高位液位持续不降时投入工频增援。P102 为工频增援泵，P103 为工频备用泵，正常运行最多两台；P101 故障默认退出，明确投入降级后进入工频分级排水，不再承诺恒液位。
+							149 heading 关键联锁（已按规则配置）, Value: 2
+								150 text 关键联锁（已按规则配置）
+							151 content list
+								152 container 液位关系：停泵液位 0.40 米 < 调节目标液位 0.80 米 < 启变频液位 1.00 米 < 启工频液位 1.80 米；调节目标只作跟踪目标，不构成第四等级。
+									153 list marker •
+									154 text 液位关系：停泵液位 0.40 米 < 调节目标液位 0.80 米 < 启变频液位 1.00 米 < 启工频液位 1.80 米；调节目标只作跟踪目标，不构成第四等级。
+								155 container 启变频：液位达启变频级并连续 2 秒确认后启动 P101，由单一 比例积分调节 跟踪目标液位，参数保留 24、0.6。
+									156 list marker •
+									157 text 启变频：液位达启变频级并连续 2 秒确认后启动 P101，由单一 比例积分调节 跟踪目标液位，参数保留 24、0.6。
+								158 container 加泵：以 P101 实际频率 ≥ 49.5 赫兹（非给定值）为前提，高位持续 10 秒、液位未下降 2 厘米，再连续 5 秒确认后投入 P102。
+									159 list marker •
+									160 text 加泵：以 P101 实际频率 ≥ 49.5 赫兹（非给定值）为前提，高位持续 10 秒、液位未下降 2 厘米，再连续 5 秒确认后投入 P102。
+								161 container 减泵：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续 5 秒确认后退出工频泵。
+									162 list marker •
+									163 text 减泵：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续 5 秒确认后退出工频泵。
+								164 container 接替：P102 故障时 P101 继续，待其运行反馈停止满 2 秒后 P103 接替；停止未确认或状态未知时仍占容量，不起第三台。
+									165 list marker •
+									166 text 接替：P102 故障时 P101 继续，待其运行反馈停止满 2 秒后 P103 接替；停止未确认或状态未知时仍占容量，不起第三台。
+								167 container 异常：许可或液位质量丢失立即退出并须重投；频率反馈坏质量禁止正常 比例积分调节 调节与满频加泵；启停反馈超过 5 秒未确认报综合报警。
+									168 list marker •
+									169 text 异常：许可或液位质量丢失立即退出并须重投；频率反馈坏质量禁止正常 比例积分调节 调节与满频加泵；启停反馈超过 5 秒未确认报综合报警。
+							170 heading 待确认事项, Value: 2
+								171 text 待确认事项
+							172 content list
+								173 container 调节目标液位位于停泵与启变频之间属常规设置；若现场希望目标更贴近启变频级（例如 0.90 米），请提出，我再调整。
+									174 list marker •
+									175 text 调节目标液位位于停泵与启变频之间属常规设置；若现场希望目标更贴近启变频级（例如 0.90 米），请提出，我再调整。
+								176 container 设备名称中“集水井 TK101”为本轮沿用名称，若现场编号不同请告知。
+									177 list marker •
+									178 text 设备名称中“集水井 TK101”为本轮沿用名称，若现场编号不同请告知。
+								179 container 参数仅允许停止状态下修改，非法参数组不允许投入；修改单台设备整定后需退出并重新投入自动。
+									180 list marker •
+									181 text 参数仅允许停止状态下修改，非法参数组不允许投入；修改单台设备整定后需退出并重新投入自动。
+						182 container
+							183 text 现场需求 采用当前工艺方案，请整理中文参数确认表；需要调整的事项继续在对话中确认。
+						184 container
+							185 text 实施协作工程师
+							186 heading 方案概括, Value: 2
+								187 text 方案概括
+							188 text 三泵集水井排水采用三个液位等级：停泵、启变频、启工频。P101 变频主调、P102 工频增援、P103 工频备用，正常最多两台运行。P101 实际满频且高位液位持续不降才投入工频；P102 故障后须确认停稳再由 P103 接替；P101 故障默认退出，投入降级后转为工频分级排水，不再承诺恒液位。
+							189 heading 中文参数确认表, Value: 2
+								190 text 中文参数确认表
+							191 table
+								192 row (selectable) 参数名称
+设定值
+单位
+允许范围
+现场说明
+								193 row (selectable)
+									194 cell (selectable) 停泵液位
+									195 cell (selectable) 0.40
+									196 cell (selectable) 米
+									197 cell (selectable) 0.10 – 0.80
+									198 cell (selectable) 低于此值停全部自动泵
+								199 row (selectable)
+									200 cell (selectable) 调节目标液位
+									201 cell (selectable) 0.80
+									202 cell (selectable) 米
+									203 cell (selectable) 0.20 – 1.50
+									204 cell (selectable) 仅为变频泵跟踪目标，不是独立液位等级
+								205 row (selectable)
+									206 cell (selectable) 启变频液位
+									207 cell (selectable) 1.00
+									208 cell (selectable) 米
+									209 cell (selectable) 0.30 – 1.70
+									210 cell (selectable) 达此值连续确认后启动 P101
+								211 row (selectable)
+									212 cell (selectable) 启工频液位
+									213 cell (selectable) 1.80
+									214 cell (selectable) 米
+									215 cell (selectable) 1.20 – 2.40
+									216 cell (selectable) 满频增援判断用，不单独启泵
+								217 row (selectable)
+									218 cell (selectable) 液位比例增益
+									219 cell (selectable) 24.00
+									220 cell (selectable) 毫安每米
+									221 cell (selectable) 0 – 30
+									222 cell (selectable) 软件模型整定值，物理工程需重新整定
+								223 row (selectable)
+									224 cell (selectable) 液位积分增益
+									225 cell (selectable) 0.60
+									226 cell (selectable) 毫安每米每秒
+									227 cell (selectable) 0 – 5
+									228 cell (selectable) 同上
+								229 row (selectable)
+									230 cell (selectable) 启变频连续确认
+									231 cell (selectable) 2000
+									232 cell (selectable) 毫秒
+									233 cell (selectable) 500 – 5000
+									234 cell (selectable) 液位持续达启变频级的时间
+								235 row (selectable)
+									236 cell (selectable) 加减泵连续确认
+									237 cell (selectable) 5000
+									238 cell (selectable) 毫秒
+									239 cell (selectable) 1000 – 30000
+									240 cell (selectable) 加泵、减泵最终确认时间
+								241 row (selectable)
+									242 cell (selectable) 泵启动反馈时限
+									243 cell (selectable) 5000
+									244 cell (selectable) 毫秒
+									245 cell (selectable) 1000 – 10000
+									246 cell (selectable) 超时报综合报警
+								247 row (selectable)
+									248 cell (selectable) 泵停止反馈时限
+									249 cell (selectable) 5000
+									250 cell (selectable) 毫秒
+									251 cell (selectable) 1000 – 10000
+									252 cell (selectable) 超时报综合报警，接替判断依赖停止反馈
+							253 text 设备名称：集水井 TK101、变频泵 P101、工频泵 P102、备用泵 P103。
+							254 heading 关键联锁提示, Value: 2
+								255 text 关键联锁提示
+							256 content list
+								257 container 四个液位须严格递增，调节目标位于停泵与启变频之间；参数非法时禁止投入，只允许在停止状态修改，投入后按快照执行。
+									258 list marker •
+									259 text 四个液位须严格递增，调节目标位于停泵与启变频之间；参数非法时禁止投入，只允许在停止状态修改，投入后按快照执行。
+								260 container 加泵以 P101 实际频率 ≥ 49.5 赫兹为前提，给定量 50 赫兹不能作为满频依据；同时需高位持续 10 秒且液位未下降 2 厘米。
+									261 list marker •
+									262 text 加泵以 P101  实际频率  ≥ 49.5 赫兹为前提，给定量 50 赫兹不能作为满频依据；同时需高位持续 10 秒且液位未下降 2 厘米。
+								263 container 减泵需同时满足低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵运行满 15 秒。
+									264 list marker •
+									265 text 减泵需同时满足低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵运行满 15 秒。
+								266 container P102 停止反馈未确认或状态未知时仍占用容量，不得起第三台。
+									267 list marker •
+									268 text P102 停止反馈未确认或状态未知时仍占用容量，不得起第三台。
+								269 container 许可或液位质量丢失即退出并须重投；频率反馈坏质量禁止正常调节与满频加泵；变频故障复位或频率信号恢复不自动退出降级，需先停稳再重新投入。
+									270 list marker •
+									271 text 许可或液位质量丢失即退出并须重投；频率反馈坏质量禁止正常调节与满频加泵；变频故障复位或频率信号恢复不自动退出降级，需先停稳再重新投入。
+							272 heading 待确认事项, Value: 2
+								273 text 待确认事项
+							274 content list
+								275 container 调节目标 0.80 米若现场希望更贴近启变频级（如 0.90 米），请告知后调整。
+									276 list marker •
+									277 text 调节目标 0.80 米若现场希望更贴近启变频级（如 0.90 米），请告知后调整。
+								278 container 集水井与各泵名称如与现场编号不一致，请提供正确名称。
+									279 list marker •
+									280 text 集水井与各泵名称如与现场编号不一致，请提供正确名称。
+						281 container 确认工艺方案与参数
+							282 heading 请确认这份工艺方案, Value: 3
+								283 text 请确认这份工艺方案
+							284 text 三泵集水井液位控制 · 工程版本 1.0.0
+							285 text 集水井 TK101 变频泵 P101 工频泵 P102 备用泵 P103
+							286 container
+								287 text 停泵液位
+								288 number field (settable) 停泵液位, Value: 0.4
+									289 stepper 0
+										290 unknown
+										291 unknown
+								292 text 米
+							293 container
+								294 text 调节目标液位
+								295 number field (settable) 调节目标液位, Value: 0.85
+									296 stepper 0
+										297 unknown
+										298 unknown
+								299 text 米
+							300 container
+								301 text 启变频液位
+								302 number field (settable) 启变频液位, Value: 1
+									303 stepper 0
+										304 unknown
+										305 unknown
+								306 text 米
+							307 container
+								308 text 启工频液位
+								309 number field (settable) 启工频液位, Value: 1.8
+									310 stepper 0
+										311 unknown
+										312 unknown
+								313 text 米
+							314 text 停泵液位 ＜ 调节目标 ＜ 启变频液位 ＜ 启工频液位
+							315 container (collapsed) Secondary Actions: Expand
+								316 summary 时序与调节参数 6 项, Value: off
+									317 text 时序与调节参数
+									318 text 6 项
+								319 stepper 0
+									320 unknown
+									321 unknown
+								322 stepper 0
+									323 unknown
+									324 unknown
+								325 stepper 0
+									326 unknown
+									327 unknown
+								328 stepper 0
+									329 unknown
+									330 unknown
+								331 stepper 0
+									332 unknown
+									333 unknown
+								334 stepper 0
+									335 unknown
+									336 unknown
+							337 container
+								338 checkbox 已核对设备分工、联锁与参数，确认用于本次工程, Value: 0
+								339 text 已核对设备分工、联锁与参数，确认用于本次工程
+							340 container
+								341 button 继续调整
+								342 button (disabled) 确认并生成工程
+					343 text entry area (settable) 控制需求, Value: [text entry area: 控制需求], Placeholder: 描述工艺要求，或继续补充设备、联锁与参数…
+						344 text 描述工艺要求，或继续补充设备、联锁与参数…
+					345 button (disabled) 发送需求
+					346 text 回车发送 · ⇧ 回车换行 沟通需求 → 确认参数 → 生成工程
+				347 summary 执行记录 2, Value: off
+					348 text 执行记录 
+					349 text 2
+	350 close button
+	351 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	352 minimize button
+	353 text NP-Tools 硬件调试平台
+354 menu bar
+	355 NP-Tools
+	356 File
+	357 Edit
+	358 View
+	359 Window
+	360 Help
+
+Selected text: ```
+1
+```
+
+Note: Pay special attention to the content selected by the user. If the user asks a question or refers to the content they are looking at on-screen, they might be referring to the selected content (but they might be referring to something else that's visible, too).
+
+恢复基线后：
+Window: "NP-Tools 硬件调试平台", App: NP-Tools.
+0 standard window NP-Tools 硬件调试平台, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering
+			3 container
+				4 text 工作区
+				5 button 折叠导航栏
+				6 button 设备调试导航, Help: 设备调试导航：按固件产品线选择正确入口
+				7 button AI辅助工作台, Help: AI辅助工作台：点位、需求、仿真与设备部署
+				8 button (collapsed) KZ3 F427 控制器, Secondary Actions: Expand
+				9 button (collapsed) 双星闪协调器, Secondary Actions: Expand
+				10 button (collapsed) SJZDV3 采集终端, Secondary Actions: Expand
+				11 button (collapsed) 通用调试工具, Secondary Actions: Expand
+				12 button (collapsed) 交付与设置, Secondary Actions: Expand
+				13 text 串口未连接 115200 8N1
+				14 button 展开参数配置
+				15 button 刷新串口列表
+				16 combo box (collapsed, settable) Secondary Actions: Expand, Value: cu.wlan-debug
+
+					17 text cu.wlan-debug
+				18 button 连接, Help: 打开串口
+			19 container
+				20 heading AI 辅助工作台, Value: 1
+					21 text AI 辅助工作台
+				22 text 现场实施协作工程师 软件联调 OpenCode 1.19.2
+				23 button 全屏展示
+				24 container 工程流程
+					25 button 点位配置
+					26 button 2 工艺需求
+					27 button (disabled) 3 控制程序
+					28 button (disabled) 4 仿真运行
+					29 button (disabled) 5 工艺调试
+					30 button (disabled) 6 烧录物理设备
+				31 text 工程资料
+				32 heading 点位已核对, Value: 3
+					33 text 点位已核对
+				34 text 三泵集水井液位控制 原始点表完整保存。 DI1 P101独立运行反馈 DI2 P101故障接点 DI3 P101远程自动许可 DI4 P102独立运行反馈 DI5 P102故障接点 DI6 P102远程自动许可 DI7 P103独立运行反馈 DI8 P103故障接点 DI9 P103远程自动许可 DI10 独立低水位许可 DI11 独立高高位报警 DI12 泵组运行许可 AI1 集水井连续液位 AI2 P101实际频率反馈 DO1 P101启动命令 DO2 P102启动命令 DO3 P103启动命令 AO1 P101频率给定 DO4 泵组综合报警
+				35 button 查看原始点表
+				36 text SHA-256 ce449deae869… 工艺规则 停泵、启变频、启工频三个液位等级；P101跟踪目标液位，实际满频且高位持续不下降时投入工频增援；P102故障由P103停稳接替，正常最多两台运行。
+				37 container 工艺需求对话
+					38 heading 现场实施协作工程师, Value: 2
+						39 text 现场实施协作工程师
+					40 text 三泵集水井液位控制 · 19 个点位已核对
+					41 text 服务已连接
+					42 button (collapsed) 智能服务设置, Secondary Actions: Expand
+					43 container 需求沟通记录
+						44 container
+							45 text 现场需求 三台排水泵，一台变频、两台工频，其中一台备用。设置停泵、启变频、启工频三个液位；变频泵满频仍降不下液位时投入工频泵，故障后备用接替。
+						46 container
+							47 text 实施协作工程师
+							48 heading 方案理解（与模板能力一致）, Value: 2
+								49 text 方案理解（与模板能力一致）
+							50 text 您描述的三泵集水井排水，与现有已验证工艺模板完全吻合： P101 固定变频主调，P102 工频增援，P103 工频备用，正常运行最多两台 。下面把未在您描述中展开、但现场必须明确的规则补全，请逐项确认。
+							51 heading 1. 三个液位等级（不是四级）, Value: 3
+								52 text 1. 三个液位等级（不是四级）
+							53 table
+								54 row (selectable) 顺序
+参数
+默认
+作用
+								55 row (selectable)
+									56 cell (selectable) ① 停泵
+									57 cell (selectable) 停泵液位
+									58 cell (selectable) 0.40 米
+									59 cell (selectable) 低于此值停全部自动泵
+								60 row (selectable)
+									61 cell (selectable) ② 启变频
+									62 cell (selectable) 启变频液位
+									63 cell (selectable) 1.00 米
+									64 cell (selectable) 连续 启变频连续确认（2 秒）起 P101
+								65 row (selectable)
+									66 cell (selectable) ③ 启工频
+									67 cell (selectable) 启工频液位
+									68 cell (selectable) 1.80 米
+									69 cell (selectable) 增援判断用；自身不是直接启泵条件
+							70 text 目标液位 调节目标液位（默认 0.80 米）只是 比例积分调节 调节目标，位于停泵与启变频之间， 不是第四个液位等级 。参数必须满足 停泵液位 < 调节目标液位 < 启变频液位 < 启工频液位，非法参数组禁止投入，且只允许在停止状态下修改，下次投入时取快照。
+							71 heading 2. 启停与增减泵, Value: 3
+								72 text 2. 启停与增减泵
+							73 content list
+								74 container 启变频：液位到启变频级并连续满足 2 秒，启动 P101，由 KZ3 单一 比例积分调节 跟踪目标液位。排水工况下液位上升对应加大频率。
+									75 list marker •
+									76 container
+										77 text 启变频 ：液位到启变频级并连续满足 2 秒，启动 P101，由 KZ3 单一 比例积分调节 跟踪目标液位。排水工况下液位上升对应加大频率。
+								78 container 加工频增援（三个条件同时满足）： 满足后投入 P102，给定 50 赫兹。
+									79 list marker •
+									80 container
+										81 text 加工频增援 （三个条件同时满足）：
+									82 content list
+										83 container P101 实际频率 ≥ 49.5 赫兹（不是给定量 50 赫兹）；
+											84 list marker 1
+											85 text P101  实际频率  ≥ 49.5 赫兹（不是给定量 50 赫兹）；
+										86 container 液位高于启工频级，且连续 10 秒 未下降 2 cm；
+											87 list marker 2
+											88 text 液位高于启工频级，且连续 10 秒 未下降 2 cm；
+										89 container 再连续满足 加减泵连续确认（5 秒）。
+											90 list marker 3
+											91 text 再连续满足 加减泵连续确认（5 秒）。
+									92 text 满足后投入 P102，给定 50 赫兹。
+								93 container 减工频：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续满足 加减泵连续确认，退出工频泵，回到 P101 单泵调节。
+									94 list marker •
+									95 container
+										96 text 减工频 ：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续满足 加减泵连续确认，退出工频泵，回到 P101 单泵调节。
+								97 container 停泵：液位低于停泵级，停所有自动泵（P101 输出 0 毫安，工频泵停机）。
+									98 list marker •
+									99 container
+										100 text 停泵 ：液位低于停泵级，停所有自动泵（P101 输出 0 毫安，工频泵停机）。
+							101 heading 3. 故障与接替（现场最容易出问题的部分）, Value: 3
+								102 text 3. 故障与接替（现场最容易出问题的部分）
+							103 content list
+								104 container P102 故障：P101 继续运行；须等 P102 运行反馈停止满 2 秒后，P103 才接替工频增援角色。若 P102 停止反馈未确认或状态未知，仍占容量，不得起第三台——防止两台以上同时运行。
+									105 list marker •
+									106 text P102 故障 ：P101 继续运行；须等 P102 运行反馈 停止满 2 秒 后，P103 才接替工频增援角色。若 P102 停止反馈未确认或状态未知， 仍占容量 ，不得起第三台——防止两台以上同时运行。
+								107 container P101 故障默认退出（不自动降级）。只有现场人员明确投入 投入工频降级 后才进入工频降级排水：P103 按液位分级排水，高位由 P102 增援，此时不再承诺恒液位控制。
+									108 list marker •
+									109 text P101 故障默认退出 （不自动降级）。只有现场人员 明确投入 投入工频降级  后才进入工频降级排水：P103 按液位分级排水，高位由 P102 增援，此时 不再承诺恒液位控制 。
+								110 container 每泵独立复位与运行累计；已被接替的角色不抢回（P103 接替期间 P102 恢复也不自动回切）。
+									111 list marker •
+									112 text 每泵独立复位与运行累计 ；已被接替的角色不抢回（P103 接替期间 P102 恢复也不自动回切）。
+							113 heading 4. 联锁与质量, Value: 3
+								114 text 4. 联锁与质量
+							115 content list
+								116 container 独立低水位许可、泵组运行许可 或液位质量丢失：全部退出，须重新投入，不自恢复。
+									117 list marker •
+									118 text 独立低水位许可、泵组运行许可 或液位质量丢失：全部退出， 须重新投入 ，不自恢复。
+								119 container 频率反馈坏质量：禁止正常 比例积分调节 调节，也禁止“满频加泵”判断（不能凭坏值判满频）。
+									120 list marker •
+									121 text 频率反馈坏质量：禁止正常 比例积分调节 调节，也禁止“满频加泵”判断（不能凭坏值判满频）。
+								122 container 泵远程许可（pumpNAuto）不满足或故障接点成立，该泵不参与自动。
+									123 list marker •
+									124 text 泵远程许可（pumpNAuto）不满足或故障接点成立，该泵不参与自动。
+								125 container 启停反馈超时（各 5 秒）报综合报警，进入异常处理，不反复启停。
+									126 list marker •
+									127 text 启停反馈超时（各 5 秒）报综合报警，进入异常处理，不反复启停。
+								128 container 独立高高位报警 只做报警与综合报警输出，不改变上述液位分级逻辑。
+									129 list marker •
+									130 text 独立高高位报警 只做报警与综合报警输出，不改变上述液位分级逻辑。
+							131 heading 5. 参数整定说明, Value: 3
+								132 text 5. 参数整定说明
+							133 text 液位比例增益=24 毫安/米、液位积分增益=0.6 毫安/(米·秒) 是 软件模型的固定整定值 （输出单位为 AO 电流 毫安），现场物理工程须重新整定。未明确要求修改时保留默认值。
+							134 heading 6. 差异说明, Value: 3
+								135 text 6. 差异说明
+							136 text 您的描述未出现与模板角色冲突的内容，无需裁剪或替换设备。运行环境为宿主软件仿真，AI/DI 与泵反馈均由软件模型产生，不需要实板，也不再重复生成底层算法。
+							137 heading 待您确认的默认参数, Value: 3
+								138 text 待您确认的默认参数
+							139 text 停泵液位 0.40 / 调节目标液位 0.80 / 启变频液位 1.00 / 启工频液位 1.80（米） 液位比例增益 24 / 液位积分增益 0.6 启变频连续确认 2000 / 加减泵连续确认 5000 泵启动反馈时限 5000 / 泵停止反馈时限 5000 设备名：集水井 TK101、变频泵 P101、工频泵 P102、备用泵 P103 请在下方核对方案参数 （或指出要调整的参数/设备名称），我再输出完整的 
+							140 text 工程参数表
+							141 text  配置；若还需要在界面上操作这些液位、泵状态和报警，请一并告知，我按 操作界面 请求格式给您。
+						142 container
+							143 text 现场需求 采用当前工艺方案，请整理中文参数确认表；需要调整的事项继续在对话中确认。
+						144 container
+							145 text 实施协作工程师
+							146 heading 方案概括, Value: 2
+								147 text 方案概括
+							148 text 三泵集水井排水按三档液位分级：低位停泵、到启变频级启动 P101 变频主调、P101 实际满频且高位液位持续不降时投入工频增援。P102 为工频增援泵，P103 为工频备用泵，正常运行最多两台；P101 故障默认退出，明确投入降级后进入工频分级排水，不再承诺恒液位。
+							149 heading 关键联锁（已按规则配置）, Value: 2
+								150 text 关键联锁（已按规则配置）
+							151 content list
+								152 container 液位关系：停泵液位 0.40 米 < 调节目标液位 0.80 米 < 启变频液位 1.00 米 < 启工频液位 1.80 米；调节目标只作跟踪目标，不构成第四等级。
+									153 list marker •
+									154 text 液位关系：停泵液位 0.40 米 < 调节目标液位 0.80 米 < 启变频液位 1.00 米 < 启工频液位 1.80 米；调节目标只作跟踪目标，不构成第四等级。
+								155 container 启变频：液位达启变频级并连续 2 秒确认后启动 P101，由单一 比例积分调节 跟踪目标液位，参数保留 24、0.6。
+									156 list marker •
+									157 text 启变频：液位达启变频级并连续 2 秒确认后启动 P101，由单一 比例积分调节 跟踪目标液位，参数保留 24、0.6。
+								158 container 加泵：以 P101 实际频率 ≥ 49.5 赫兹（非给定值）为前提，高位持续 10 秒、液位未下降 2 厘米，再连续 5 秒确认后投入 P102。
+									159 list marker •
+									160 text 加泵：以 P101 实际频率 ≥ 49.5 赫兹（非给定值）为前提，高位持续 10 秒、液位未下降 2 厘米，再连续 5 秒确认后投入 P102。
+								161 container 减泵：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续 5 秒确认后退出工频泵。
+									162 list marker •
+									163 text 减泵：液位低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵已运行满 15 秒，再连续 5 秒确认后退出工频泵。
+								164 container 接替：P102 故障时 P101 继续，待其运行反馈停止满 2 秒后 P103 接替；停止未确认或状态未知时仍占容量，不起第三台。
+									165 list marker •
+									166 text 接替：P102 故障时 P101 继续，待其运行反馈停止满 2 秒后 P103 接替；停止未确认或状态未知时仍占容量，不起第三台。
+								167 container 异常：许可或液位质量丢失立即退出并须重投；频率反馈坏质量禁止正常 比例积分调节 调节与满频加泵；启停反馈超过 5 秒未确认报综合报警。
+									168 list marker •
+									169 text 异常：许可或液位质量丢失立即退出并须重投；频率反馈坏质量禁止正常 比例积分调节 调节与满频加泵；启停反馈超过 5 秒未确认报综合报警。
+							170 heading 待确认事项, Value: 2
+								171 text 待确认事项
+							172 content list
+								173 container 调节目标液位位于停泵与启变频之间属常规设置；若现场希望目标更贴近启变频级（例如 0.90 米），请提出，我再调整。
+									174 list marker •
+									175 text 调节目标液位位于停泵与启变频之间属常规设置；若现场希望目标更贴近启变频级（例如 0.90 米），请提出，我再调整。
+								176 container 设备名称中“集水井 TK101”为本轮沿用名称，若现场编号不同请告知。
+									177 list marker •
+									178 text 设备名称中“集水井 TK101”为本轮沿用名称，若现场编号不同请告知。
+								179 container 参数仅允许停止状态下修改，非法参数组不允许投入；修改单台设备整定后需退出并重新投入自动。
+									180 list marker •
+									181 text 参数仅允许停止状态下修改，非法参数组不允许投入；修改单台设备整定后需退出并重新投入自动。
+						182 container
+							183 text 现场需求 采用当前工艺方案，请整理中文参数确认表；需要调整的事项继续在对话中确认。
+						184 container
+							185 text 实施协作工程师
+							186 heading 方案概括, Value: 2
+								187 text 方案概括
+							188 text 三泵集水井排水采用三个液位等级：停泵、启变频、启工频。P101 变频主调、P102 工频增援、P103 工频备用，正常最多两台运行。P101 实际满频且高位液位持续不降才投入工频；P102 故障后须确认停稳再由 P103 接替；P101 故障默认退出，投入降级后转为工频分级排水，不再承诺恒液位。
+							189 heading 中文参数确认表, Value: 2
+								190 text 中文参数确认表
+							191 table
+								192 row (selectable) 参数名称
+设定值
+单位
+允许范围
+现场说明
+								193 row (selectable)
+									194 cell (selectable) 停泵液位
+									195 cell (selectable) 0.40
+									196 cell (selectable) 米
+									197 cell (selectable) 0.10 – 0.80
+									198 cell (selectable) 低于此值停全部自动泵
+								199 row (selectable)
+									200 cell (selectable) 调节目标液位
+									201 cell (selectable) 0.80
+									202 cell (selectable) 米
+									203 cell (selectable) 0.20 – 1.50
+									204 cell (selectable) 仅为变频泵跟踪目标，不是独立液位等级
+								205 row (selectable)
+									206 cell (selectable) 启变频液位
+									207 cell (selectable) 1.00
+									208 cell (selectable) 米
+									209 cell (selectable) 0.30 – 1.70
+									210 cell (selectable) 达此值连续确认后启动 P101
+								211 row (selectable)
+									212 cell (selectable) 启工频液位
+									213 cell (selectable) 1.80
+									214 cell (selectable) 米
+									215 cell (selectable) 1.20 – 2.40
+									216 cell (selectable) 满频增援判断用，不单独启泵
+								217 row (selectable)
+									218 cell (selectable) 液位比例增益
+									219 cell (selectable) 24.00
+									220 cell (selectable) 毫安每米
+									221 cell (selectable) 0 – 30
+									222 cell (selectable) 软件模型整定值，物理工程需重新整定
+								223 row (selectable)
+									224 cell (selectable) 液位积分增益
+									225 cell (selectable) 0.60
+									226 cell (selectable) 毫安每米每秒
+									227 cell (selectable) 0 – 5
+									228 cell (selectable) 同上
+								229 row (selectable)
+									230 cell (selectable) 启变频连续确认
+									231 cell (selectable) 2000
+									232 cell (selectable) 毫秒
+									233 cell (selectable) 500 – 5000
+									234 cell (selectable) 液位持续达启变频级的时间
+								235 row (selectable)
+									236 cell (selectable) 加减泵连续确认
+									237 cell (selectable) 5000
+									238 cell (selectable) 毫秒
+									239 cell (selectable) 1000 – 30000
+									240 cell (selectable) 加泵、减泵最终确认时间
+								241 row (selectable)
+									242 cell (selectable) 泵启动反馈时限
+									243 cell (selectable) 5000
+									244 cell (selectable) 毫秒
+									245 cell (selectable) 1000 – 10000
+									246 cell (selectable) 超时报综合报警
+								247 row (selectable)
+									248 cell (selectable) 泵停止反馈时限
+									249 cell (selectable) 5000
+									250 cell (selectable) 毫秒
+									251 cell (selectable) 1000 – 10000
+									252 cell (selectable) 超时报综合报警，接替判断依赖停止反馈
+							253 text 设备名称：集水井 TK101、变频泵 P101、工频泵 P102、备用泵 P103。
+							254 heading 关键联锁提示, Value: 2
+								255 text 关键联锁提示
+							256 content list
+								257 container 四个液位须严格递增，调节目标位于停泵与启变频之间；参数非法时禁止投入，只允许在停止状态修改，投入后按快照执行。
+									258 list marker •
+									259 text 四个液位须严格递增，调节目标位于停泵与启变频之间；参数非法时禁止投入，只允许在停止状态修改，投入后按快照执行。
+								260 container 加泵以 P101 实际频率 ≥ 49.5 赫兹为前提，给定量 50 赫兹不能作为满频依据；同时需高位持续 10 秒且液位未下降 2 厘米。
+									261 list marker •
+									262 text 加泵以 P101  实际频率  ≥ 49.5 赫兹为前提，给定量 50 赫兹不能作为满频依据；同时需高位持续 10 秒且液位未下降 2 厘米。
+								263 container 减泵需同时满足低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵运行满 15 秒。
+									264 list marker •
+									265 text 减泵需同时满足低于启变频级、P101 实际频率 ≤ 26 赫兹、工频泵运行满 15 秒。
+								266 container P102 停止反馈未确认或状态未知时仍占用容量，不得起第三台。
+									267 list marker •
+									268 text P102 停止反馈未确认或状态未知时仍占用容量，不得起第三台。
+								269 container 许可或液位质量丢失即退出并须重投；频率反馈坏质量禁止正常调节与满频加泵；变频故障复位或频率信号恢复不自动退出降级，需先停稳再重新投入。
+									270 list marker •
+									271 text 许可或液位质量丢失即退出并须重投；频率反馈坏质量禁止正常调节与满频加泵；变频故障复位或频率信号恢复不自动退出降级，需先停稳再重新投入。
+							272 heading 待确认事项, Value: 2
+								273 text 待确认事项
+							274 content list
+								275 container 调节目标 0.80 米若现场希望更贴近启变频级（如 0.90 米），请告知后调整。
+									276 list marker •
+									277 text 调节目标 0.80 米若现场希望更贴近启变频级（如 0.90 米），请告知后调整。
+								278 container 集水井与各泵名称如与现场编号不一致，请提供正确名称。
+									279 list marker •
+									280 text 集水井与各泵名称如与现场编号不一致，请提供正确名称。
+						281 container 确认工艺方案与参数
+							282 heading 请确认这份工艺方案, Value: 3
+								283 text 请确认这份工艺方案
+							284 text 三泵集水井液位控制 · 工程版本 1.0.0
+							285 text 集水井 TK101 变频泵 P101 工频泵 P102 备用泵 P103
+							286 container
+								287 text 停泵液位
+								288 number field (settable) 停泵液位, Value: 0.4
+									289 stepper 0
+										290 unknown
+										291 unknown
+								292 text 米
+							293 container
+								294 text 调节目标液位
+								295 number field (settable) 调节目标液位, Value: 0.8
+									296 stepper 0
+										297 unknown
+										298 unknown
+								299 text 米
+							300 container
+								301 text 启变频液位
+								302 number field (settable) 启变频液位, Value: 1
+									303 stepper 0
+										304 unknown
+										305 unknown
+								306 text 米
+							307 container
+								308 text 启工频液位
+								309 number field (settable) 启工频液位, Value: 1.8
+									310 stepper 0
+										311 unknown
+										312 unknown
+								313 text 米
+							314 text 停泵液位 ＜ 调节目标 ＜ 启变频液位 ＜ 启工频液位
+							315 container (collapsed) Secondary Actions: Expand
+								316 summary 时序与调节参数 6 项, Value: off
+									317 text 时序与调节参数
+									318 text 6 项
+								319 stepper 0
+									320 unknown
+									321 unknown
+								322 stepper 0
+									323 unknown
+									324 unknown
+								325 stepper 0
+									326 unknown
+									327 unknown
+								328 stepper 0
+									329 unknown
+									330 unknown
+								331 stepper 0
+									332 unknown
+									333 unknown
+								334 stepper 0
+									335 unknown
+									336 unknown
+							337 container
+								338 checkbox 已核对设备分工、联锁与参数，确认用于本次工程, Value: 0
+								339 text 已核对设备分工、联锁与参数，确认用于本次工程
+							340 container
+								341 button 继续调整
+								342 button (disabled) 确认并生成工程
+					343 text entry area (settable) 控制需求, Value: [text entry area: 控制需求], Placeholder: 描述工艺要求，或继续补充设备、联锁与参数…
+						344 text 描述工艺要求，或继续补充设备、联锁与参数…
+					345 button (disabled) 发送需求
+					346 text 回车发送 · ⇧ 回车换行 沟通需求 → 确认参数 → 生成工程
+				347 summary 执行记录 2, Value: off
+					348 text 执行记录 
+					349 text 2
+	350 close button
+	351 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	352 minimize button
+	353 text NP-Tools 硬件调试平台
+354 menu bar
+	355 NP-Tools
+	356 File
+	357 Edit
+	358 View
+	359 Window
+	360 Help
+
+Selected text: ```
+1
+```
+
+Note: Pay special attention to the content selected by the user. If the user asks a question or refers to the content they are looking at on-screen, they might be referring to the selected content (but they might be referring to something else that's visible, too).

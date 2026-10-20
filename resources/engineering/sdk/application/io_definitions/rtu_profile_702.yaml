@@ -1,0 +1,48 @@
+schema: kz3-modbus-profile/v1
+
+profile:
+  name: sp4055_702
+  legacy_type: 702
+  description: 8DI + 8DO 扩展模块
+  qualification: software_qualified
+
+  read_blocks:
+    - name: di
+      function: read_coils
+      pdu_address: 0
+      count: 8
+
+    - name: do_feedback
+      function: read_coils
+      pdu_address: 16
+      count: 8
+
+  write_groups:
+    - name: do
+      function: write_multiple_coils
+      pdu_address: 16
+      count: 8
+      default_safe_value: false
+
+  # 连续同类通道允许用模板展开，避免重复写 16 份寄存器描述。
+  channels:
+    - kind: digital_input
+      names: [di01, di02, di03, di04, di05, di06, di07, di08]
+      source: {block: di, first_bit: 0}
+
+    - kind: digital_feedback
+      names: [do01_feedback, do02_feedback, do03_feedback, do04_feedback,
+              do05_feedback, do06_feedback, do07_feedback, do08_feedback]
+      source: {block: do_feedback, first_bit: 0}
+
+    - kind: digital_output
+      names: [do01, do02, do03, do04, do05, do06, do07, do08]
+      target: {group: do, first_bit: 0}
+      feedback:
+        names: [do01_feedback, do02_feedback, do03_feedback, do04_feedback,
+                do05_feedback, do06_feedback, do07_feedback, do08_feedback]
+
+  evidence:
+    protocol_source: legacy_source_golden_vector
+    hardware_hil: pending
+    note: 软件请求/响应格式已有基线，但未证明实际端子输出。

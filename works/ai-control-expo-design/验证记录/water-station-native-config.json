@@ -1,0 +1,36 @@
+{
+  "bindings": {
+    "pump1Fault": "board.di06",
+    "pump1Output": "board.do01",
+    "pump1Run": "board.di05",
+    "pump2Fault": "board.di08",
+    "pump2Output": "board.do02",
+    "pump2Run": "board.di07",
+    "runPermit": "board.di11",
+    "sourceAvailable": "board.di03",
+    "supplyDemand": "board.di04",
+    "tankHigh": "board.di02",
+    "tankLow": "board.di01",
+    "valveCloseLimit": "board.di10",
+    "valveCloseOutput": "board.do04",
+    "valveOpenLimit": "board.di09",
+    "valveOpenOutput": "board.do03"
+  },
+  "caseId": "water-supply-station",
+  "caseVersion": "1.0.0",
+  "labels": {
+    "pump1": "主供泵 P101",
+    "pump2": "备用泵 P102",
+    "tank": "清水箱 TK101",
+    "valve": "进水阀 XV101"
+  },
+  "parameters": {
+    "pumpStartTimeoutMs": 5000,
+    "pumpStopTimeoutMs": 5000,
+    "switchDelayMs": 2000,
+    "valveTravelTimeoutMs": 8000
+  },
+  "projectId": "water_supply_station",
+  "projectVersion": "1.0.0",
+  "schema": "np-tools-expo-case-config/v1"
+}

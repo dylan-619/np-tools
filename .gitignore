@@ -37,3 +37,7 @@ Thumbs.db
 
 # Project specific
 .gemini/
+
+# Engineering Python build helpers
+__pycache__/
+*.pyc

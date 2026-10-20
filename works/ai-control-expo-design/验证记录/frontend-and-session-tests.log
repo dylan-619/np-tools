@@ -1,0 +1,12 @@
+✔ only complete JSON code blocks can produce a candidate (1.034ms)
+✔ case identity, fixed wiring, integer ranges and labels are enforced (0.340959ms)
+✔ HMI cannot bind a different revision, writable physical output or unknown point (0.286875ms)
+✔ restore does not adopt old model output; only a fresh request can create a candidate (19.720583ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 468.689834

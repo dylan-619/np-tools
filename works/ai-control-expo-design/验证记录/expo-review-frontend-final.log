@@ -1,0 +1,29 @@
+✔ historical camel-case summaries become Chinese Markdown without changing machine data (5.988709ms)
+✔ streamed configuration is hidden before its schema or closing fence arrives (0.399333ms)
+✔ assistant markup cannot inject HTML, load images or navigate the desktop webview (2.19175ms)
+✔ a completed proposal offers the next action inside the conversation (8.653833ms)
+✔ partial, busy or failed replies never offer a premature proposal confirmation (3.620833ms)
+✔ current validated configuration becomes a Chinese in-chat form requiring explicit confirmation (2.419083ms)
+✔ restored unconfirmed configuration requires a fresh request instead of automatic adoption (2.258875ms)
+✔ generated artifact receipt uses real version, fields and confirmed parameters (1.5755ms)
+✔ questions, permission requests and real generation activity remain in the message flow (5.441ms)
+✔ requirement outline covers operating and failure boundaries with actual recipe defaults (0.669083ms)
+✔ workflow completion depends on real evidence, not visiting later pages (0.481375ms)
+✔ new conversations provide a complete requirement entry and existing ones retain a checklist (1.45125ms)
+✔ only complete JSON code blocks can produce a candidate (1.45275ms)
+✔ case identity, fixed wiring, integer ranges and labels are enforced (1.108333ms)
+✔ HMI cannot bind a different revision, writable physical output or unknown point (0.34425ms)
+✔ water station requires its own 15 bindings and bounded process parameters (0.610916ms)
+✔ three-pump finite parameters, ordered levels and engineering units are enforced (0.512792ms)
+✔ startup inspection blocks competing imports until restoration is complete (2.970959ms)
+✔ three-pump conversation uses its own analog roles, PI rules and current identity (40.044ms)
+✔ restore does not adopt old model output; only a fresh request can create a candidate (2.540375ms)
+✔ water process context and model config stay isolated from the legacy case (1.755208ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1016.185208

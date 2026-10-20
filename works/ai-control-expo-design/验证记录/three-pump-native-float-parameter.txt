@@ -1,0 +1,198 @@
+Window: "NP-Tools 硬件调试平台", App: NP-Tools.
+0 standard window NP-Tools 硬件调试平台, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering
+			3 container
+				4 text 工作区
+				5 button 折叠导航栏
+				6 button 设备调试导航, Help: 设备调试导航：按固件产品线选择正确入口
+				7 button AI辅助工作台, Help: AI辅助工作台：点位、需求、仿真与设备部署
+				8 button (collapsed) KZ3 F427 控制器, Secondary Actions: Expand
+				9 button (collapsed) 双星闪协调器, Secondary Actions: Expand
+				10 button (collapsed) SJZDV3 采集终端, Secondary Actions: Expand
+				11 button (collapsed) 通用调试工具, Secondary Actions: Expand
+				12 button (collapsed) 交付与设置, Secondary Actions: Expand
+				13 text 串口未连接 115200 8N1
+				14 button 展开参数配置
+				15 button 刷新串口列表
+				16 combo box (collapsed, settable) Secondary Actions: Expand, Value: cu.wlan-debug
+
+					17 text cu.wlan-debug
+				18 button 连接, Help: 打开串口
+			19 container
+				20 heading AI 辅助工作台, Value: 1
+					21 text AI 辅助工作台
+				22 text 软件联调 OpenCode 1.19.2
+				23 button 导出工程包
+				24 button 全屏展示
+				25 container 工程流程
+					26 button 点位配置
+					27 button 工艺需求
+					28 button 控制程序
+					29 button 仿真运行
+					30 button 5 工艺调试
+					31 button 6 烧录物理设备
+				32 heading 三泵集水井液位控制, Value: 2
+					33 text 三泵集水井液位控制
+				34 button 导出 HMI 配置
+				35 button 烧录物理设备
+				36 container 三泵集水井液位控制
+					37 text 集水井排水系统
+					38 heading 已停止, Value: 2
+						39 text 已停止
+					40 text 控制就绪 集水井液位
+					41 container
+						42 text 1.15 m
+					43 text 调节目标
+					44 container
+						45 text 0.85 m
+					46 text 实际频率 / 给定
+					47 container
+						48 text 0.0 / 0.0 Hz
+					49 text 运行 / 占用台数
+					50 container
+						51 text 0 / 0
+					52 image 集水井三级液位、一台变频主调泵与两台工频泵并联排水
+					53 text 投入液位自动，开始集水井排水控制。
+					54 button 投入液位自动
+					55 button 正常停止
+					56 button 立即停止
+					57 container
+						58 text 变频泵 P101 变频主调 待机 远程自动 0 s
+						59 button (disabled) 故障复位
+					60 container
+						61 text 工频泵 P102 工频增援 待机 远程自动 0 s
+						62 button (disabled) 故障复位
+					63 container
+						64 text 备用泵 P103 工频备用 待机 远程自动 0 s
+						65 button (disabled) 故障复位
+					66 text 液位与频率趋势 液位 0–3m 实际频率 0–50Hz · 近120秒
+					67 image 液位与变频泵实际频率趋势
+					68 container (expanded) Secondary Actions: Collapse
+						69 summary 液位与调节参数 停止后修改，重新投入生效, Value: on
+							70 text 液位与调节参数
+							71 text 停止后修改，重新投入生效
+						72 container
+							73 text 停泵液位
+							74 number field (settable) 停泵液位, Value: 0.4
+								75 stepper 0
+									76 unknown
+									77 unknown
+							78 text m
+							79 button (disabled) 停泵液位 0.4 m
+						80 container
+							81 text 调节目标液位
+							82 number field (settable) 调节目标液位, Value: 0.85
+								83 stepper 0
+									84 unknown
+									85 unknown
+							86 text m
+							87 button (disabled) 调节目标液位 0.85 m
+						88 container
+							89 text 启变频液位
+							90 number field (settable) 启变频液位, Value: 1
+								91 stepper 0
+									92 unknown
+									93 unknown
+							94 text m
+							95 button (disabled) 启变频液位 1 m
+						96 container
+							97 text 启工频液位
+							98 number field (settable) 启工频液位, Value: 1.8
+								99 stepper 0
+									100 unknown
+									101 unknown
+							102 text m
+							103 button (disabled) 启工频液位 1.8 m
+						104 container
+							105 text 液位比例增益
+							106 number field (settable) 液位比例增益, Value: 24
+								107 stepper 0
+									108 unknown
+									109 unknown
+							110 text mA/m
+							111 button (disabled) 液位比例增益 24 mA/m
+						112 container
+							113 text 液位积分增益
+							114 number field (settable) 液位积分增益, Value: 0.6
+								115 stepper 0
+									116 unknown
+									117 unknown
+							118 text mA/(m·s)
+							119 button (disabled) 液位积分增益 0.6 mA/(m·s)
+						120 container
+							121 text 启变频连续确认
+							122 number field (settable) 启变频连续确认, Value: 2000
+								123 stepper 0
+									124 unknown
+									125 unknown
+							126 text ms
+							127 button (disabled) 启变频连续确认 2000 ms
+						128 container
+							129 text 加减泵连续确认
+							130 number field (settable) 加减泵连续确认, Value: 5000
+								131 stepper 0
+									132 unknown
+									133 unknown
+							134 text ms
+							135 button (disabled) 加减泵连续确认 5000 ms
+						136 container
+							137 text 泵启动反馈时限
+							138 number field (settable) 泵启动反馈时限, Value: 5000
+								139 stepper 0
+									140 unknown
+									141 unknown
+							142 text ms
+							143 button (disabled) 泵启动反馈时限 5000 ms
+						144 container
+							145 text 泵停止反馈时限
+							146 number field (settable) 泵停止反馈时限, Value: 5000
+								147 stepper 0
+									148 unknown
+									149 unknown
+							150 text ms
+							151 button (disabled) 泵停止反馈时限 5000 ms
+						152 text 停泵 < 调节目标 < 启变频 < 启工频。PI 增益仅对本软件模型整定，实际设备需重新核验。
+					153 container 三泵工况调试
+						154 heading 工况调试, Value: 3
+							155 text 工况调试
+						156 text 改变来水与现场条件，观察控制响应。
+						157 container
+							158 text 上游来水
+							159 combo box (collapsed, settable) 上游来水工况, Secondary Actions: Expand, Value: 日常来水
+
+								160 text 日常来水
+						161 text 运行许可 允许
+						162 switch (settable, boolean) 运行许可, Value: on
+						163 text 低水位许可 允许
+						164 switch (settable, boolean) 低水位许可, Value: on
+						165 text 变频泵故障 正常
+						166 switch (settable, boolean) 变频泵故障, Value: off
+						167 text 工频泵故障 正常
+						168 switch (settable, boolean) 工频泵故障, Value: off
+						169 text 备用泵故障 正常
+						170 switch (settable, boolean) 备用泵故障, Value: off
+						171 summary 信号与故障注入, Value: off
+							172 text 信号与故障注入
+						173 text 解除故障条件后，需在对应设备卡片复位。降级排水采用工频分级启停。
+						174 summary 状态记录 2, Value: off
+							175 text 状态记录 2
+						176 text 工程 1.0.0 · 扫描 12480
+						177 button 重新部署
+						178 button 停止软件运行器
+				179 summary 执行记录 6, Value: off
+					180 text 执行记录 
+					181 text 6
+	182 close button
+	183 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	184 minimize button
+	185 text NP-Tools 硬件调试平台
+186 menu bar
+	187 NP-Tools
+	188 File
+	189 Edit
+	190 View
+	191 Window
+	192 Help
+
+The focused UI element is 2 HTML content Description: Tauri + Vue + Typescript App, URL: tauri://localhost#/ai-engineering

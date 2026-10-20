@@ -1,0 +1,683 @@
+{
+  "schema": "np-tools-ai-delivery/v1",
+  "identity": {
+    "protocolVersion": 1,
+    "projectId": "three_pump_level_control",
+    "projectVersion": "1.0.0",
+    "inputSha256": "ce449deae8697aedf1ada2bbeb0395d60929e84508e122c494b69b00f35a0f7f",
+    "sourceSha256": "e7078548872aead262b9f4764ef9323649a41ffd71f5277b02920fdb64996141",
+    "northboundManifest": "faa324a6f20c3c4ba642532d9096f9cda24bc6434c7d34c408f8ecc7df7fb7e1",
+    "configSha256": "3b5aed0f4d9e24b98fdff67d1f5e3b85c3f3221227fc74e38ba9566aba674a61",
+    "plantSha256": "ed12087623e72ba9e0bd7762bacfd7bbb99a46c47cc81350e25cf2767d536382",
+    "protocolSha256": "1c817a8dd796e4fd7ad19720ec49e3758d5d6728b08248e894e6d0bf0fcf2323"
+  },
+  "config": {
+    "schema": "np-tools-expo-case-config/v1",
+    "caseId": "three-pump-level-control",
+    "caseVersion": "1.0.0",
+    "projectId": "three_pump_level_control",
+    "projectVersion": "1.0.0",
+    "bindings": {
+      "pump1Run": "board.di01",
+      "pump1Fault": "board.di02",
+      "pump1Auto": "board.di03",
+      "pump1Output": "board.do01",
+      "pump2Run": "board.di04",
+      "pump2Fault": "board.di05",
+      "pump2Auto": "board.di06",
+      "pump2Output": "board.do02",
+      "pump3Run": "board.di07",
+      "pump3Fault": "board.di08",
+      "pump3Auto": "board.di09",
+      "pump3Output": "board.do03",
+      "waterAvailable": "board.di10",
+      "highHigh": "board.di11",
+      "runPermit": "board.di12",
+      "levelInput": "board.ai01",
+      "frequencyInput": "board.ai02",
+      "speedOutput": "board.ao01",
+      "alarmOutput": "board.do04"
+    },
+    "parameters": {
+      "stopLevelM": 0.4,
+      "targetLevelM": 0.8,
+      "vfdStartLevelM": 1.0,
+      "assistStartLevelM": 1.8,
+      "pidKp": 24.0,
+      "pidKi": 0.6,
+      "startConfirmMs": 2000,
+      "stageConfirmMs": 5000,
+      "pumpStartTimeoutMs": 5000,
+      "pumpStopTimeoutMs": 5000
+    },
+    "labels": {
+      "tank": "集水井 TK101",
+      "pump1": "变频泵 P101",
+      "pump2": "工频泵 P102",
+      "pump3": "备用泵 P103"
+    }
+  },
+  "fields": [
+    {
+      "name": "P1_RUN",
+      "bind": "point.pump1_run_fb",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10001",
+      "description": "P101独立运行反馈"
+    },
+    {
+      "name": "P1_FLT",
+      "bind": "point.pump1_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10002",
+      "description": "P101故障接点"
+    },
+    {
+      "name": "P1_REM",
+      "bind": "point.pump1_remote",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10003",
+      "description": "P101远程自动许可"
+    },
+    {
+      "name": "P1_DO",
+      "bind": "point.pump1_output",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10004",
+      "description": "P101启动 DO输出"
+    },
+    {
+      "name": "P2_RUN",
+      "bind": "point.pump2_run_fb",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10005",
+      "description": "P102独立运行反馈"
+    },
+    {
+      "name": "P2_FLT",
+      "bind": "point.pump2_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10006",
+      "description": "P102故障接点"
+    },
+    {
+      "name": "P2_REM",
+      "bind": "point.pump2_remote",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10007",
+      "description": "P102远程自动许可"
+    },
+    {
+      "name": "P2_DO",
+      "bind": "point.pump2_output",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10008",
+      "description": "P102启动 DO输出"
+    },
+    {
+      "name": "P3_RUN",
+      "bind": "point.pump3_run_fb",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10009",
+      "description": "P103独立运行反馈"
+    },
+    {
+      "name": "P3_FLT",
+      "bind": "point.pump3_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10010",
+      "description": "P103故障接点"
+    },
+    {
+      "name": "P3_REM",
+      "bind": "point.pump3_remote",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10011",
+      "description": "P103远程自动许可"
+    },
+    {
+      "name": "P3_DO",
+      "bind": "point.pump3_output",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10012",
+      "description": "P103启动 DO输出"
+    },
+    {
+      "name": "WATER_OK",
+      "bind": "point.water_available",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10013",
+      "description": "独立低水位许可"
+    },
+    {
+      "name": "LEVEL_HH",
+      "bind": "point.high_high",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10014",
+      "description": "独立高高位报警"
+    },
+    {
+      "name": "RUN_PERMIT",
+      "bind": "point.run_permit",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10015",
+      "description": "泵组运行许可"
+    },
+    {
+      "name": "ALARM_DO",
+      "bind": "point.alarm_output",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10016",
+      "description": "泵组综合报警 DO输出"
+    },
+    {
+      "name": "L_STOP_M",
+      "bind": "parameter.stop_level_m",
+      "c_type": "float",
+      "access": "read_write",
+      "reference": "40001",
+      "description": "停泵液位"
+    },
+    {
+      "name": "L_SP_M",
+      "bind": "parameter.target_level_m",
+      "c_type": "float",
+      "access": "read_write",
+      "reference": "40003",
+      "description": "调节目标液位"
+    },
+    {
+      "name": "L_VFD_M",
+      "bind": "parameter.vfd_start_level_m",
+      "c_type": "float",
+      "access": "read_write",
+      "reference": "40005",
+      "description": "启变频液位"
+    },
+    {
+      "name": "L_AUX_M",
+      "bind": "parameter.assist_start_level_m",
+      "c_type": "float",
+      "access": "read_write",
+      "reference": "40007",
+      "description": "启工频液位"
+    },
+    {
+      "name": "PID_KP",
+      "bind": "parameter.pid_kp",
+      "c_type": "float",
+      "access": "read_write",
+      "reference": "40009",
+      "description": "液位比例增益"
+    },
+    {
+      "name": "PID_KI",
+      "bind": "parameter.pid_ki",
+      "c_type": "float",
+      "access": "read_write",
+      "reference": "40011",
+      "description": "液位积分增益"
+    },
+    {
+      "name": "START_MS",
+      "bind": "parameter.start_confirm_ms",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40013",
+      "description": "启变频连续确认"
+    },
+    {
+      "name": "STAGE_MS",
+      "bind": "parameter.stage_confirm_ms",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40015",
+      "description": "加减泵连续确认"
+    },
+    {
+      "name": "P_START_MS",
+      "bind": "parameter.pump_start_timeout_ms",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40017",
+      "description": "泵启动反馈时限"
+    },
+    {
+      "name": "P_STOP_MS",
+      "bind": "parameter.pump_stop_timeout_ms",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40019",
+      "description": "泵停止反馈时限"
+    },
+    {
+      "name": "SYS_STA",
+      "bind": "command.system_start",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00001",
+      "description": "投入液位自动"
+    },
+    {
+      "name": "SYS_STP",
+      "bind": "command.system_stop",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00002",
+      "description": "正常停止"
+    },
+    {
+      "name": "SYS_TRIP",
+      "bind": "command.system_trip",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00003",
+      "description": "立即停止"
+    },
+    {
+      "name": "DEG_STA",
+      "bind": "command.degraded_start",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00004",
+      "description": "投入工频降级排水"
+    },
+    {
+      "name": "P1_RST",
+      "bind": "command.pump1_reset_faults",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00005",
+      "description": "P101故障复位"
+    },
+    {
+      "name": "P1_RT_S",
+      "bind": "runtime.pump1.seconds",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30001",
+      "description": "P101运行累计秒数"
+    },
+    {
+      "name": "P1_RT_CLR",
+      "bind": "runtime.pump1.clear",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00006",
+      "description": "P101运行累计清零"
+    },
+    {
+      "name": "P2_RST",
+      "bind": "command.pump2_reset_faults",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00007",
+      "description": "P102故障复位"
+    },
+    {
+      "name": "P2_RT_S",
+      "bind": "runtime.pump2.seconds",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30003",
+      "description": "P102运行累计秒数"
+    },
+    {
+      "name": "P2_RT_CLR",
+      "bind": "runtime.pump2.clear",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00008",
+      "description": "P102运行累计清零"
+    },
+    {
+      "name": "P3_RST",
+      "bind": "command.pump3_reset_faults",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00009",
+      "description": "P103故障复位"
+    },
+    {
+      "name": "P3_RT_S",
+      "bind": "runtime.pump3.seconds",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30005",
+      "description": "P103运行累计秒数"
+    },
+    {
+      "name": "P3_RT_CLR",
+      "bind": "runtime.pump3.clear",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00010",
+      "description": "P103运行累计清零"
+    },
+    {
+      "name": "SYS_AUTO",
+      "bind": "state.automatic",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10017",
+      "description": "液位自动已投入"
+    },
+    {
+      "name": "SYS_DEG",
+      "bind": "state.degraded",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10018",
+      "description": "工频降级已投入"
+    },
+    {
+      "name": "LEVEL_OK",
+      "bind": "state.level_valid",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10019",
+      "description": "液位测量有效"
+    },
+    {
+      "name": "FREQ_OK",
+      "bind": "state.frequency_valid",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10020",
+      "description": "实际频率测量有效"
+    },
+    {
+      "name": "CONFIG_OK",
+      "bind": "state.config_ready",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10021",
+      "description": "控制参数有效"
+    },
+    {
+      "name": "LEVEL_M",
+      "bind": "state.level_m",
+      "c_type": "float",
+      "access": "read",
+      "reference": "30007",
+      "description": "集水井液位 m"
+    },
+    {
+      "name": "F_ACT_HZ",
+      "bind": "state.frequency_hz",
+      "c_type": "float",
+      "access": "read",
+      "reference": "30009",
+      "description": "P101实际频率 Hz"
+    },
+    {
+      "name": "F_SET_HZ",
+      "bind": "state.set_hz",
+      "c_type": "float",
+      "access": "read",
+      "reference": "30011",
+      "description": "P101频率给定 Hz"
+    },
+    {
+      "name": "SYS_STATUS",
+      "bind": "state.system_status",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30013",
+      "description": "泵组当前运行阶段"
+    },
+    {
+      "name": "BLOCK_REASON",
+      "bind": "state.block_reason",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30015",
+      "description": "泵组等待或禁止原因"
+    },
+    {
+      "name": "REMAIN_MS",
+      "bind": "state.remain_ms",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30017",
+      "description": "当前等待剩余毫秒"
+    },
+    {
+      "name": "OCCUPIED",
+      "bind": "state.occupied",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30019",
+      "description": "当前已占用泵台数"
+    },
+    {
+      "name": "SYS_ALARM",
+      "bind": "state.alarm",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10022",
+      "description": "泵组综合报警"
+    },
+    {
+      "name": "PI_RUN",
+      "bind": "state.pi_running",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10023",
+      "description": "液位调节运行中"
+    },
+    {
+      "name": "P1_STATUS",
+      "bind": "state.pump1_status",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30021",
+      "description": "P101设备运行阶段"
+    },
+    {
+      "name": "P1_FAULT",
+      "bind": "state.pump1_fault_code",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30023",
+      "description": "P101当前故障原因"
+    },
+    {
+      "name": "P1_F_L",
+      "bind": "state.pump1_total_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10024",
+      "description": "P101总故障"
+    },
+    {
+      "name": "P1_F_DEV",
+      "bind": "state.pump1_device_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10025",
+      "description": "P101设备故障记录"
+    },
+    {
+      "name": "P1_F_STA",
+      "bind": "state.pump1_start_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10026",
+      "description": "P101启动反馈超时"
+    },
+    {
+      "name": "P1_F_STP",
+      "bind": "state.pump1_stop_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10027",
+      "description": "P101停止反馈超时"
+    },
+    {
+      "name": "P1_F_RUN",
+      "bind": "state.pump1_loss_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10028",
+      "description": "P101运行反馈丢失"
+    },
+    {
+      "name": "P2_STATUS",
+      "bind": "state.pump2_status",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30025",
+      "description": "P102设备运行阶段"
+    },
+    {
+      "name": "P2_FAULT",
+      "bind": "state.pump2_fault_code",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30027",
+      "description": "P102当前故障原因"
+    },
+    {
+      "name": "P2_F_L",
+      "bind": "state.pump2_total_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10029",
+      "description": "P102总故障"
+    },
+    {
+      "name": "P2_F_DEV",
+      "bind": "state.pump2_device_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10030",
+      "description": "P102设备故障记录"
+    },
+    {
+      "name": "P2_F_STA",
+      "bind": "state.pump2_start_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10031",
+      "description": "P102启动反馈超时"
+    },
+    {
+      "name": "P2_F_STP",
+      "bind": "state.pump2_stop_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10032",
+      "description": "P102停止反馈超时"
+    },
+    {
+      "name": "P2_F_RUN",
+      "bind": "state.pump2_loss_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10033",
+      "description": "P102运行反馈丢失"
+    },
+    {
+      "name": "P3_STATUS",
+      "bind": "state.pump3_status",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30029",
+      "description": "P103设备运行阶段"
+    },
+    {
+      "name": "P3_FAULT",
+      "bind": "state.pump3_fault_code",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30031",
+      "description": "P103当前故障原因"
+    },
+    {
+      "name": "P3_F_L",
+      "bind": "state.pump3_total_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10034",
+      "description": "P103总故障"
+    },
+    {
+      "name": "P3_F_DEV",
+      "bind": "state.pump3_device_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10035",
+      "description": "P103设备故障记录"
+    },
+    {
+      "name": "P3_F_STA",
+      "bind": "state.pump3_start_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10036",
+      "description": "P103启动反馈超时"
+    },
+    {
+      "name": "P3_F_STP",
+      "bind": "state.pump3_stop_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10037",
+      "description": "P103停止反馈超时"
+    },
+    {
+      "name": "P3_F_RUN",
+      "bind": "state.pump3_loss_fault",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10038",
+      "description": "P103运行反馈丢失"
+    }
+  ],
+  "hostReport": {
+    "status": "HOST_PASS",
+    "scope": "host-only",
+    "log": "THREE_PUMP_HOST_PASS: 34 executed scenarios\n+ /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tools/point_config_gen.py /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_io.yaml --output-dir /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated\n+ cc -std=c11 -Wall -Wextra -Werror -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application/projects/工博会/.building/1.0.0/logic_project_test.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -include /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/.opencode/skills/kz3-control-engineer/assets/plc_test_evidence.h -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_0.o\n+ cc -std=c11 -Wall -Wextra -Werror -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application/projects/工博会/.building/1.0.0/logic.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_1.o\n+ cc -std=c11 -Wall -Wextra -Werror -c /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated/point_config.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_2.o\n+ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Src/data_manager.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_0.o\n+ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Src/logic_manager.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_1.o\n+ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Src/logic_parameter_store.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_2.o\n+ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Src/logic_runtime_store.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_3.o\n+ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -c /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests/eeprom_transport_fake.c -I /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/generated -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/application -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/User/Inc -I /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/works/ai-control-expo-design/three-pump-verification/project/sdk/tests -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_4.o\n+ cc /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_0.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_1.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/project_2.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_0.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_1.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_2.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_3.o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/platform_4.o -o /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/logic_project_test\n+ /var/folders/jp/yzb6kpdd3x70lh6fmw_mslt40000gp/T/stm32-logic-verify-l_222cih/logic_project_test\nTHREE_PUMP_HOST_PASS: 34 executed scenarios\nPLC_EXECUTED_V1: PASS (host-only); executed_scenarios=34; executed_assertions=7736; successful_manager_steps=391\nSTM32-Logic 项目验证通过: three_pump_level_control\nKZ3 PLC_STYLE_V1: PASS (host-only); HMI_SHORT_V1: PASS; 有效逻辑行=349; 决策点代理=214; 最大嵌套=5; 单函数最大行数=35; 单函数最大决策点=36; 单函数最大参数数=6; 单输出最大写点=1; 北向字段=74; 静态断言位置=103; 静态场景标签=34\n验证范围: host-only；HIL 与现场验证未执行\n",
+    "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+    "runnerSha256": "511553f409d3dd660862b6da9baddbe1638d9cb8ef2a60fb299b72cf30ee6058"
+  },
+  "createdFiles": {
+    "northbound.csv": "38eb18e1f14720878e93fd2d5926b0c42640445e175a64e5844d0680fd651461",
+    "project_io.yaml": "ce449deae8697aedf1ada2bbeb0395d60929e84508e122c494b69b00f35a0f7f",
+    "logic.c": "e7078548872aead262b9f4764ef9323649a41ffd71f5277b02920fdb64996141",
+    "scene.bindings.json": "1882c59a34742ee85d62bfb43c1b19382734880060adebed5ed9dfb532490ce8",
+    "original-project_io.yaml": "ce449deae8697aedf1ada2bbeb0395d60929e84508e122c494b69b00f35a0f7f",
+    "plant_runner.c": "ed12087623e72ba9e0bd7762bacfd7bbb99a46c47cc81350e25cf2767d536382",
+    "flat_json.h": "1c817a8dd796e4fd7ad19720ec49e3758d5d6728b08248e894e6d0bf0fcf2323",
+    "README.md": "c324aa753ee42df9e1e5e7b000a9765b6665367ef1dbb96ace6970d03d5ba700",
+    "point-role-map.json": "bd1cc57b6a236d3b7d706da891c2dec60f8eddab6789f1c99fd81270ce9451c8",
+    "identity.h": "410f22a101d64c64ec7caa04f8c3fbfc1b3132c695215c0218f12d2100ed6b28",
+    "model-profile.json": "74928e67822c7154d28e7aacb51b15edf907a66989c2cf593347d5b4a8e257ae",
+    "case-config.json": "3b5aed0f4d9e24b98fdff67d1f5e3b85c3f3221227fc74e38ba9566aba674a61",
+    "demo.scene.json": "203adbef0717e2f3f98f86b24a8bec76607b6e3225bc6a4b711a4be4968020d7",
+    "logic_project_test.c": "1537a34c73ee7305b0642048adbfb9f3501a2ada062977dd20f923842f739abf",
+    "generated/point_config.h": "5b906449aab150d16e506293f985c79050bbe5bafabbdb71c05d4a85ee92a2a7",
+    "generated/point_config.md": "b7dcb724b2d07d8a3fd7333f3d4d1d3fc7ad27afa7061cbe27d17b3dc19f15c6",
+    "generated/point_config.c": "83c19a183804ee521b289f2f036e9e1c656964ace51baf877702067fc57a367f",
+    "host/runner": "511553f409d3dd660862b6da9baddbe1638d9cb8ef2a60fb299b72cf30ee6058",
+    "host/logic_test": "43161ed99e97cd75189347d2c7c5d12f5d9b9d8b36ec3233a60718413e7baa27",
+    "host/build.log": "10e548337a66ae76f2eb29117bfe74ec4c5d2ba67bf6ff8c8a8631037333c2aa"
+  }
+}

@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import { open } from '@tauri-apps/plugin-dialog'
+import { useRoute, useRouter } from 'vue-router'
 import { useFlashStore } from '../stores/flashStore'
 import { useSerialStore } from '../stores/serialStore'
 import { useSjzdStore } from '../stores/sjzdStore'
@@ -19,6 +20,9 @@ import CustomSelect from '../components/common/CustomSelect.vue'
 const flash = useFlashStore()
 const serial = useSerialStore()
 const sjzd = useSjzdStore()
+const route = useRoute()
+const router = useRouter()
+const fromAssistant = computed(() => route.query.from === 'ai-assistant')
 
 const autoBurnSnAfterFlash = ref(false)
 const productionSn = ref('430125010001')
@@ -108,13 +112,20 @@ async function handleStartFlash() {
   }
 }
 
-onMounted(() => {
-  const savedHex = localStorage.getItem('np_tools_last_hex')
-  if (savedHex && !flash.selectedHexPath) {
-    flash.selectedHexPath = savedHex
+onMounted(async () => {
+  const assistantHandoff = fromAssistant.value && route.query.profile === 'kz3_f427_app'
+  if (!assistantHandoff) {
+    const savedHex = localStorage.getItem('np_tools_last_hex')
+    if (savedHex && !flash.selectedHexPath) flash.selectedHexPath = savedHex
   }
-  void flash.loadProductProfiles()
   void flash.probeTool()
+  await flash.loadProductProfiles()
+  if (assistantHandoff && !flash.isFlashing) {
+    flash.selectedHexPath = ''
+    flash.selectedProfileId = flash.productProfiles.some((p) => p.id === 'kz3_f427_app')
+      ? 'kz3_f427_app'
+      : ''
+  }
 })
 
 watch(canUseSjzdSnPipeline, (supported) => {
@@ -136,6 +147,14 @@ watch(canUseSjzdSnPipeline, (supported) => {
       </div>
 
       <div class="actions-col">
+        <button
+          v-if="fromAssistant"
+          class="btn btn-secondary"
+          :disabled="flash.isFlashing"
+          @click="router.push({ name: 'AiEngineering' })"
+        >
+          返回 AI 辅助工作台
+        </button>
         <button
           class="btn btn-secondary"
           :disabled="flash.isProbing || flash.isFlashing"

@@ -1,0 +1,68 @@
+schema: kz3-project-io/v3
+
+project:
+  name: 运行时间认证模板主机夹具
+  id: standard_runtime_counter_fixture
+  version: 1.0.0
+  board: kz3_f427_standard
+  required_profiles: []
+  scan_period_ms: 10
+
+  features: {pid: false, counter: false, retained: false}
+  rs485_ports: {}
+  devices: []
+
+  points:
+    inputs:
+      - name: device_running_feedback
+        source: board.di01
+        description: 仅供主机夹具使用的独立设备运行反馈，不代表真实端子
+    outputs: []
+
+  application_variables:
+    parameters: []
+    commands: []
+    states: []
+
+  pids: []
+  logic_blocks:
+    timers: []
+    edges: []
+    counters: []
+    latches: []
+    debounces: []
+    filters: []
+    rate_limits: []
+
+  runtime_counters:
+    - name: device_01
+      description: GOOD 且有效的独立运行反馈累计秒数
+      trigger:
+        bind: point.device_running_feedback
+        active_value: true
+        quality: good
+
+  northbound:
+    protocols: [http, modbus_tcp]
+    modbus_tcp:
+      address_style: modicon_5_digit
+      word_order_32: abcd
+    fields:
+      - {name: runtime.device_01.clear, bind: runtime.device_01.clear,
+         c_type: bool, access: read_write, reference: "00001"}
+      - {name: input.device_running_feedback, bind: point.device_running_feedback,
+         c_type: bool, access: read, reference: "10001"}
+      - {name: state.retained_store_fault, bind: state.retained_store_fault,
+         c_type: bool, access: read, reference: "10003"}
+      - {name: state.retained_store_busy, bind: state.retained_store_busy,
+         c_type: bool, access: read, reference: "10004"}
+      - {name: runtime.device_01.seconds, bind: runtime.device_01.seconds,
+         c_type: u32, access: read, reference: "30001"}
+      - {name: state.retained_store_fault_mask,
+         bind: state.retained_store_fault_mask,
+         c_type: u32, access: read, reference: "30003"}
+      - {name: state.system_boot_count, bind: state.system_boot_count,
+         c_type: u32, access: read, reference: "30005"}
+      - {name: state.system_total_runtime_seconds,
+         bind: state.system_total_runtime_seconds,
+         c_type: u32, access: read, reference: "30007"}

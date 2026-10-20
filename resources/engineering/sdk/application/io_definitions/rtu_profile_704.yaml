@@ -1,0 +1,39 @@
+schema: kz3-modbus-profile/v1
+
+profile:
+  name: sp4055_704
+  legacy_type: 704
+  description: 8AI 扩展模块，4–20 mA 输入按 µA 输出
+  qualification: software_qualified
+
+  read_blocks:
+    - name: ai
+      function: read_holding_registers
+      pdu_address: 0
+      count: 8
+
+  write_groups: []
+
+  signals:
+    # 原始码 0..65535 对应 4..20 mA；engineering 的单位为 µA。
+    - {name: ai01, source: {block: ai, register_offset: 0}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai02, source: {block: ai, register_offset: 1}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai03, source: {block: ai, register_offset: 2}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai04, source: {block: ai, register_offset: 3}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai05, source: {block: ai, register_offset: 4}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai06, source: {block: ai, register_offset: 5}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai07, source: {block: ai, register_offset: 6}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+    - {name: ai08, source: {block: ai, register_offset: 7}, wire_type: u16,
+       engineering: {unit: uA, raw_min: 0, raw_max: 65535, value_min: 4000, value_max: 20000}}
+
+  evidence:
+    protocol_source: legacy_source_golden_vector
+    hardware_hil: range_confirmed
+    note: 已确认 8 路 AI 均采用 4–20 mA 量程；AI1 实测 4 mA=0、20 mA=65502，统一按 0..65535 对应 4000..20000 µA 换算。

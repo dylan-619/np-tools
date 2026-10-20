@@ -1,0 +1,589 @@
+[
+  {
+    "run": "18dfeff8f70664d0.jsonl",
+    "events": [
+      {
+        "detail": {
+          "configSha256": "c88edcdb3e46497e1c4519a298d7045a9eae87501ba3f6e0f953a4c540f5df37",
+          "inputSha256": "90773afbde2b7a710dff7b6bef5b0b482e3c1928cb8f5fa9c73dc97ccc16ef9b",
+          "northboundManifest": "579b7f873cc3f9c29ed3720056ec468e8654542edf855fba24640048457236c8",
+          "projectId": "water_supply_station",
+          "projectVersion": "1.0.0",
+          "protocolVersion": 1,
+          "sourceSha256": "791dfa9f536eba3e2cb4e89d40b60c0bb6b8b034f8bde133512d5174e47b4313"
+        },
+        "event": "deployed",
+        "timeMs": 1792415029292
+      },
+      {
+        "detail": {
+          "nowMs": 1,
+          "phase": [
+            0,
+            1
+          ],
+          "scanSequence": 1
+        },
+        "event": "phase",
+        "timeMs": 1792415029295
+      },
+      {
+        "detail": {
+          "op": "command",
+          "value": "SYS_STA"
+        },
+        "event": "action",
+        "timeMs": 1792415121902
+      },
+      {
+        "detail": {
+          "nowMs": 92608,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 9243
+        },
+        "event": "phase",
+        "timeMs": 1792415121903
+      },
+      {
+        "detail": {
+          "nowMs": 94099,
+          "phase": [
+            2,
+            1
+          ],
+          "scanSequence": 9392
+        },
+        "event": "phase",
+        "timeMs": 1792415123394
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "pump1Fault",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415142942
+      },
+      {
+        "detail": {
+          "nowMs": 113648,
+          "phase": [
+            4,
+            1
+          ],
+          "scanSequence": 11347
+        },
+        "event": "phase",
+        "timeMs": 1792415142943
+      },
+      {
+        "detail": {
+          "nowMs": 113658,
+          "phase": [
+            6,
+            1
+          ],
+          "scanSequence": 11348
+        },
+        "event": "phase",
+        "timeMs": 1792415142952
+      },
+      {
+        "detail": {
+          "nowMs": 115648,
+          "phase": [
+            3,
+            1
+          ],
+          "scanSequence": 11547
+        },
+        "event": "phase",
+        "timeMs": 1792415144943
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "pump1Fault",
+            "value": false
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415158572
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "pump2Fault",
+            "value": false
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415158581
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "source",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415158591
+      },
+      {
+        "detail": {
+          "op": "environment",
+          "value": {
+            "name": "restore",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415158602
+      },
+      {
+        "detail": {
+          "op": "quality",
+          "value": 0
+        },
+        "event": "action",
+        "timeMs": 1792415158612
+      },
+      {
+        "detail": {
+          "nowMs": 129489,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 12931
+        },
+        "event": "phase",
+        "timeMs": 1792415158783
+      },
+      {
+        "detail": {
+          "nowMs": 130218,
+          "phase": [
+            6,
+            1
+          ],
+          "scanSequence": 13004
+        },
+        "event": "phase",
+        "timeMs": 1792415159513
+      },
+      {
+        "detail": {
+          "nowMs": 131489,
+          "phase": [
+            3,
+            1
+          ],
+          "scanSequence": 13131
+        },
+        "event": "phase",
+        "timeMs": 1792415160784
+      },
+      {
+        "detail": {
+          "op": "command",
+          "value": "P1_RST"
+        },
+        "event": "action",
+        "timeMs": 1792415163612
+      },
+      {
+        "detail": {
+          "op": "environment",
+          "value": {
+            "name": "valveBlocked",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415177691
+      },
+      {
+        "detail": {
+          "op": "environment",
+          "value": {
+            "name": "tankLevel",
+            "value": 1000
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415181141
+      },
+      {
+        "detail": {
+          "nowMs": 151848,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 15167
+        },
+        "event": "phase",
+        "timeMs": 1792415181142
+      },
+      {
+        "detail": {
+          "error": "扫描延迟超过250ms，已中止当前运行，请重新部署",
+          "identity": {
+            "configSha256": "c88edcdb3e46497e1c4519a298d7045a9eae87501ba3f6e0f953a4c540f5df37",
+            "inputSha256": "90773afbde2b7a710dff7b6bef5b0b482e3c1928cb8f5fa9c73dc97ccc16ef9b",
+            "northboundManifest": "579b7f873cc3f9c29ed3720056ec468e8654542edf855fba24640048457236c8",
+            "projectId": "water_supply_station",
+            "projectVersion": "1.0.0",
+            "protocolVersion": 1,
+            "sourceSha256": "791dfa9f536eba3e2cb4e89d40b60c0bb6b8b034f8bde133512d5174e47b4313"
+          },
+          "runId": "18dfeff8f70664d0",
+          "status": "failed",
+          "workspaceId": "18dfefe92623d640"
+        },
+        "event": "ended",
+        "timeMs": 1792415230445
+      }
+    ]
+  },
+  {
+    "run": "18dff0680874c490.jsonl",
+    "events": [
+      {
+        "detail": {
+          "configSha256": "c88edcdb3e46497e1c4519a298d7045a9eae87501ba3f6e0f953a4c540f5df37",
+          "inputSha256": "90773afbde2b7a710dff7b6bef5b0b482e3c1928cb8f5fa9c73dc97ccc16ef9b",
+          "northboundManifest": "579b7f873cc3f9c29ed3720056ec468e8654542edf855fba24640048457236c8",
+          "projectId": "water_supply_station",
+          "projectVersion": "1.0.0",
+          "protocolVersion": 1,
+          "sourceSha256": "791dfa9f536eba3e2cb4e89d40b60c0bb6b8b034f8bde133512d5174e47b4313"
+        },
+        "event": "deployed",
+        "timeMs": 1792415506326
+      },
+      {
+        "detail": {
+          "nowMs": 10,
+          "phase": [
+            0,
+            1
+          ],
+          "scanSequence": 1
+        },
+        "event": "phase",
+        "timeMs": 1792415506328
+      },
+      {
+        "detail": {
+          "op": "environment",
+          "value": {
+            "name": "valveBlocked",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415542154
+      },
+      {
+        "detail": {
+          "op": "command",
+          "value": "SYS_STA"
+        },
+        "event": "action",
+        "timeMs": 1792415545793
+      },
+      {
+        "detail": {
+          "nowMs": 39420,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 3942
+        },
+        "event": "phase",
+        "timeMs": 1792415545794
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "pump1Fault",
+            "value": false
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415613739
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "pump2Fault",
+            "value": false
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415613749
+      },
+      {
+        "detail": {
+          "op": "condition",
+          "value": {
+            "name": "source",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415613759
+      },
+      {
+        "detail": {
+          "op": "environment",
+          "value": {
+            "name": "restore",
+            "value": true
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415613769
+      },
+      {
+        "detail": {
+          "op": "quality",
+          "value": 0
+        },
+        "event": "action",
+        "timeMs": 1792415613779
+      },
+      {
+        "detail": {
+          "op": "command",
+          "value": "XV_RST"
+        },
+        "event": "action",
+        "timeMs": 1792415617800
+      },
+      {
+        "detail": {
+          "nowMs": 112740,
+          "phase": [
+            2,
+            1
+          ],
+          "scanSequence": 11274
+        },
+        "event": "phase",
+        "timeMs": 1792415619300
+      },
+      {
+        "detail": {
+          "nowMs": 145550,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 14555
+        },
+        "event": "phase",
+        "timeMs": 1792415652153
+      },
+      {
+        "detail": {
+          "nowMs": 146290,
+          "phase": [
+            6,
+            1
+          ],
+          "scanSequence": 14629
+        },
+        "event": "phase",
+        "timeMs": 1792415652893
+      },
+      {
+        "detail": {
+          "nowMs": 147550,
+          "phase": [
+            2,
+            1
+          ],
+          "scanSequence": 14755
+        },
+        "event": "phase",
+        "timeMs": 1792415654152
+      },
+      {
+        "detail": {
+          "op": "command",
+          "value": "SYS_STP"
+        },
+        "event": "action",
+        "timeMs": 1792415680035
+      },
+      {
+        "detail": {
+          "nowMs": 173270,
+          "phase": [
+            0,
+            1
+          ],
+          "scanSequence": 17327
+        },
+        "event": "phase",
+        "timeMs": 1792415680037
+      }
+    ]
+  },
+  {
+    "run": "18dff0cf4cf968e8.jsonl",
+    "events": [
+      {
+        "detail": {
+          "configSha256": "c88edcdb3e46497e1c4519a298d7045a9eae87501ba3f6e0f953a4c540f5df37",
+          "inputSha256": "90773afbde2b7a710dff7b6bef5b0b482e3c1928cb8f5fa9c73dc97ccc16ef9b",
+          "northboundManifest": "579b7f873cc3f9c29ed3720056ec468e8654542edf855fba24640048457236c8",
+          "projectId": "water_supply_station",
+          "projectVersion": "1.0.0",
+          "protocolVersion": 1,
+          "sourceSha256": "791dfa9f536eba3e2cb4e89d40b60c0bb6b8b034f8bde133512d5174e47b4313"
+        },
+        "event": "deployed",
+        "timeMs": 1792415949857
+      },
+      {
+        "detail": {
+          "nowMs": 10,
+          "phase": [
+            0,
+            1
+          ],
+          "scanSequence": 1
+        },
+        "event": "phase",
+        "timeMs": 1792415949859
+      },
+      {
+        "detail": {
+          "op": "parameter",
+          "value": {
+            "name": "SWITCH_MS",
+            "revision": 0,
+            "value": 3000
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415972781
+      },
+      {
+        "detail": {
+          "op": "parameter",
+          "value": {
+            "name": "SWITCH_MS",
+            "revision": 1,
+            "value": 2000
+          }
+        },
+        "event": "action",
+        "timeMs": 1792415991504
+      },
+      {
+        "detail": {
+          "op": "command",
+          "value": "SYS_STA"
+        },
+        "event": "action",
+        "timeMs": 1792416087070
+      },
+      {
+        "detail": {
+          "nowMs": 136280,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 13628
+        },
+        "event": "phase",
+        "timeMs": 1792416087071
+      },
+      {
+        "detail": {
+          "nowMs": 137770,
+          "phase": [
+            2,
+            1
+          ],
+          "scanSequence": 13777
+        },
+        "event": "phase",
+        "timeMs": 1792416088564
+      },
+      {
+        "detail": {
+          "nowMs": 170580,
+          "phase": [
+            1,
+            1
+          ],
+          "scanSequence": 17058
+        },
+        "event": "phase",
+        "timeMs": 1792416121432
+      },
+      {
+        "detail": {
+          "nowMs": 171320,
+          "phase": [
+            6,
+            1
+          ],
+          "scanSequence": 17132
+        },
+        "event": "phase",
+        "timeMs": 1792416122174
+      },
+      {
+        "detail": {
+          "nowMs": 172580,
+          "phase": [
+            2,
+            1
+          ],
+          "scanSequence": 17258
+        },
+        "event": "phase",
+        "timeMs": 1792416123434
+      }
+    ]
+  },
+  {
+    "run": "engineering.jsonl",
+    "events": [
+      {
+        "detail": {
+          "configSha256": "c88edcdb3e46497e1c4519a298d7045a9eae87501ba3f6e0f953a4c540f5df37",
+          "inputSha256": "90773afbde2b7a710dff7b6bef5b0b482e3c1928cb8f5fa9c73dc97ccc16ef9b",
+          "northboundManifest": "579b7f873cc3f9c29ed3720056ec468e8654542edf855fba24640048457236c8",
+          "projectId": "water_supply_station",
+          "projectVersion": "1.0.0",
+          "protocolVersion": 1,
+          "sourceSha256": "791dfa9f536eba3e2cb4e89d40b60c0bb6b8b034f8bde133512d5174e47b4313"
+        },
+        "event": "generated",
+        "timeMs": 1792415012124
+      }
+    ]
+  }
+]

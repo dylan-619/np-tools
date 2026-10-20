@@ -1,0 +1,9 @@
+{
+  "id": "water-supply-station",
+  "version": "1.0.0",
+  "files": {
+    "project_io.yaml": "90773afbde2b7a710dff7b6bef5b0b482e3c1928cb8f5fa9c73dc97ccc16ef9b",
+    "logic.c": "791dfa9f536eba3e2cb4e89d40b60c0bb6b8b034f8bde133512d5174e47b4313",
+    "logic_project_test.c": "d612a1774ae82654f43d3ae049a01287cc69c6e3e471997112e15fb4893c4909"
+  }
+}

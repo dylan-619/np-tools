@@ -14,6 +14,18 @@ const router = createRouter({
       meta: { title: '设备调试导航' }
     },
     {
+      path: '/ai-engineering',
+      name: 'AiEngineering',
+      component: () => import('../views/engineering/AiEngineeringView.vue'),
+      meta: { title: 'AI 辅助工作台' }
+    },
+    {
+      path: '/ai-engineering/:workspaceId/hmi',
+      name: 'EngineeringHmi',
+      component: () => import('../views/engineering/AiEngineeringView.vue'),
+      meta: { title: '本地仿真 HMI' }
+    },
+    {
       path: '/serial',
       name: 'SerialDebugger',
       component: () => import('../views/SerialView.vue'),

@@ -1,0 +1,76 @@
+# 三泵集水井液位控制：现场输入点表
+# 用于 AI 辅助工作台第一步导入；控制逻辑、运行参数与北向点位在后续流程生成。
+schema: kz3-project-io/v3
+project:
+  name: 三泵集水井液位控制
+  id: three_pump_level_control
+  version: 1.0.0
+  board: kz3_f427_standard
+  scan_period_ms: 10
+  features:
+    pid: true
+    counter: false
+    retained: false
+  points:
+    inputs:
+    - name: pump1_run_fb
+      source: board.di01
+      description: P101独立运行反馈，信号有效时表示成立
+    - name: pump1_fault
+      source: board.di02
+      description: P101故障接点，信号有效时表示成立
+    - name: pump1_remote
+      source: board.di03
+      description: P101远程自动许可，信号有效时表示成立
+    - name: pump2_run_fb
+      source: board.di04
+      description: P102独立运行反馈，信号有效时表示成立
+    - name: pump2_fault
+      source: board.di05
+      description: P102故障接点，信号有效时表示成立
+    - name: pump2_remote
+      source: board.di06
+      description: P102远程自动许可，信号有效时表示成立
+    - name: pump3_run_fb
+      source: board.di07
+      description: P103独立运行反馈，信号有效时表示成立
+    - name: pump3_fault
+      source: board.di08
+      description: P103故障接点，信号有效时表示成立
+    - name: pump3_remote
+      source: board.di09
+      description: P103远程自动许可，信号有效时表示成立
+    - name: water_available
+      source: board.di10
+      description: 独立低水位许可，信号有效时表示成立
+    - name: high_high
+      source: board.di11
+      description: 独立高高位报警，信号有效时表示成立
+    - name: run_permit
+      source: board.di12
+      description: 泵组运行许可，信号有效时表示成立
+    - name: level_current
+      source: board.ai01
+      c_type: float
+      description: 集水井连续液位，4–20mA对应0–3m
+    - name: frequency_current
+      source: board.ai02
+      c_type: float
+      description: P101实际频率反馈，4–20mA对应0–50Hz
+    outputs:
+    - name: pump1_output
+      source: board.do01
+      description: P101启动命令
+    - name: pump2_output
+      source: board.do02
+      description: P102启动命令
+    - name: pump3_output
+      source: board.do03
+      description: P103启动命令
+    - name: speed_output
+      source: board.ao01
+      c_type: float
+      description: P101频率给定，4–20mA对应0–50Hz；停止0mA
+    - name: alarm_output
+      source: board.do04
+      description: 泵组综合报警
