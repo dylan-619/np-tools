@@ -16,6 +16,7 @@
   - **系统维护与安全保护**：日志级别/上报周期修改、故障计数清零、系统软复位及 EEPROM 格式化双重二次防误触确认。
 - **ST-Link 固件烧录流水线**：
   - 自动探测 `STM32_Programmer_CLI` 本地环境、支持多探针枚举、SWD 硬件复位烧录、实时分步进度追踪与产线一键流水线（烧录 $\to$ 写 SN）。
+  - 分别提供 **SJZDV3 · STM32F411CEU6（默认，Device ID `0x431`）** 与 **SJZDV4 · STM32F412RET6（Device ID `0x441`）** 两个独立档案。F411 选择 `SJZDV3/build/firmware-release/SJZD_Board_V3.hex`，Flash 范围为 `0x08000000..0x0807FFFF`、SRAM 为 128 KiB；写入前核验实际芯片 ID，执行下载、校验与复位，不执行 Mass Erase。HEX 本身不含可靠的板型标识，必须选择与目标板匹配的固件。
 - **通用极速串口终端**：
   - 基于 Tokio Async Actor 模型的高吞吐串口引擎，支持 33ms 数据包聚合、ANSI 颜色代码解析、标签分级过滤与零拷贝数据流录制。
 - **通用 Modbus RTU / TCP 多点监视**：

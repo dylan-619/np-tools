@@ -1,6 +1,6 @@
 # SJZDV3 与 KZ3 F427 调试兼容性核查
 
-> 核查日期：2026-09-09；范围：`np-tools` 对照同级固件源码。本文是工具接入判断，不是实机、现场或生产验收记录。
+> 初始核查：2026-09-09；F411 烧录增补：2026-10-22；范围：`np-tools` 对照同级固件源码。本文是工具接入判断，不是实机、现场或生产验收记录。
 
 ## 1. 核查对象与结论
 
@@ -8,7 +8,7 @@
 
 | 产品 | 实际目录 | 核查分支 | 结论 |
 | --- | --- | --- | --- |
-| SJZDV3 采集终端 | `../SJZDV3` | `4G` | 工具的设备信息、SN、SLE、4G/MQTT、Modbus、维护和 F412 烧录路径均有对应固件协议；可作为串口调试工具使用。 |
+| SJZDV3 采集终端 | `../SJZDV3` | 当前 F411 分支（原核查分支为 `4G`） | 工具的设备信息、SN、SLE、4G/MQTT、Modbus、维护以及 F411/F412 独立烧录档案均有对应入口；可作为串口调试工具使用。 |
 | KZ3 F427 控制器 | `../KZ3_F427_SLE_V1` | `TCP_NETTY` | 工具的 UART1 配置、HTTP 在线调试、I/O 工程配置和 F427 application 烧录路径均可对接；原工具的旧版 `@CFG,IO,*` 角色入口与本分支不兼容，已改为本分支实际提供的 Edge TCP 管理。 |
 
 两者可以在同一桌面工具中先后调试，但当前公共串口连接是**单端口、单会话**模型：不能在一个工具实例中同时占用两台设备的 UART；切换产品前应断开旧设备、选择新端口并确认对应串口参数。
@@ -24,7 +24,10 @@
 | 4G Cat.1 / MQTT | `WLAN_TYPE`、`4G_CONFIG`、4G 配置/重连命令 | 完整事务读取、保存后 revision 复核、凭证不回显 | 支持 |
 | RS485 / Modbus | `RS485_CONFIG`、`MB_DEBUG` | 点位管理、单点诊断与事务完整性校验 | 支持 |
 | 维护 | 日志、频率、`@RST`、`@EEP` 等维护命令 | 高风险操作确认和状态提示 | 支持（操作仍需现场许可） |
-| 固件烧录 | STM32F412 / ST-Link profile | `sjzdv3_f412`，Flash `0x08000000..0x0807FFFF` | 配置匹配 |
+| 固件烧录（当前 F411 板） | STM32F411CEU6 / ST-Link profile，Device ID `0x431` | `sjzdv3_f411`（默认），Flash `0x08000000..0x0807FFFF`，SRAM 128 KiB | 支持；使用 F411 分支的 `SJZD_Board_V3.hex` |
+| 固件烧录（SJZDV4 / F412 板） | STM32F412RET6 / ST-Link profile，Device ID `0x441` | `sjzdv3_f412`，Flash `0x08000000..0x0807FFFF`，SRAM 256 KiB | 保留支持；显示为 `SJZDV4 · STM32F412RET6`，须选择对应固件 |
+
+两个档案均先校验带地址 HEX 的地址和向量表，再通过 Under Reset 读取实际 MCU ID，型号不匹配时在下载前拒绝；F411/F412 均不接受 CCM SRAM 栈地址。通过后使用 `-d <HEX> -v -rst` 下载、校验与复位，不执行 Mass Erase。F411 的 Device ID 依据 ST [RM0383](https://www.st.com/resource/en/reference_manual/rm0383-stm32f411xce-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)。此处为工具支持范围，不代表已经完成实板烧录验收。
 
 SJZDV3 的 PC 工装口为 USART1 `115200 8N1`。无线模组使用 UART2，4G 模式为 `115200`，SLE 模式为 `230400`；这不是 PC 工装口的波特率。若已开启 `SLE_BRIDGE`，UART1 owner 转给无线模组时，工具会阻止 MCU 配置命令，必须先按 `SLE_BRIDGE:ACK` 确认 owner 再继续。
 
@@ -62,6 +65,8 @@ KZ3 UART1 固定为 `115200 8N1`、无流控。当前分支没有 `@CFG,IO,SHOW`
 5. 补充协议回归测试，确保工具不会重新放行旧 `@CFG,IO,SHOW`，且 Edge TCP 指令与当前固件格式一致。
 
 ## 4. 验证边界与建议执行顺序
+
+2026-10-22 的 F411 增补已通过 68 项协议测试、40 项 Rust 工作区测试及文档测试；独立实 HEX 检查通过，地址范围为 `0x08000000..0x0801CB67`。前端生产构建和本机 arm64 macOS 调试版 `.app` 构建通过，应用内已核对 F411/F412 两个选项，F411 实际 HEX 显示“已通过”。假的 CLI 回归覆盖芯片匹配成功、交叉型号在下载前拒绝、Under Reset/下载/校验/复位参数；没有对实板执行下载，实际烧录与启动仍需连接 ST-Link 验证。
 
 本次结论来自工具源码和固件源码的静态对照，以及工具侧协议回归/构建验证。**没有连接实际 SJZDV3 或 KZ3，没有执行 ST-Link 烧录、SLE/4G/RS485、Ethernet、Edge TCP、HTTP 网关或现场联锁 HIL。** 我不知道（I don't know）实际接线、适配器、设备版本和目标网络是否与这些源码一致；需要用目标设备按以下顺序补证。
 

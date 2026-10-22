@@ -47,14 +47,29 @@ struct FlashProfileDefinition {
     expected_device_id: u32,
     expected_manifest_target: Option<u32>,
     main_sram_end: u32,
+    supports_ccm_sram: bool,
     supports_sjzd_sn_pipeline: bool,
     safety_note: &'static str,
 }
 
 const FLASH_PROFILES: &[FlashProfileDefinition] = &[
     FlashProfileDefinition {
+        id: "sjzdv3_f411",
+        label: "SJZDV3 · STM32F411CEU6",
+        mcu: "STM32F411CEU6 / Device ID 0x431",
+        image_kind: "完整应用 HEX",
+        flash_start: 0x0800_0000,
+        flash_end_exclusive: 0x0808_0000,
+        expected_device_id: 0x431,
+        expected_manifest_target: None,
+        main_sram_end: 0x2002_0000,
+        supports_ccm_sram: false,
+        supports_sjzd_sn_pipeline: true,
+        safety_note: "仅接受 F411 固件从 0x08000000 起始的带地址 HEX；芯片 ID 必须为 0x431，烧录前后均不执行 Mass Erase。",
+    },
+    FlashProfileDefinition {
         id: "sjzdv3_f412",
-        label: "SJZDV3 · STM32F412RET6",
+        label: "SJZDV4 · STM32F412RET6",
         mcu: "STM32F412RET6 / Device ID 0x441",
         image_kind: "完整应用 HEX",
         flash_start: 0x0800_0000,
@@ -62,6 +77,7 @@ const FLASH_PROFILES: &[FlashProfileDefinition] = &[
         expected_device_id: 0x441,
         expected_manifest_target: None,
         main_sram_end: 0x2004_0000,
+        supports_ccm_sram: false,
         supports_sjzd_sn_pipeline: true,
         safety_note: "仅接受从 0x08000000 起始的带地址 HEX；烧录前后均不执行 Mass Erase。",
     },
@@ -75,6 +91,7 @@ const FLASH_PROFILES: &[FlashProfileDefinition] = &[
         expected_device_id: 0x413,
         expected_manifest_target: Some(0x0000_0407),
         main_sram_end: 0x2002_0000,
+        supports_ccm_sram: true,
         supports_sjzd_sn_pipeline: false,
         safety_note: "只允许含 manifest 的 APP HEX；Boot、同步存储区和 Mass Erase 均不在此流程内。",
     },
@@ -88,6 +105,7 @@ const FLASH_PROFILES: &[FlashProfileDefinition] = &[
         expected_device_id: 0x419,
         expected_manifest_target: Some(0x0000_0427),
         main_sram_end: 0x2003_0000,
+        supports_ccm_sram: true,
         supports_sjzd_sn_pipeline: false,
         safety_note: "只允许含 manifest 的 APP HEX；Boot、同步存储区和 Mass Erase 均不在此流程内。",
     },
@@ -101,6 +119,7 @@ const FLASH_PROFILES: &[FlashProfileDefinition] = &[
         expected_device_id: 0x419,
         expected_manifest_target: None,
         main_sram_end: 0x2003_0000,
+        supports_ccm_sram: true,
         supports_sjzd_sn_pipeline: false,
         safety_note: "仅接受 0x08020000..0x0807FFFF 的带地址 APP HEX，不覆盖既有 Bootloader。",
     },
@@ -136,7 +155,12 @@ fn public_profile(profile: &FlashProfileDefinition) -> FlashProductProfile {
 
 /// 返回由后端固定维护的烧录产品档案，调用方不能提交自定义地址范围。
 pub fn list_product_profiles() -> Vec<FlashProductProfile> {
-    FLASH_PROFILES.iter().map(public_profile).collect()
+    FLASH_PROFILES
+        .iter()
+        // XTQ F407/F427 尚未发布，暂不在烧录列表展示；保留底层档案供后续恢复。
+        .filter(|profile| !matches!(profile.id, "xtq_f407_app" | "xtq_f427_app"))
+        .map(public_profile)
+        .collect()
 }
 
 fn hex_nibble(value: u8) -> Result<u8, String> {
@@ -335,7 +359,9 @@ fn validate_vector_bytes(
     let initial_msp = read_u32_le(bytes, 0);
     let reset_handler = read_u32_le(bytes, 4);
     let msp_in_main_sram = initial_msp > 0x2000_0000 && initial_msp <= profile.main_sram_end;
-    let msp_in_ccm_sram = initial_msp > 0x1000_0000 && initial_msp <= 0x1001_0000;
+    // F411/F412 没有 CCM SRAM，不能接受 F407/F427 的 CCM 栈地址。
+    let msp_in_ccm_sram =
+        profile.supports_ccm_sram && initial_msp > 0x1000_0000 && initial_msp <= 0x1001_0000;
     if initial_msp & 0x7 != 0 || !(msp_in_main_sram || msp_in_ccm_sram) {
         return Err(format!(
             "初始 MSP 不属于 {} 的可用 SRAM: 0x{initial_msp:08X}",
@@ -1113,6 +1139,67 @@ mod tests {
         output.into_bytes()
     }
 
+    fn application_hex_fixture(
+        image_start: u32,
+        initial_msp: u32,
+        extra_byte: Option<(u32, u8)>,
+    ) -> Vec<u8> {
+        let mut image = Vec::new();
+        image.extend_from_slice(&initial_msp.to_le_bytes());
+        image.extend_from_slice(&(image_start + 9).to_le_bytes());
+        image.extend_from_slice(&[0x00, 0xBF, 0xFE, 0xE7]);
+
+        let mut output = String::new();
+        output.push_str(&ihex_record(
+            0,
+            0x04,
+            &((image_start >> 16) as u16).to_be_bytes(),
+        ));
+        output.push('\n');
+        append_data_records(&mut output, image_start as u16, &image);
+        if let Some((address, byte)) = extra_byte {
+            output.push_str(&ihex_record(
+                0,
+                0x04,
+                &((address >> 16) as u16).to_be_bytes(),
+            ));
+            output.push('\n');
+            append_data_records(&mut output, address as u16, &[byte]);
+        }
+        output.push_str(&ihex_record(0, 0x01, &[]));
+        output.push('\n');
+        output.into_bytes()
+    }
+
+    #[cfg(unix)]
+    struct TestDirectory(PathBuf);
+
+    #[cfg(unix)]
+    impl TestDirectory {
+        fn new() -> Self {
+            static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            loop {
+                let sequence = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+                let path = std::env::temp_dir().join(format!(
+                    "np-tools-flash-test-{}-{sequence}",
+                    std::process::id()
+                ));
+                match std::fs::create_dir(&path) {
+                    Ok(()) => return Self(path),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => panic!("create test directory: {error}"),
+                }
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
     #[test]
     fn test_clean_cli_text_progress() {
         let text = "[==================================================] 100%";
@@ -1198,6 +1285,200 @@ mod tests {
             .expect_err("profile range must reject one byte beyond Flash");
 
         assert!(error.contains("超出"));
+    }
+
+    #[test]
+    fn validates_sjzd_sram_limits_and_preserves_existing_ccm_profiles() {
+        for (profile_id, initial_msp, accepted) in [
+            ("sjzdv3_f411", 0x2002_0000, true),
+            ("sjzdv3_f411", 0x2004_0000, false),
+            ("sjzdv3_f411", 0x1001_0000, false),
+            ("sjzdv3_f411", 0x2000_0000, false),
+            ("sjzdv3_f411", 0x2002_0008, false),
+            ("sjzdv3_f411", 0x2001_FFFC, false),
+            ("sjzdv3_f412", 0x2004_0000, true),
+            ("sjzdv3_f412", 0x1001_0000, false),
+        ] {
+            let profile = find_flash_profile(profile_id).unwrap();
+            let fixture = application_hex_fixture(0x0800_0000, initial_msp, None);
+            let result = inspect_parsed_image(
+                profile,
+                parse_ihex_bytes(&fixture).unwrap(),
+                "fixture.hex",
+                "fixture".into(),
+            );
+            assert_eq!(
+                result.is_ok(),
+                accepted,
+                "{profile_id}, MSP=0x{initial_msp:08X}: {result:?}"
+            );
+            if let Err(error) = result {
+                assert!(error.contains("可用 SRAM"), "{error}");
+            }
+        }
+
+        for profile_id in ["xtq_f407_app", "xtq_f427_app", "kz3_f427_app"] {
+            let profile = find_flash_profile(profile_id).unwrap();
+            let mut vector = Vec::new();
+            vector.extend_from_slice(&0x1001_0000u32.to_le_bytes());
+            vector.extend_from_slice(&(profile.flash_start + 9).to_le_bytes());
+            validate_vector_bytes(
+                &vector,
+                profile,
+                profile.flash_start,
+                profile.flash_end_exclusive,
+            )
+            .unwrap_or_else(|error| panic!("{profile_id} must retain CCM SRAM: {error}"));
+        }
+    }
+
+    #[test]
+    fn validates_f411_flash_address_boundaries() {
+        let profile = find_flash_profile("sjzdv3_f411").unwrap();
+        for (start, extra_byte, expected_error) in [
+            (0x0800_0000, Some((0x0807_FFFF, 0xFF)), None),
+            (0x0800_0000, Some((0x0808_0000, 0xFF)), Some("超出")),
+            (0x0800_0100, None, Some("必须从 0x08000000 起始")),
+        ] {
+            let fixture = application_hex_fixture(start, 0x2002_0000, extra_byte);
+            let result = inspect_parsed_image(
+                profile,
+                parse_ihex_bytes(&fixture).unwrap(),
+                "fixture.hex",
+                "fixture".into(),
+            );
+            if let Some(expected_error) = expected_error {
+                let error = result.expect_err("invalid F411 address must be rejected");
+                assert!(error.contains(expected_error), "{error}");
+            } else {
+                let inspection = result.expect("last Flash byte must be accepted");
+                assert_eq!(inspection.address_end_inclusive, 0x0807_FFFF);
+                assert!(inspection.validated);
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn execute_flash_matches_sjzd_target_before_download_and_verifies_without_mass_erase() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let connection = "port=SWD mode=UR freq=4000 sn=TESTPROBE123";
+        for (profile_id, device_id, accepted) in [
+            ("sjzdv3_f411", 0x431, true),
+            ("sjzdv3_f411", 0x441, false),
+            ("sjzdv3_f412", 0x431, false),
+            ("sjzdv3_f412", 0x441, true),
+        ] {
+            let directory = TestDirectory::new();
+            let cli_path = directory.0.join("fake-programmer");
+            let hex_path = directory.0.join("firmware with spaces.hex");
+            let log_path = directory.0.join("invocations.txt");
+            let profile = find_flash_profile(profile_id).unwrap();
+            std::fs::write(
+                &hex_path,
+                application_hex_fixture(profile.flash_start, profile.main_sram_end, None),
+            )
+            .unwrap();
+            std::fs::write(
+                &cli_path,
+                format!(
+                    r#"#!/bin/sh
+set -eu
+test_directory=${{0%/*}}
+printf 'BEGIN\n' >> "$test_directory/invocations.txt"
+printf '%s\n' "$@" >> "$test_directory/invocations.txt"
+printf 'END\n' >> "$test_directory/invocations.txt"
+for argument in "$@"; do
+    if [ "$argument" = '-d' ]; then
+        printf 'Memory Programming\nDownload verified successfully\n'
+        exit 0
+    fi
+done
+printf 'Device ID   : 0x{device_id:03X}\nDevice name : test STM32\n'
+"#
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&cli_path, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+            let (tx, mut rx) = mpsc::channel(64);
+            let result = tokio::time::timeout(
+                Duration::from_secs(5),
+                execute_flash(
+                    cli_path.to_str().unwrap(),
+                    profile_id,
+                    hex_path.to_str().unwrap(),
+                    Some(" TESTPROBE123 ".into()),
+                    tx,
+                    Arc::new(AtomicBool::new(false)),
+                ),
+            )
+            .await
+            .expect("fake programmer must finish promptly");
+            let mut events = Vec::new();
+            while let Some(event) = rx.recv().await {
+                events.push(event);
+            }
+
+            let log = std::fs::read_to_string(&log_path).unwrap();
+            let invocations: Vec<Vec<&str>> = log
+                .split("BEGIN\n")
+                .skip(1)
+                .map(|block| block.strip_suffix("END\n").unwrap().lines().collect())
+                .collect();
+            assert_eq!(invocations[0], ["-c", connection]);
+            assert!(
+                invocations
+                    .iter()
+                    .flatten()
+                    .all(|argument| *argument != "-e")
+            );
+            let terminal = events.last().expect("terminal progress event");
+            assert!(terminal.is_terminal);
+            if accepted {
+                result.unwrap_or_else(|error| panic!("{profile_id}: {error}"));
+                assert_eq!(invocations.len(), 2);
+                assert_eq!(
+                    invocations[1],
+                    [
+                        "-c",
+                        connection,
+                        "-d",
+                        hex_path.to_str().unwrap(),
+                        "-v",
+                        "-rst"
+                    ]
+                );
+                assert_eq!(terminal.state, "success");
+                assert_eq!(terminal.percent, 100);
+            } else {
+                let error = result.expect_err("cross-target ID must be rejected");
+                assert!(error.contains("已禁止烧录"), "{error}");
+                assert_eq!(invocations.len(), 1, "mismatch must stop before download");
+                assert_eq!(terminal.state, "error");
+                assert!(events.iter().all(|event| event.state != "success"));
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "set SJZD_F411_HEX to inspect a locally built F411 firmware"]
+    fn validates_real_f411_release_hex_from_environment() {
+        let hex_path =
+            std::env::var("SJZD_F411_HEX").expect("set SJZD_F411_HEX to the F411 HEX path");
+        let inspection = inspect_flash_image("sjzdv3_f411", &hex_path)
+            .expect("real F411 Release HEX must pass inspection");
+        assert!(inspection.validated);
+        assert_eq!(inspection.address_start, 0x0800_0000);
+        assert!(inspection.address_end_inclusive < 0x0808_0000);
+        println!(
+            "F411 HEX: {} bytes, 0x{:08X}..0x{:08X}, SHA-256 {}",
+            inspection.data_byte_count,
+            inspection.address_start,
+            inspection.address_end_inclusive,
+            inspection.file_sha256
+        );
     }
 
     #[test]

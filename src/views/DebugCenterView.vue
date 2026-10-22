@@ -53,7 +53,7 @@ function open(path: string) {
       <article class="product-lane sjzd-lane">
         <div class="lane-heading">
           <div class="lane-icon"><Radio :size="20" /></div>
-          <div><span class="eyebrow">F412 · UART1 CONSOLE</span><h2>SJZDV3 采集终端</h2></div>
+          <div><span class="eyebrow">F411 / F412 · UART1 CONSOLE</span><h2>SJZDV3 采集终端</h2></div>
           <span class="product-tag">采集 / 无线</span>
         </div>
         <p class="lane-summary">覆盖设备信息与 SN、SLE、4G Cat.1/MQTT、RS485/Modbus 点位、实时观测及维护命令。</p>

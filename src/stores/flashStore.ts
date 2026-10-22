@@ -18,7 +18,7 @@ import type {
 } from '../types/flash'
 
 const CLI_PATH_STORAGE_KEY = 'np_tools_flash_cli_path'
-const DEFAULT_PROFILE_ID = 'sjzdv3_f412'
+const DEFAULT_PROFILE_ID = 'sjzdv3_f411'
 
 function loadPersistedCliPath(): string {
   if (typeof localStorage === 'undefined') return ''
