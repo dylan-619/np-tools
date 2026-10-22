@@ -50,15 +50,33 @@ if ! command -v opencode >/dev/null || [ "$(opencode --version)" != "1.19.2" ]; 
     npm install -g opencode-ai@1.19.2
 fi
 
-# 首次输入 Key，后续从当前目录的 .env 读取。
-if [ -z "${DEEPSEEK_API_KEY:-}" ] && [ -f .env ]; then source .env; fi
-if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
-    read -r -s -p "请输入 DeepSeek API Key：" DEEPSEEK_API_KEY
-    echo
-    [ -n "$DEEPSEEK_API_KEY" ] || fail "API Key 不能为空。"
-    (umask 077; printf 'export DEEPSEEK_API_KEY=%q\n' "$DEEPSEEK_API_KEY" > .env)
+# 已在配置文件中填 Key 时直接使用；环境变量模板才读取 .env 或询问 Key。
+KEY_SOURCE=$(python3 - <<'PY'
+import json
+import sys
+
+try:
+    with open('opencode.json', encoding='utf-8') as stream:
+        key = json.load(stream)['provider']['deepseek']['options']['apiKey']
+except (OSError, UnicodeError, ValueError, KeyError, TypeError):
+    sys.exit('无法读取 DeepSeek Key 配置，请检查 opencode.json 的 JSON 格式和 provider.deepseek.options.apiKey。')
+if not isinstance(key, str) or not key.strip():
+    sys.exit('请在 opencode.json 中填写 DeepSeek Key，或将 apiKey 设置为 {env:DEEPSEEK_API_KEY}。')
+print('env' if key == '{env:DEEPSEEK_API_KEY}' else 'config')
+PY
+) || fail "DeepSeek 配置检查失败。"
+if [ "$KEY_SOURCE" = config ]; then
+    echo "使用 opencode.json 中已配置的 DeepSeek Key，无需再次输入。"
+else
+    if [ -z "${DEEPSEEK_API_KEY:-}" ] && [ -f .env ]; then source .env; fi
+    if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+        read -r -s -p "请输入 DeepSeek API Key：" DEEPSEEK_API_KEY
+        echo
+        [ -n "$DEEPSEEK_API_KEY" ] || fail "API Key 不能为空。"
+        (umask 077; printf 'export DEEPSEEK_API_KEY=%q\n' "$DEEPSEEK_API_KEY" > .env)
+    fi
+    export DEEPSEEK_API_KEY
 fi
-export DEEPSEEK_API_KEY
 export OPENCODE_CONFIG="$PACKAGE_DIR/opencode.json"
 
 # 直接运行应用可继承终端的 PATH 和 Python 环境。
