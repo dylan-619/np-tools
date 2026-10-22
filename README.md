@@ -1,4 +1,4 @@
-# NP-Tools 工业硬件产品调试与配置平台 (v1.0.8)
+# NP-Tools 工业硬件产品调试与配置平台 (v1.0.9)
 
 > 基于 **Tauri v2 + Rust + Vue 3 (Vite + TypeScript) + Pinia + ECharts** 构建的高性能、跨平台（Windows / macOS）现代化工业硬件调试与产线生产配置工具。
 
@@ -6,6 +6,7 @@
 
 ## 🌟 核心功能与硬件支持
 
+- **AI 辅助工作台**：以现场点表为依据，协助沟通工艺需求、确认参数、生成控制工程，并进行本机仿真与 HMI 联调。内置顺序启停、清水供水泵站、三泵集水井三个案例；实板部署需另行准备匹配固件。Mac 配套脚本、配置模板、安装说明和单页工具介绍统一位于 [`Np 工具部署及使用/`](Np%20工具部署及使用/)。
 - **SJZDV3 智能现场数据采集终端**：
   - **RS485 总线波特率**：单一全局参数，默认 9600；Modbus 页面支持读取、保存、恢复 9600 和待重启显示。`RS485:LIST` 实际读取 EEPROM，`RS485:BAUD:<速率>` / `RS485:BAUD:DEFAULT` 保存后再读回复核；UART1 仍为 115200，用户重启后再次查询确认。
   - **设备概览与出厂 SN 固化**：实时查询设备运行时间、开机次数、采样频率等，支持产线 12 位 SN 序列号手动敲入、复制粘贴、自动校验与批量流水号自动递增（`SN:4301xxxxxxxx` 严格定长 15 字节，重启即生效）。
@@ -111,7 +112,7 @@ pnpm tauri build
 
 #### 打包输出产物路径：
 编译完成后，可在以下路径获取独立的 Windows 安装程序：
-- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.0.8_x64-setup.exe`
+- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.0.9_x64-setup.exe`
 - **单文件便携可执行程序**：`src-tauri\target\release\np-tools.exe`
 
 ---

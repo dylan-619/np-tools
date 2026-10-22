@@ -256,7 +256,7 @@ function saveSettings() {
       <div class="card-body about-box">
         <div class="about-item">
           <span class="about-label">软件版本：</span>
-          <span class="about-val">v1.0.8 (Tauri v2 + Rust Actor Architecture)</span>
+          <span class="about-val">v1.0.9 (Tauri v2 + Rust Actor Architecture)</span>
         </div>
         <div class="about-item">
           <span class="about-label">支持硬件产品线：</span>

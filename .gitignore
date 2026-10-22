@@ -41,3 +41,12 @@ Thumbs.db
 # Engineering Python build helpers
 __pycache__/
 *.pyc
+
+# Local macOS credentials and dependency environments
+/Np 工具部署及使用/opencode.json
+/Np 工具部署及使用/.env
+/Np 工具部署及使用/.venv/
+/works/macos-delivery/
+
+# Promotional production files stay local
+/video-create/

@@ -34,6 +34,8 @@ jobs:
             const tag = context.ref.replace('refs/tags/', '').replace('refs/heads/', '');
             const version = require('./package.json').version;
             const tagName = context.ref.startsWith('refs/tags/') ? tag : `v${version}`;
+            const fs = require('node:fs');
+            const notesPath = `.github/release-notes/${tagName}.md`;
 
             try {
               const existing = await github.rest.repos.getReleaseByTag({
@@ -48,8 +50,9 @@ jobs:
                 owner,
                 repo,
                 tag_name: tagName,
+                target_commitish: context.sha,
                 name: `NP-Tools ${tagName}`,
-                body: `## NP-Tools ${tagName} 发布包\n\n基于 Tauri v2 + Rust 构建的跨平台工业硬件调试与产线配置平台。\n\n### 包含安装包：\n- **Windows**: \`.exe\` (NSIS 安装包) / \`.msi\` (Windows Installer)\n- **macOS (Apple Silicon M系列)**: \`aarch64\` \`.dmg\`\n- **macOS (Intel 系列)**: \`x86_64\` \`.dmg\``,
+                body: fs.existsSync(notesPath) ? fs.readFileSync(notesPath, 'utf8') : `## NP-Tools ${tagName} 发布包\n\n基于 Tauri v2 + Rust 构建的跨平台工业硬件调试与产线配置平台。\n\n### 包含安装包：\n- **Windows**: \`.exe\` (NSIS 安装包) / \`.msi\` (Windows Installer)\n- **macOS (Apple Silicon M系列)**: \`aarch64\` \`.dmg\`\n- **macOS (Intel 系列)**: \`x86_64\` \`.dmg\``,
                 draft: false,
                 prerelease: false,
               });
@@ -114,3 +117,36 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Verify macOS app version and engineering resources
+        if: runner.os == 'macOS'
+        env:
+          CARGO_TARGET: ${{ matrix.target }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import plistlib
+          from pathlib import Path
+
+          version = json.loads(Path('package.json').read_text())['version']
+          app = Path('target') / os.environ['CARGO_TARGET'] / 'release/bundle/macos/NP-Tools.app'
+          with (app / 'Contents/Info.plist').open('rb') as stream:
+              info = plistlib.load(stream)
+          assert info['CFBundleShortVersionString'] == version, 'App version mismatch'
+          assert info['CFBundleIdentifier'] == 'com.nptools.desktop', 'App identity mismatch'
+          assert (app / 'Contents/MacOS' / info['CFBundleExecutable']).is_file(), 'Missing app executable'
+          source = Path('resources/engineering')
+          bundled = app / 'Contents/Resources/resources/engineering'
+          checked = 0
+          for item in source.rglob('*'):
+              if not item.is_file() or '__pycache__' in item.parts or item.suffix == '.pyc':
+                  continue
+              packaged = bundled / item.relative_to(source)
+              assert packaged.is_file(), f'Missing bundled resource: {item}'
+              assert hashlib.sha256(packaged.read_bytes()).digest() == hashlib.sha256(item.read_bytes()).digest(), f'Resource mismatch: {item}'
+              checked += 1
+          assert checked > 0, 'No engineering resources checked'
+          print(f'NP-Tools {version}: verified {checked} bundled engineering resources')
+          PY
