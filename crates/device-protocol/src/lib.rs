@@ -2,7 +2,6 @@ use app_types::{AiSampleDto, DeviceInfoResult, ModbusPointConfig, SleFieldCompar
 use regex::Regex;
 use std::sync::LazyLock;
 
-pub const DEVICE_SN_PREFIX: &str = "4301";
 /// 与 SJZDV3 固件 `MODBUS_DEV_MAX_NUM` 保持一致，桌面端不得再截断为 16 点。
 pub const MAX_MODBUS_POINTS: usize = 100;
 /// SJZDV3 UART1 接收缓冲区大小；批量点位命令必须在发送前受此上限约束。
@@ -39,12 +38,6 @@ pub fn encode_sn_command(sn: &str) -> Result<EncodedCommand, String> {
     let clean = sn.trim();
     if clean.len() != 12 || !clean.chars().all(|c| c.is_ascii_digit()) {
         return Err(format!("SN 必须为恰好 12 位纯数字（当前: '{}'）", sn));
-    }
-    if !clean.starts_with(DEVICE_SN_PREFIX) {
-        return Err(format!(
-            "SN 必须以 '{}' 开头（当前: '{}'）",
-            DEVICE_SN_PREFIX, sn
-        ));
     }
     // userMain.c: 要求 UART1_RxCnt == 15 ("SN:" + 12位数字)，严格定长且不加 \r\n
     let cmd = format!("SN:{}", clean);
@@ -580,6 +573,47 @@ pub fn parse_sle_comparisons(text: &str) -> Vec<SleFieldComparison> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn encodes_twelve_digit_sn_with_any_prefix_and_leading_zeros() {
+        for sn in [
+            "430125010001",
+            "123456789012",
+            "000000000001",
+            "999999999999",
+        ] {
+            let command = encode_sn_command(sn).expect("任意前缀的 12 位数字 SN 必须可编码");
+
+            assert_eq!(command.text, format!("SN:{sn}"));
+            assert_eq!(command.payload, command.text.as_bytes());
+            assert_eq!(command.payload.len(), 15);
+            assert!(command.exact_bytes);
+        }
+    }
+
+    #[test]
+    fn trims_surrounding_whitespace_from_sn() {
+        let command = encode_sn_command(" \t123456789012\r\n ").expect("保留 SN 首尾空白清理");
+
+        assert_eq!(command.payload, b"SN:123456789012");
+    }
+
+    #[test]
+    fn rejects_sn_with_invalid_length_or_non_ascii_digits() {
+        for sn in [
+            "",
+            "12345678901",
+            "1234567890123",
+            "12345678901A",
+            "12345 789012",
+            "12345\n789012",
+            "+23456789012",
+            "１２３４５６７８９０１２",
+            "١٢٣٤٥٦٧٨٩٠١٢",
+        ] {
+            assert!(encode_sn_command(sn).is_err(), "必须拒绝非法 SN: {sn:?}");
+        }
+    }
 
     fn max_length_modbus_point() -> ModbusPointConfig {
         ModbusPointConfig {

@@ -373,3 +373,122 @@ test('SJZ DEVINFO 与 VERSION 回读显示实际固件版本，旧响应清空�
     delete globalThis.window
   }
 })
+
+async function createDeviceInfoStore(port) {
+  const { createPinia, setActivePinia } = await import('pinia')
+  const { nextTick } = await import('vue')
+  setActivePinia(createPinia())
+  const { useSerialStore } = await server.ssrLoadModule('/src/stores/serialStore.ts')
+  const serial = useSerialStore()
+  const listeners = new Map()
+  serial.registerLineListener = (id, callback) => listeners.set(id, callback)
+  serial.unregisterLineListener = (id) => listeners.delete(id)
+  const { useSjzdStore } = await server.ssrLoadModule('/src/stores/sjzdStore.ts')
+  const store = useSjzdStore()
+  serial.connectedPort = port
+  await nextTick()
+  const emit = (line) => { for (const listener of [...listeners.values()]) listener(line) }
+  return { store, listeners, emit }
+}
+
+test('SJZ DEVINFO 等待实际回读完成后才发送后续 WLAN_TYPE 查询', async () => {
+  globalThis.window = { setTimeout, clearTimeout }
+  try {
+    const { store, listeners, emit } = await createDeviceInfoStore('mock-device-info-order')
+    const sent = []
+    let deviceInfoWritten
+    const writeCompleted = new Promise((resolve) => { deviceInfoWritten = resolve })
+    window.__TAURI_INTERNALS__ = {
+      invoke: async (name, args) => {
+        assert.equal(name, 'sjzd_send_raw_command')
+        assert.equal(args.path, 'mock-device-info-order')
+        sent.push(args.text)
+        if (args.text === 'SLE_BRIDGE:LIST') {
+          queueMicrotask(() => emit('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=MCU,wireless=SLE,status=OK'))
+        } else if (args.text === 'DEVINFO') {
+          deviceInfoWritten()
+        } else {
+          assert.equal(args.text, 'WLAN_TYPE:LIST')
+          queueMicrotask(() => emit('WLAN_TYPE: mode=4G,mode_code=3,uart2_baud=115200'))
+        }
+        return args.text
+      },
+    }
+
+    let infoResolved = false
+    const infoQuery = store.queryDeviceInfo().then(() => { infoResolved = true })
+    const refresh = infoQuery.then(() => store.queryWlanType())
+    await writeCompleted
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(store.isBusy, true)
+    assert.equal(infoResolved, false)
+    assert.deepEqual(sent, ['SLE_BRIDGE:LIST', 'DEVINFO'])
+    assert.equal(listeners.size, 2, '回读前必须保留 DEVINFO 事务监听器')
+
+    emit('[1.000] UART1 RX: DEVINFO')
+    emit('[1.001] AppVersion:SJZD_V2.0')
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(infoResolved, false, '发送回显和版本日志不能替代 DevInfo 回读')
+    assert.equal(store.isBusy, true)
+    assert.deepEqual(sent, ['SLE_BRIDGE:LIST', 'DEVINFO'])
+
+    emit('[1.020] DevInfo: SN=123456789012, Type=4301, Addr=1, PwrOnCnt=7, TotRunTim=123s, RptFreq=2s')
+    await refresh
+    assert.equal(infoResolved, true)
+    assert.deepEqual(sent, ['SLE_BRIDGE:LIST', 'DEVINFO', 'WLAN_TYPE:LIST'])
+    assert.equal(store.deviceInfo.sn, '123456789012')
+    assert.equal(store.wlanTypeInfo.mode, '4G')
+    assert.equal(store.isBusy, false)
+    assert.equal(store.lastOpMessage.success, true)
+    assert.equal(listeners.size, 1, '事务结束后只保留全局解析器')
+  } finally {
+    delete globalThis.window
+  }
+})
+
+test('SJZ DEVINFO 不支持或回读超时均报告失败并释放事务监听器', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  globalThis.window = { setTimeout, clearTimeout }
+  try {
+    const { store, listeners, emit } = await createDeviceInfoStore('mock-device-info-failure')
+    let mode = 'unsupported'
+    window.__TAURI_INTERNALS__ = {
+      invoke: async (name, args) => {
+        assert.equal(name, 'sjzd_send_raw_command')
+        assert.equal(args.path, 'mock-device-info-failure')
+        if (args.text === 'SLE_BRIDGE:LIST') {
+          queueMicrotask(() => emit('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=MCU,wireless=SLE,status=OK'))
+        } else {
+          assert.equal(args.text, 'DEVINFO')
+          if (mode === 'unsupported') queueMicrotask(() => emit('[ERROR] Command not support.'))
+        }
+        return args.text
+      },
+    }
+
+    await store.queryDeviceInfo()
+    assert.equal(store.lastOpMessage.success, false)
+    assert.match(store.lastOpMessage.text, /Command not support/)
+    assert.equal(store.isBusy, false)
+    assert.equal(listeners.size, 1)
+
+    mode = 'timeout'
+    let resolved = false
+    const query = store.queryDeviceInfo().then(() => { resolved = true })
+    await new Promise((resolve) => setImmediate(resolve))
+    context.mock.timers.tick(2499)
+    await Promise.resolve()
+    assert.equal(resolved, false)
+    assert.equal(store.isBusy, true)
+    assert.equal(listeners.size, 2)
+
+    context.mock.timers.tick(1)
+    await query
+    assert.equal(store.lastOpMessage.success, false)
+    assert.match(store.lastOpMessage.text, /等待设备响应超时（2500ms）/)
+    assert.equal(store.isBusy, false)
+    assert.equal(listeners.size, 1)
+  } finally {
+    delete globalThis.window
+  }
+})

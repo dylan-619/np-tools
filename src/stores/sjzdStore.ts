@@ -1245,8 +1245,15 @@ export const useSjzdStore = defineStore('sjzd', () => {
     isBusy.value = true
     try {
       await ensureMcuConsoleAvailable('DEVINFO')
-      await sjzdSendRawCommand(serialStore.connectedPort, 'DEVINFO', false)
-      showMessage('已发送设备信息查询指令 (DEVINFO)')
+      const port = serialStore.connectedPort as string
+      // 必须等实际回读再返回，避免后续查询与 DEVINFO 在固件端合为同一接收帧。
+      await waitForSerialLine(
+        '查询设备信息',
+        () => sjzdSendRawCommand(port, 'DEVINFO', false),
+        (line) => /\bDevInfo:\s*SN=\s*[0-9A-Za-z]+/i.test(line),
+        (line) => (line.includes('Command not support') ? line : undefined)
+      )
+      showMessage('设备信息已完成回读 (DEVINFO)')
     } catch (e: any) {
       showMessage(`查询失败: ${e}`, false)
     } finally {

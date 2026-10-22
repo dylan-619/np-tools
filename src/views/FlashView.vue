@@ -21,7 +21,7 @@ const serial = useSerialStore()
 const sjzd = useSjzdStore()
 
 const autoBurnSnAfterFlash = ref(false)
-const productionSn = ref('430125010001')
+const productionSn = ref('')
 const logTerminalRef = ref<HTMLElement | null>(null)
 
 const probeOptions = computed(() => {
@@ -90,7 +90,7 @@ async function handleStartFlash() {
     canUseSjzdSnPipeline.value &&
     flash.progress.state === 'success' &&
     serial.selectedPort &&
-    productionSn.value.length === 12
+    /^\d{12}$/.test(productionSn.value.trim())
   ) {
     flash.addLog(`[产线流水线] 正在尝试通过串口 ${serial.selectedPort} 自动写入 SN...`, 'cmd')
     try {
@@ -316,8 +316,9 @@ watch(canUseSjzdSnPipeline, (supported) => {
               <input
                 v-model="productionSn"
                 type="text"
+                inputmode="numeric"
                 maxlength="12"
-                placeholder="4301xxxxxxxx"
+                placeholder="请输入 12 位纯数字序列号，开头不限"
                 class="form-input mono-text"
                 :disabled="flash.isFlashing"
               />

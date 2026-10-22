@@ -23,7 +23,7 @@ import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
 
-const inputSn = ref('430125010001')
+const inputSn = ref('')
 const autoIncrement = ref(true)
 const showConfirmModal = ref(false)
 const isVerifying = ref(false)
@@ -69,11 +69,10 @@ const isSnValid = computed(() => {
 
 const snValidationMessage = computed(() => {
   const clean = inputSn.value.trim()
-  if (!clean) return '请输入 12 位纯数字序列号 (如 430126070777)'
+  if (!clean) return '请输入 12 位纯数字序列号，开头不限'
   if (!/^\d+$/.test(clean)) return 'SN 序列号必须全部为纯数字'
   if (clean.length < 12) return `当前输入 ${clean.length}/12 位，缺少 ${12 - clean.length} 位数字`
   if (clean.length > 12) return `当前输入 ${clean.length}/12 位，超出 ${clean.length - 12} 位`
-  if (!clean.startsWith('4301')) return '提示: SJZDV3 标准产品 SN 建议以 4301 开头，当前格式已满足 12 位可正常烧录'
   return 'SN 格式正确 (12 位纯数字)，点击右侧按钮即可写入设备'
 })
 
@@ -365,7 +364,7 @@ onMounted(() => {
         <div class="burn-intro">
           <p>
             <strong>实施人员操作指引：</strong>
-            SJZDV3 固件要求 SN 指令为严格定长 15 字节（<code>SN:4301xxxxxxxx</code>），严禁附加 <code>\r\n</code> 尾随符。
+            SN 必须为 12 位纯数字，开头不限。SJZDV3 固件要求 SN 指令为严格定长 15 字节（<code>SN:</code> + 12 位数字），严禁附加 <code>\r\n</code> 尾随符。
             写入成功后硬件将立即自动复位重启并生效。支持扫码枪扫入及批量流水号自动递增。
           </p>
         </div>
@@ -376,8 +375,9 @@ onMounted(() => {
             <input
               v-model="inputSn"
               type="text"
+              inputmode="numeric"
               maxlength="12"
-              placeholder="请输入 12 位纯数字序列号 (如 4301xxxxxxxx)"
+              placeholder="请输入 12 位纯数字序列号，开头不限"
               class="sn-input mono-text"
               :class="{ invalid: !isSnValid && inputSn.length > 0, valid: isSnValid }"
               @input="handleSnInput"
@@ -455,7 +455,7 @@ onMounted(() => {
         <div class="hex-viewer mono-text">
           <div class="hex-item">
             <span class="label">指令字符：</span>
-            <span class="val">SN:{{ inputSn || '4301xxxxxxxx' }}</span>
+            <span class="val">SN:{{ inputSn || 'xxxxxxxxxxxx' }}</span>
           </div>
           <div class="hex-item">
             <span class="label">十六进制：</span>
@@ -465,7 +465,7 @@ onMounted(() => {
                   ? Array.from(inputSn)
                       .map((c) => c.charCodeAt(0).toString(16).toUpperCase())
                       .join(' ')
-                  : '34 33 30 31 ...'
+                  : '（输入 SN 后显示）'
               }}
             </span>
           </div>
