@@ -205,8 +205,38 @@ onMounted(() => {
 
           <div class="card-body form-body">
             <p class="field-hint">
-              设备地址由 SN 后四位自动生成。升级到统一地址固件后，上报 Addr 与下行设备地址一致，无需设置 APID；旧固件请先升级。
+              默认地址取 SN 后三位（000 使用 1），同一路由下地址必须唯一。可手动指定地址解决后缀冲突，上报与下行共用有效地址，无需设置 APID。
             </p>
+            <div class="form-group">
+              <div class="label-with-cur">
+                <label>星闪设备地址 (ADDR)</label>
+                <span v-if="sjzd.sleCurrentStatus?.addressSaved !== undefined" class="cur-badge">
+                  {{ sjzd.sleCurrentStatus.addressSaved ? '已保存' : '默认' }} · 有效地址 {{ sjzd.sleCurrentStatus.devAddr }}
+                </span>
+              </div>
+              <div class="input-with-action">
+                <input
+                  v-model.number="sjzd.sleForm.address"
+                  type="number"
+                  min="1"
+                  max="65534"
+                  class="form-input"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.sleCurrentStatus?.addressSaved === undefined"
+                />
+                <button
+                  class="btn btn-sm btn-secondary"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.sleCurrentStatus?.addressSaved === undefined"
+                  @click="sjzd.setSleAddress(sjzd.sleForm.address)"
+                >写入地址</button>
+              </div>
+              <span class="field-hint">
+                地址范围 1～65534。未设置时默认取 SN 后三位；保存后优先使用 EEPROM 中的地址。
+                保存后模组自动重配，请查询芯片地址确认生效。
+              </span>
+              <span v-if="sjzd.sleCurrentStatus?.addressSaved === undefined" class="field-hint">
+                请先查询完整配置；旧固件未提供地址配置能力时需升级。
+              </span>
+            </div>
             <!-- Net Name -->
             <div class="form-group">
               <div class="label-with-cur">

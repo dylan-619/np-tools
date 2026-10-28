@@ -8,6 +8,7 @@ import {
   sjzdSendSlePwr,
   sjzdSendSleMaxPwr,
   sjzdSendSleNetName,
+  sjzdSendSleAddress,
   sjzdSendWlanBridge,
   sjzdSendRawCommand,
   sjzdQueryWlanType,
@@ -44,6 +45,7 @@ import type {
 } from '../types/sjzd'
 import { FOUR_G_EMPTY_CONFIG, type Rs485BaudResponse } from '../types/sjzd'
 import { buildRs485BaudCommand, parseRs485BaudResponse } from '../utils/sjzdRs485Baud'
+import { buildSjzdSleAddressCommand } from '../utils/sjzdSleAddress'
 import {
   buildModbusDebugReport,
   parseModbusDebugProtocolLine,
@@ -69,6 +71,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
   const sleCurrentStatus = ref<SleCurrentStatus>({})
   const sleForm = ref({
     netName: 'star_RS01',
+    address: 1,
     txPower: 5, // +10 dBm
     maxTxPower: 8, // +20 dBm
   })
@@ -435,6 +438,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
   function matchesSleReadback(expected: Partial<SleEepromReadback>, actual: SleEepromReadback): boolean {
     return (
       (expected.netName === undefined || expected.netName === actual.netName) &&
+      (expected.devAddr === undefined || expected.devAddr === actual.devAddr) &&
       (expected.txPower === undefined || expected.txPower === actual.txPower) &&
       (expected.maxTxPower === undefined || expected.maxTxPower === actual.maxTxPower) &&
       (expected.bridge === undefined || expected.bridge === actual.bridge)
@@ -446,6 +450,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
     const previousSave = sleCurrentStatus.value.lastSave
     sleForm.value = {
       netName: snapshot.eeprom.netName,
+      address: Number(snapshot.eeprom.devAddr),
       txPower: snapshot.eeprom.txPower,
       maxTxPower: snapshot.eeprom.maxTxPower,
     }
@@ -453,6 +458,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
       netName: snapshot.eeprom.netName,
       apId: snapshot.eeprom.apId,
       devAddr: snapshot.eeprom.devAddr,
+      addressSaved: snapshot.eeprom.addressSaved,
       txPower: snapshot.eeprom.txPower,
       maxTxPower: snapshot.eeprom.maxTxPower,
       bridge: snapshot.eeprom.bridge,
@@ -1317,6 +1323,27 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
   }
 
+  async function setSleAddress(address: number) {
+    if (!serialStore.connectedPort) return
+    if (sleCurrentStatus.value.addressSaved === undefined) {
+      showMessage('当前固件未提供地址配置回读，请先升级固件并查询完整配置', false)
+      return
+    }
+    isBusy.value = true
+    try {
+      await sendSleAndVerify(
+        '设置星闪设备地址',
+        () => sjzdSendSleAddress(serialStore.connectedPort as string, address),
+        { devAddr: String(address) }
+      )
+      showMessage('设备地址已保存并完成回读；星闪模组正在重新配置，请查询芯片实际地址确认生效。')
+    } catch (e: any) {
+      showMessage(`设置星闪地址失败: ${e}`, false)
+    } finally {
+      isBusy.value = false
+    }
+  }
+
   async function setSlePwr(level: number) {
     if (!serialStore.connectedPort) return
     isBusy.value = true
@@ -1363,18 +1390,25 @@ export const useSjzdStore = defineStore('sjzd', () => {
       const port = serialStore.connectedPort as string
       const target = {
         netName: sleForm.value.netName.trim(),
+        devAddr: sleCurrentStatus.value.addressSaved === undefined ? undefined : String(sleForm.value.address),
         txPower: sleForm.value.txPower,
         maxTxPower: sleForm.value.maxTxPower,
         bridge: wlanBridgeEnabled.value ? 1 : 0,
       }
+      if (target.devAddr !== undefined) buildSjzdSleAddressCommand(Number(target.devAddr))
       showMessage('正在逐项等待 SLE_CONFIG:SAVED 回执...')
       await waitForConfigSave('SLE', '设置星闪网络名称', () => sjzdSendSleNetName(port, target.netName))
       await waitForConfigSave('SLE', '设置星闪发射功率', () => sjzdSendSlePwr(port, target.txPower))
-      const latestReceipt = await waitForConfigSave(
+      let latestReceipt = await waitForConfigSave(
         'SLE',
         '设置星闪最大发射功率',
         () => sjzdSendSleMaxPwr(port, target.maxTxPower)
       )
+      if (target.devAddr !== undefined) {
+        latestReceipt = await waitForConfigSave(
+          'SLE', '设置星闪设备地址', () => sjzdSendSleAddress(port, Number(target.devAddr))
+        )
+      }
       const actual = await readSleConfigOnce()
       if (!matchesSleReadback(target, actual.eeprom)) {
         throw new Error('星闪全套参数写入后完整 SLE_CONFIG 快照与目标不一致')
@@ -2225,6 +2259,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
     burnSn,
     querySleConfig,
     setSleNetName,
+    setSleAddress,
     setSlePwr,
     setSleMaxPwr,
     applyAllSleConfig,

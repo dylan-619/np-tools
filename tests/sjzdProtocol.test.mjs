@@ -16,14 +16,15 @@ after(() => server.close())
 const configProtocol = await server.ssrLoadModule('/src/utils/sjzdConsoleProtocol.ts')
 const debugProtocol = await server.ssrLoadModule('/src/utils/sjzdModbusDebug.ts')
 const baudProtocol = await server.ssrLoadModule('/src/utils/sjzdRs485Baud.ts')
+const addressProtocol = await server.ssrLoadModule('/src/utils/sjzdSleAddress.ts')
 
-test('SJZ 星闪批量配置只写网络和功率，保留历史 APID 回读与完整保存校验', async () => {
+test('SJZ 星闪配置保存有效设备地址，旧固件不写地址，APID 仅回读', async () => {
   const previousWindow = globalThis.window
   globalThis.window = { setTimeout, clearTimeout }
   try {
     const { useSerialStore } = await server.ssrLoadModule('/src/stores/serialStore.ts')
     const { useSjzdStore } = await server.ssrLoadModule('/src/stores/sjzdStore.ts')
-    for (const apId of [0, 5, 255]) {
+    for (const apId of [0, 5, 255]) for (const supported of [false, true]) {
       delete window.__TAURI_INTERNALS__
       setActivePinia(createPinia())
       const serial = useSerialStore()
@@ -34,7 +35,8 @@ test('SJZ 星闪批量配置只写网络和功率，保留历史 APID 回读与�
       serial.connectedPort = 'mock-sjzd'
       await nextTick()
       const calls = []
-      const state = { netName: 'star_RS', txPower: 5, maxTxPower: 8, revision: 100 }
+      const commands = []
+      const state = { netName: 'star_RS', txPower: 5, maxTxPower: 8, revision: 100, address: 234, saved: false }
       const emit = (line) => {
         for (const listener of [...listeners.values()]) listener(line)
       }
@@ -43,13 +45,23 @@ test('SJZ 星闪批量配置只写网络和功率，保留历史 APID 回读与�
           assert.equal(args.path, 'mock-sjzd')
           calls.push(name)
           if (name === 'sjzd_send_raw_command') {
+            commands.push(args.text)
             if (args.text === 'SLE_BRIDGE:LIST') {
               emit('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=MCU,wireless=SLE,status=OK')
+            } else if (args.text.startsWith('SLE_ADDR:')) {
+              assert.ok(supported)
+              state.address = Number(args.text.slice(9))
+              state.saved = true
+              state.revision++
+              const hash = configProtocol.formatSjzdCrc32(state.revision)
+              emit(`SLE_CONFIG:SAVED,revision=${state.revision},hash=${hash},status=OK,restart=MODULE`)
             } else {
               assert.equal(args.text, 'SLE:LIST')
+              const effective = supported ? state.address : 1024
+              const metadata = supported ? `,addr_saved=${state.saved ? 1 : 0}` : ''
               const payloads = [
-                `SLE_CONFIG:EEPROM,id=2,net_name="${state.netName}",apid=${apId},dev_addr=1024,tx_pwr=${state.txPower},max_tx_pwr=${state.maxTxPower},bridge=0`,
-                `SLE_CONFIG:CHIP,id=2,net_name="${state.netName}",name_len=${state.netName.length},mode=0,mac=4E:50:AA:04:00:55,addr=1024,tx_pwr=${state.txPower}`,
+                `SLE_CONFIG:EEPROM,id=2,net_name="${state.netName}",apid=${apId},dev_addr=${effective},tx_pwr=${state.txPower},max_tx_pwr=${state.maxTxPower},bridge=0${metadata}`,
+                `SLE_CONFIG:CHIP,id=2,net_name="${state.netName}",name_len=${state.netName.length},mode=0,mac=4E:50:AA:04:00:55,addr=${effective},tx_pwr=${state.txPower}`,
               ]
               const crc = configProtocol.formatSjzdCrc32(configProtocol.crc32IsoHdlc(payloads.join('')))
               emit(`SLE_CONFIG:BEGIN,id=2,version=1,revision=${state.revision}`)
@@ -75,27 +87,74 @@ test('SJZ 星闪批量配置只写网络和功率，保留历史 APID 回读与�
       await store.querySleConfig()
       assert.equal(store.lastOpMessage.success, true, store.lastOpMessage.text)
       assert.equal(store.sleCurrentStatus.apId, apId)
-      assert.equal(store.sleCurrentStatus.devAddr, '1024')
+      assert.equal(store.sleCurrentStatus.devAddr, supported ? '234' : '1024')
+      assert.equal(store.sleCurrentStatus.addressSaved, supported ? false : undefined)
       assert.equal('apId' in store.sleForm, false)
       assert.equal('setSleApid' in store, false)
       store.sleForm.netName = 'JY_2'
       store.sleForm.txPower = 4
       store.sleForm.maxTxPower = 7
+      store.sleForm.address = 1024
+      if (!supported) {
+        const count = calls.length
+        await store.setSleAddress(1024)
+        assert.equal(calls.length, count, '旧固件不得发送地址写入')
+        assert.equal(store.lastOpMessage.success, false)
+      }
       calls.length = 0
+      commands.length = 0
       await store.applyAllSleConfig()
       assert.deepEqual(calls, [
-        'sjzd_send_sle_netname', 'sjzd_send_sle_pwr', 'sjzd_send_sle_maxpwr', 'sjzd_send_raw_command',
+        'sjzd_send_sle_netname', 'sjzd_send_sle_pwr', 'sjzd_send_sle_maxpwr',
+        ...(supported ? ['sjzd_send_raw_command'] : []), 'sjzd_send_raw_command',
       ])
+      assert.deepEqual(commands, supported ? ['SLE_ADDR:1024', 'SLE:LIST'] : ['SLE:LIST'])
       assert.equal(store.lastOpMessage.success, true, store.lastOpMessage.text)
       assert.equal(store.sleCurrentStatus.apId, apId)
       assert.equal(store.sleCurrentStatus.lastSave.revision, state.revision)
       assert.equal(store.sleCurrentStatus.snapshot.revision, state.revision)
-      assert.deepEqual(store.sleForm, { netName: 'JY_2', txPower: 4, maxTxPower: 7 })
+      assert.deepEqual(store.sleForm, { netName: 'JY_2', address: 1024, txPower: 4, maxTxPower: 7 })
+      if (supported) {
+        await store.setSleAddress(32768)
+        assert.equal(store.lastOpMessage.success, true, store.lastOpMessage.text)
+        assert.equal(store.sleCurrentStatus.addressSaved, true)
+        assert.equal(store.sleCurrentStatus.devAddr, '32768')
+        calls.length = 0
+        await store.setSleAddress(0)
+        assert.equal(store.lastOpMessage.success, false)
+        await store.setSleAddress(65535)
+        assert.equal(store.lastOpMessage.success, false)
+        assert.deepEqual(calls, [], '非法地址不得写入设备')
+        assert.equal(store.sleCurrentStatus.addressSaved, true)
+      }
       assert.equal(listeners.size, 1, '事务监听器必须在完整回读后释放')
     }
   } finally {
     globalThis.window = previousWindow
   }
+})
+
+test('SJZ 地址只允许 1..65534，回读兼容默认地址和已保存地址', () => {
+  for (const address of [1, 234, 1024, 32768, 65534]) {
+    assert.equal(addressProtocol.buildSjzdSleAddressCommand(address), `SLE_ADDR:${address}`)
+  }
+  for (const address of [0, -1, 1.5, NaN, Infinity, 65535]) {
+    assert.throws(() => addressProtocol.buildSjzdSleAddressCommand(address), /1～65534/)
+  }
+  const parse = (address, metadata) => {
+    const payload = `SLE_CONFIG:EEPROM,id=2,net_name="star_RS",apid=5,dev_addr=${address},tx_pwr=5,max_tx_pwr=5,bridge=0${metadata}`
+    const crc = configProtocol.formatSjzdCrc32(configProtocol.crc32IsoHdlc(payload))
+    return configProtocol.parseSjzdSleSnapshot(completeSnapshot('SLE', [
+      'SLE_CONFIG:BEGIN,id=2,version=1,revision=1', payload,
+      `SLE_CONFIG:END,id=2,count=1,crc32=${crc},status=ERROR,code=CHIP_NOT_READY`,
+    ]))
+  }
+  assert.equal(parse(234, ',addr_saved=0').eeprom.addressSaved, false)
+  assert.equal(parse(65534, ',addr_saved=1').eeprom.addressSaved, true)
+  assert.equal(parse(234, '').eeprom.addressSaved, undefined)
+  assert.throws(() => parse(0, ',addr_saved=0'))
+  assert.throws(() => parse(65535, ',addr_saved=1'))
+  assert.throws(() => parse(234, ',addr_saved=2'))
 })
 
 function completeSnapshot(feature, lines) {
