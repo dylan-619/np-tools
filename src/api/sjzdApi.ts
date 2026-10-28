@@ -39,10 +39,6 @@ export async function sjzdSendSleNetName(path: string, name: string): Promise<st
   return await invoke<string>('sjzd_send_sle_netname', { path, name })
 }
 
-export async function sjzdSendSleApid(path: string, apid: number): Promise<string> {
-  return await invoke<string>('sjzd_send_sle_apid', { path, apid })
-}
-
 export async function sjzdSendWlanBridge(path: string, enable: boolean): Promise<string> {
   return await invoke<string>('sjzd_send_wlan_bridge', { path, enable })
 }

@@ -8,7 +8,6 @@ import {
   sjzdSendSlePwr,
   sjzdSendSleMaxPwr,
   sjzdSendSleNetName,
-  sjzdSendSleApid,
   sjzdSendWlanBridge,
   sjzdSendRawCommand,
   sjzdQueryWlanType,
@@ -70,7 +69,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
   const sleCurrentStatus = ref<SleCurrentStatus>({})
   const sleForm = ref({
     netName: 'star_RS01',
-    apId: 1,
     txPower: 5, // +10 dBm
     maxTxPower: 8, // +20 dBm
   })
@@ -437,7 +435,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
   function matchesSleReadback(expected: Partial<SleEepromReadback>, actual: SleEepromReadback): boolean {
     return (
       (expected.netName === undefined || expected.netName === actual.netName) &&
-      (expected.apId === undefined || expected.apId === actual.apId) &&
       (expected.txPower === undefined || expected.txPower === actual.txPower) &&
       (expected.maxTxPower === undefined || expected.maxTxPower === actual.maxTxPower) &&
       (expected.bridge === undefined || expected.bridge === actual.bridge)
@@ -449,7 +446,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
     const previousSave = sleCurrentStatus.value.lastSave
     sleForm.value = {
       netName: snapshot.eeprom.netName,
-      apId: snapshot.eeprom.apId,
       txPower: snapshot.eeprom.txPower,
       maxTxPower: snapshot.eeprom.maxTxPower,
     }
@@ -747,7 +743,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
           if (apIdMatch) {
             const ap = parseInt(apIdMatch[1], 10)
             if (!isNaN(ap)) {
-              sleForm.value.apId = ap
               sleCurrentStatus.value.apId = ap
             }
           }
@@ -801,7 +796,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
           if (apIdMatch) {
             const ap = parseInt(apIdMatch[1], 10)
             if (!isNaN(ap)) {
-              sleForm.value.apId = ap
               sleCurrentStatus.value.apId = ap
             }
           }
@@ -1323,24 +1317,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
   }
 
-  async function setSleApid(apid: number) {
-    if (!serialStore.connectedPort) return
-    isBusy.value = true
-    try {
-      const port = serialStore.connectedPort as string
-      await sendSleAndVerify(
-        '设置星闪 AP ID',
-        () => sjzdSendSleApid(port, apid),
-        { apId: apid }
-      )
-      showMessage('星闪 AP ID 已获保存回执，并通过完整 SLE_CONFIG 快照 revision 复核。')
-    } catch (e: any) {
-      showMessage(`设置 AP ID 失败: ${e}`, false)
-    } finally {
-      isBusy.value = false
-    }
-  }
-
   async function setSlePwr(level: number) {
     if (!serialStore.connectedPort) return
     isBusy.value = true
@@ -1387,14 +1363,12 @@ export const useSjzdStore = defineStore('sjzd', () => {
       const port = serialStore.connectedPort as string
       const target = {
         netName: sleForm.value.netName.trim(),
-        apId: sleForm.value.apId,
         txPower: sleForm.value.txPower,
         maxTxPower: sleForm.value.maxTxPower,
         bridge: wlanBridgeEnabled.value ? 1 : 0,
       }
       showMessage('正在逐项等待 SLE_CONFIG:SAVED 回执...')
       await waitForConfigSave('SLE', '设置星闪网络名称', () => sjzdSendSleNetName(port, target.netName))
-      await waitForConfigSave('SLE', '设置星闪 AP ID', () => sjzdSendSleApid(port, target.apId))
       await waitForConfigSave('SLE', '设置星闪发射功率', () => sjzdSendSlePwr(port, target.txPower))
       const latestReceipt = await waitForConfigSave(
         'SLE',
@@ -2251,7 +2225,6 @@ export const useSjzdStore = defineStore('sjzd', () => {
     burnSn,
     querySleConfig,
     setSleNetName,
-    setSleApid,
     setSlePwr,
     setSleMaxPwr,
     applyAllSleConfig,

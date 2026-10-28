@@ -10,7 +10,7 @@
 - **SJZDV3 智能现场数据采集终端**：
   - **RS485 总线波特率**：单一全局参数，默认 9600；Modbus 页面支持读取、保存、恢复 9600 和待重启显示。`RS485:LIST` 实际读取 EEPROM，`RS485:BAUD:<速率>` / `RS485:BAUD:DEFAULT` 保存后再读回复核；UART1 仍为 115200，用户重启后再次查询确认。
   - **设备概览与出厂 SN 固化**：实时查询设备运行时间、开机次数、采样频率等，支持产线 12 位 SN 序列号手动敲入、复制粘贴、自动校验与批量流水号自动递增（`SN:4301xxxxxxxx` 严格定长 15 字节，重启即生效）。
-  - **星闪 (NearLink / SLE) 无线网络配置**：按 `SLE_CONFIG:BEGIN/EEPROM/CHIP/END` 的同一事务 ID、payload 数量和 CRC32 校验 EEPROM/芯片快照；保存后校验 `SAVED` 回执与下一次 `revision`。`SLE_BRIDGE:ACK` 是唯一的实时透传状态依据，透传开启时工具会阻止 MCU 配置命令。
+  - **星闪 (NearLink / SLE) 无线网络配置**：按 `SLE_CONFIG:BEGIN/EEPROM/CHIP/END` 的同一事务 ID、payload 数量和 CRC32 校验 EEPROM/芯片快照；保存后校验 `SAVED` 回执与下一次 `revision`。设备地址由 SN 后四位生成；配套 SJZDV3 统一地址固件（`efddf94` 起）的遥测 Addr 使用同一设备地址，无需设置 APID。工具移除 APID 单项设置和批量写入，仅保留历史值回读；旧固件应先升级。`SLE_BRIDGE:ACK` 是唯一的实时透传状态依据，透传开启时工具会阻止 MCU 配置命令。
   - **Modbus RTU 100 点位 Data Grid 维护**：RAW/INT16/UINT16/INT32/UINT32/FLOAT32/BOOL 数据类型、字节序（ABCD/CDAB/BADC/DCBA）、寄存器长度智能纠错、行业模版一键加载与 CSV/JSON 双向导入导出；还可将已采录点位生成 `smart-edge-gateway` 固定 14 列全量导入 `.xlsx`，以 `从站地址_PLC地址` 精确匹配终端上报 JSON，点位名称保持稳定且采集间隔固定为订阅模式 `0`。`RAW_HEX` 因网关没有等价规范类型会在导出前明确拦截；`RS485_CONFIG:BEGIN/POINT/END` 通过 count/CRC32 后才更新点表，单点诊断仅接受同一 `MB_DEBUG` 事务的完整 `BEGIN/TX/RX/DATA/RESULT/END`。
   - **4G Cat.1 / MQTT 配置复核**：按完整 `4G_CONFIG` 事务读取，保存后比对 `SAVED` 和 `revision`；明确区分“读取完整但 `CONFIG_INCOMPLETE`”与“配置有效”，密码始终只按 `set/empty` 状态复核。
   - **2 路 4~20mA 模拟量输入诊断**：1Hz 动态平滑趋势图、断线/超量程/正常状态诊断、历史采样导出与硬件双色 LED 状态灯测试。
