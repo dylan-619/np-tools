@@ -130,6 +130,8 @@ export interface SleCurrentStatus {
   netName?: string
   apId?: number
   devAddr?: string
+  /** 缺少此字段表示旧固件不支持地址配置；false 为尚未保存，使用默认地址。 */
+  addressSaved?: boolean
   txPower?: number
   maxTxPower?: number
   mac?: string

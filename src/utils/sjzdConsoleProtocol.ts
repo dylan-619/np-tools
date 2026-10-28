@@ -36,6 +36,7 @@ export interface SjzdSleSnapshot {
     netName: string
     apId: number
     devAddr: string
+    addressSaved?: boolean
     txPower: number
     maxTxPower: number
     bridge: number
@@ -330,6 +331,11 @@ export function parseSjzdSleSnapshot(snapshot: SjzdConfigSnapshot): SjzdSleSnaps
       bridge: boundedUint(eeprom, 'bridge', 0, 1, 'SLE bridge'),
     },
     evidence: snapshot.evidence,
+  }
+  // 新固件回读地址是否来自 EEPROM；缺少此字段的旧固件只开放地址查看。
+  if (eeprom.addr_saved !== undefined) {
+    result.eeprom.addressSaved = boundedUint(eeprom, 'addr_saved', 0, 1, 'SLE 地址保存状态') === 1
+    boundedUint(eeprom, 'dev_addr', 1, 65534, 'SLE 有效地址')
   }
   if (chipPayload) {
     const chip = chipPayload.fields

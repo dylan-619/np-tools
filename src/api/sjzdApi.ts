@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { buildSjzdSleAddressCommand } from '../utils/sjzdSleAddress'
 import type {
   ModbusPointConfig,
   DeviceInfoResult,
@@ -39,8 +40,8 @@ export async function sjzdSendSleNetName(path: string, name: string): Promise<st
   return await invoke<string>('sjzd_send_sle_netname', { path, name })
 }
 
-export async function sjzdSendSleApid(path: string, apid: number): Promise<string> {
-  return await invoke<string>('sjzd_send_sle_apid', { path, apid })
+export async function sjzdSendSleAddress(path: string, address: number): Promise<string> {
+  return await sjzdSendRawCommand(path, buildSjzdSleAddressCommand(address), false)
 }
 
 export async function sjzdSendWlanBridge(path: string, enable: boolean): Promise<string> {

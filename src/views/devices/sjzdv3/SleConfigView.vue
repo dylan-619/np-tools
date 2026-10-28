@@ -92,7 +92,7 @@ onMounted(() => {
       <div class="title-col">
         <h2>星闪 (NearLink / SLE) 无线网络配置</h2>
         <p class="subtitle">
-          配置采集终端星闪模组的 AP ID、网络名称、发射功率；仅在同一事务 ID、数量和 CRC32 通过后展示 EEPROM 与芯片快照，并提供受 ACK 保护的 AT 透传调试。
+          配置采集终端星闪模组的网络名称、发射功率；校验完整配置快照，并提供受 ACK 保护的 AT 透传调试。
         </p>
       </div>
 
@@ -146,14 +146,8 @@ onMounted(() => {
           <Sliders :size="20" />
         </div>
         <div class="metric-content">
-          <span class="metric-label">从机通信地址 (DevAddr) / APID</span>
-          <span class="metric-value">
-            {{
-              sjzd.sleCurrentStatus?.devAddr || sjzd.sleCurrentStatus?.apId !== undefined
-                ? `${sjzd.sleCurrentStatus?.devAddr ? '地址: ' + sjzd.sleCurrentStatus.devAddr : ''}${sjzd.sleCurrentStatus?.devAddr && sjzd.sleCurrentStatus?.apId !== undefined ? ' | ' : ''}${sjzd.sleCurrentStatus?.apId !== undefined ? 'APID: ' + sjzd.sleCurrentStatus.apId : ''}`
-                : '--'
-            }}
-          </span>
+          <span class="metric-label">星闪设备地址 (DevAddr)</span>
+          <span class="metric-value">{{ sjzd.sleCurrentStatus?.devAddr ?? '--' }}</span>
         </div>
       </div>
 
@@ -210,6 +204,39 @@ onMounted(() => {
           </div>
 
           <div class="card-body form-body">
+            <p class="field-hint">
+              默认地址取 SN 后三位（000 使用 1），同一路由下地址必须唯一。可手动指定地址解决后缀冲突，上报与下行共用有效地址，无需设置 APID。
+            </p>
+            <div class="form-group">
+              <div class="label-with-cur">
+                <label>星闪设备地址 (ADDR)</label>
+                <span v-if="sjzd.sleCurrentStatus?.addressSaved !== undefined" class="cur-badge">
+                  {{ sjzd.sleCurrentStatus.addressSaved ? '已保存' : '默认' }} · 有效地址 {{ sjzd.sleCurrentStatus.devAddr }}
+                </span>
+              </div>
+              <div class="input-with-action">
+                <input
+                  v-model.number="sjzd.sleForm.address"
+                  type="number"
+                  min="1"
+                  max="65534"
+                  class="form-input"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.sleCurrentStatus?.addressSaved === undefined"
+                />
+                <button
+                  class="btn btn-sm btn-secondary"
+                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy || sjzd.sleCurrentStatus?.addressSaved === undefined"
+                  @click="sjzd.setSleAddress(sjzd.sleForm.address)"
+                >写入地址</button>
+              </div>
+              <span class="field-hint">
+                地址范围 1～65534。未设置时默认取 SN 后三位；保存后优先使用 EEPROM 中的地址。
+                保存后模组自动重配，请查询芯片地址确认生效。
+              </span>
+              <span v-if="sjzd.sleCurrentStatus?.addressSaved === undefined" class="field-hint">
+                请先查询完整配置；旧固件未提供地址配置能力时需升级。
+              </span>
+            </div>
             <!-- Net Name -->
             <div class="form-group">
               <div class="label-with-cur">
@@ -236,34 +263,6 @@ onMounted(() => {
                 </button>
               </div>
               <span class="field-hint">最长 15 个可打印 ASCII 字符（16B 存储区预留 NUL）。写入后必须收到 <code>SLE_CONFIG:SAVED</code>，再以 <code>SLE:LIST</code> 的 transaction ID、count、CRC32 和 revision 复核。</span>
-            </div>
-
-            <!-- AP ID -->
-            <div class="form-group">
-              <div class="label-with-cur">
-                <label>星闪 AP ID (SLE_APID)</label>
-                <span v-if="sjzd.sleCurrentStatus?.apId !== undefined" class="cur-badge">
-                  完整回读: {{ sjzd.sleCurrentStatus.apId }}
-                </span>
-              </div>
-              <div class="input-with-action">
-                <input
-                  v-model.number="sjzd.sleForm.apId"
-                  type="number"
-                  min="0"
-                  max="255"
-                  class="form-input"
-                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
-                />
-                <button
-                  class="btn btn-sm btn-secondary"
-                  :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
-                  @click="sjzd.setSleApid(sjzd.sleForm.apId)"
-                >
-                  写入 APID
-                </button>
-              </div>
-              <span class="field-hint">范围 0 ~ 255 (十进制数字)</span>
             </div>
 
             <!-- Tx Power -->
@@ -388,7 +387,7 @@ onMounted(() => {
                 <span class="p-val mono-text">{{ sjzd.sleCurrentStatus.devAddr || '--' }}</span>
               </div>
               <div class="prop-item">
-                <span class="p-name">星闪 AP ID (EEPROM):</span>
+                <span class="p-name">历史 APID（仅回读，新固件遥测地址不使用）:</span>
                 <span class="p-val mono-text">{{ sjzd.sleCurrentStatus.apId ?? '--' }}</span>
               </div>
               <div class="prop-item">
