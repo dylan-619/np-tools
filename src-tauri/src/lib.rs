@@ -417,6 +417,7 @@ pub fn run() {
             flash_cancel,
             // KZ3 HTTP 在线调试
             kz3_http::kz3_http_get_diagnostic,
+            kz3_http::kz3_http_get_ota_state,
             kz3_http::kz3_http_get_point,
             kz3_http::kz3_http_get_points_page,
             kz3_http::kz3_http_write_point,

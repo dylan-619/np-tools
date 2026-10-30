@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   kz3GetDiagnostic,
+  kz3GetOtaState,
   kz3GetPoint,
   kz3GetPointsPage,
   kz3WritePoint,
@@ -15,6 +16,7 @@ import {
 } from '../utils/kz3ProjectManifest'
 import {
   isRuntimeClearBinding,
+  normalizePointType,
   pointValueMatchesType,
   pointValuesEqual,
   writeValueError
@@ -159,6 +161,11 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   const writeInFlight = ref(false)
   const writePermitUntil = ref<number | null>(null)
   const writePermitReason = ref('')
+  const otaState = ref<Awaited<ReturnType<typeof kz3GetOtaState>> | null>(null)
+  const identityVerified = ref(false)
+  let boundSerial = ''
+  let boundPackage = ''
+  let permitGeneration = 0
   const now = ref(Date.now())
   let pollTimer: number | null = null
   let diagnosticCursor = 0
@@ -167,18 +174,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   let pointsPageCapability: 'unknown' | 'supported' | 'unsupported' = 'unknown'
 
   function projectContractSignature(): string {
-    const project = controller.doc.project
-    return JSON.stringify([
-      project.id,
-      project.version,
-      project.northbound.fields.map((field) => [
-        field.name,
-        field.bind,
-        field.c_type,
-        field.access,
-        String(field.reference)
-      ])
-    ])
+    return JSON.stringify(controller.doc)
   }
 
   if (typeof window !== 'undefined') {
@@ -195,7 +191,9 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
 
   const pointDescriptors = computed<PointDescriptor[]>(() => {
     const project = controller.doc.project
-    return project.northbound.fields.map((field) => {
+    return project.northbound.fields.map((sourceField) => {
+      // 只规范化在线descriptor；原始字段类型仍用于YAML/manifest，避免改变包契约。
+      const field = { ...sourceField, c_type: normalizePointType(sourceField.c_type) ?? sourceField.c_type }
       const fieldDescription = field.description?.trim()
       let description = fieldDescription || ''
       let unit: string | undefined
@@ -312,10 +310,10 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   const allHealthHealthy = computed(() => {
     const health = diagnostics.value.health?.data
     return Boolean(
-      health?.watchdog_healthy &&
-        health.storage_healthy &&
-        health.network_healthy &&
-        health.control_task_healthy
+      health?.watchdog_healthy === true &&
+        health.storage_healthy === true &&
+        health.network_healthy === true &&
+        health.control_task_healthy === true
     )
   })
   const projectIdentityChanged = computed(() => {
@@ -326,11 +324,16 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     if (writePermitUntil.value === null) return 0
     return Math.max(0, Math.ceil((writePermitUntil.value - now.value) / 1000))
   })
-  const writesEnabled = computed(() => writePermitRemainingSeconds.value > 0)
+  function hasWritePermit() {
+    return writePermitUntil.value !== null && writePermitUntil.value > Date.now()
+  }
+  const writesEnabled = computed(() => writePermitRemainingSeconds.value > 0 && hasWritePermit())
   const canEnableWrites = computed(
     () =>
       isConnected.value &&
       compatibilityState.value === 'matched' &&
+      identityVerified.value &&
+      otaState.value !== null &&
       !projectIdentityChanged.value &&
       !controllerFaultActive.value &&
       operatorName.value.trim().length > 0 &&
@@ -357,8 +360,14 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       sessionId &&
       session.value?.sessionId === sessionId &&
       session.value.endedAt === undefined &&
-      transportState.value !== 'disconnected'
+      transportState.value !== 'disconnected' &&
+      baseUrl.value.trim() === session.value.baseUrl
     )
+  }
+
+  function sessionUrl(sessionId: string | undefined): string {
+    if (!isActiveSession(sessionId)) throw new Error('会话或目标地址已改变，请重新连接')
+    return session.value!.baseUrl
   }
 
   function appendLog(
@@ -428,13 +437,54 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     if (activeSession && activeSession.sessionId === expectedSessionId) activeSession.compatibilityState = next
   }
 
+  async function verifyDeviceState(expectedSessionId = session.value?.sessionId) {
+    identityVerified.value = false
+    try {
+      await readDiagnostic('device', true, expectedSessionId)
+      await readDiagnostic('hardware', true, expectedSessionId)
+      const ota = await kz3GetOtaState(sessionUrl(expectedSessionId))
+      if (!isActiveSession(expectedSessionId) || baseUrl.value.trim() !== session.value?.baseUrl) throw new Error('会话或目标地址已改变，请重新连接')
+      const device = diagnostics.value.device?.data
+      const hardware = diagnostics.value.hardware?.data
+      const sn = device?.serial_number
+      if (device?.device_type !== 'KZ3-F427' || controller.doc.project.board !== 'kz3_f427_standard' ||
+          !sn || !/^\d{12}$/.test(sn) || (boundSerial && boundSerial !== sn) ||
+          !hardware || hardware.di_count !== 12 || hardware.do_count !== 8 ||
+          hardware.ai_count !== 4 || hardware.ao_count !== 2 || !/STM32F427/i.test(hardware.mcu))
+        throw new Error('设备型号、硬件能力或SN不匹配')
+      const { info, status, identity } = ota
+      if (info.sn !== sn || info.board_type !== 'kz3_f427_standard' || info.ota_protocol !== 2 ||
+          diagnostics.value.project?.data.schema_version !== 7 ||
+          info.phase !== 1 || status.phase !== 1 || status.state !== 0 || status.error !== 0 ||
+          !Number.isInteger(status.flags) || status.flags < 0 || status.flags > 255 || info.flags !== status.flags || (status.flags & 1) !== 0 ||
+          (status.flags & 128) === 0 || (status.flags & 64) !== 0 ||
+          (status.flags & (4 | 16)) === 0 || (status.flags & (8 | 32)) === 0 ||
+          identity.present !== 1 || identity.project_id !== controller.doc.project.id ||
+          identity.project_version !== controller.doc.project.version ||
+          !/^[a-f0-9]{64}$/.test(identity.package_id) || /^0+$/.test(identity.package_id) ||
+          status.active !== identity.package_id || !isUnsigned32(identity.revision))
+        throw new Error('OTA维护中、数据无效、包未确认或契约不支持；保持只读')
+      const packageSignature = `${identity.package_id}:${identity.revision}`
+      if (boundPackage && boundPackage !== packageSignature) throw new Error('会话期间工程包身份已改变，请重新连接')
+      boundSerial = sn
+      boundPackage = packageSignature
+      otaState.value = ota
+      identityVerified.value = true
+    } catch (error) {
+      otaState.value = null
+      disableWrites(errorDetail(error))
+      appendLog('warning', 'session', '设备/OTA预检未通过，保持只读', errorDetail(error))
+      throw error
+    }
+  }
+
   async function readDiagnostic(
     resource: DiagnosticResource,
     quiet = false,
     expectedSessionId = session.value?.sessionId
   ): Promise<void> {
     try {
-      const response = await kz3GetDiagnostic(baseUrl.value, resource)
+      const response = await kz3GetDiagnostic(sessionUrl(expectedSessionId), resource)
       if (!isActiveSession(expectedSessionId)) throw new Error('调试会话已结束，已丢弃过期诊断响应')
       const envelope = parseSuccessJson<DiagnosticEnvelope<unknown>>(response)
       if (
@@ -445,6 +495,13 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         throw new Error(`/${resource} 响应不符合 KZ3 v1 诊断外层契约`)
       }
       if (resource === 'project') parseProjectDiagnostic(envelope.data)
+      if (resource === 'io' && typeof (envelope.data as { controller_fault?: { active?: unknown } }).controller_fault?.active !== 'boolean')
+        throw new Error('/io 缺少有效的控制器故障状态，禁止写入')
+      if (resource === 'device' && boundSerial &&
+          (envelope.data as { serial_number?: string }).serial_number !== boundSerial) {
+        identityVerified.value = false
+        disableWrites('目标SN已变化，请重新连接')
+      }
       assignDiagnostic(resource, envelope)
       markSuccess(expectedSessionId)
       if (resource === 'health') consecutiveHealthErrors.value = 0
@@ -562,7 +619,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     expectedSessionId = session.value?.sessionId
   ): Promise<PointSample> {
     try {
-      const response = await kz3GetPoint(baseUrl.value, name)
+      const response = await kz3GetPoint(sessionUrl(expectedSessionId), name)
       if (!isActiveSession(expectedSessionId)) throw new Error('调试会话已结束，已丢弃过期点位响应')
       const data = parseSuccessJson<{ name: string; value: Kz3Scalar; quality: number }>(response)
       if (
@@ -683,7 +740,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
 
     try {
       for (let pageIndex = 0; pageIndex <= pointDescriptors.value.length; pageIndex += 1) {
-        const response = await kz3GetPointsPage(baseUrl.value, offset, POINT_PAGE_LIMIT)
+        const response = await kz3GetPointsPage(sessionUrl(expectedSessionId), offset, POINT_PAGE_LIMIT)
         if (!isActiveSession(expectedSessionId)) {
           throw new Error('调试会话已结束，已丢弃过期点位分页响应')
         }
@@ -768,6 +825,10 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     consecutiveErrors.value = 0
     consecutiveHealthErrors.value = 0
     pointsPageCapability = 'unknown'
+    identityVerified.value = false
+    otaState.value = null
+    boundSerial = ''
+    boundPackage = ''
     const project = controller.doc.project
     sessionProjectContractSignature = projectContractSignature()
     session.value = {
@@ -873,6 +934,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
           compatibilityReason.value
         )
       }
+      try { await verifyDeviceState(sessionId) } catch { /* 保留观察能力，禁止写入 */ }
       startPolling()
     } catch (error) {
       if (session.value?.sessionId === sessionId) {
@@ -945,6 +1007,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         /* 日志已记录 */
       }
 
+      try { await verifyDeviceState(sessionId) } catch { /* 身份/维护查询失败保持只读 */ }
       if (pointsPageCapability !== 'unsupported') {
         try {
           await readAllPointPages(true, sessionId)
@@ -1032,6 +1095,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   }
 
   function disableWrites(reason?: string) {
+    permitGeneration += 1
     if (writePermitUntil.value !== null && reason) appendLog('warning', 'write', reason)
     writePermitUntil.value = null
     writePermitReason.value = ''
@@ -1047,7 +1111,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     if (!descriptor) throw new Error(`当前工程不存在北向点位 ${name}`)
     if (!descriptor.writeSupported)
       throw new Error(descriptor.writeDisabledReason || '当前点位不可写')
-    if (!writesEnabled.value || !canEnableWrites.value)
+    if (!hasWritePermit() || !canEnableWrites.value)
       throw new Error('北向写入许可未启用或已失效')
     const auditReason = reason.trim() || writePermitReason.value.trim()
     if (!auditReason) throw new Error('当前写入许可缺少测试编号或调试依据')
@@ -1075,6 +1139,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     writeInFlight.value = true
     lastWriteAt = Date.now()
     const sessionId = session.value?.sessionId
+    const permit = permitGeneration
     const shouldResumePolling = isPolling.value
     stopPolling()
 
@@ -1086,6 +1151,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       await readDiagnostic('io', true, sessionId)
       await readDiagnostic('project', true, sessionId)
       await verifyProjectCompatibility(sessionId, true)
+      await verifyDeviceState(sessionId)
       if (!canEnableWrites.value || compatibilityState.value !== 'matched' || projectIdentityChanged.value) {
         throw new Error('写入前工程身份、健康或控制器状态校验未通过，已取消本次写入')
       }
@@ -1100,7 +1166,10 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         )
       }
 
-      const response = await kz3WritePoint(baseUrl.value, name, descriptor.bind, value)
+      if (!isActiveSession(sessionId) || !hasWritePermit() || !canEnableWrites.value ||
+          permit !== permitGeneration || projectIdentityChanged.value)
+        throw new Error('最终写入前许可已失效或目标已变化')
+      const response = await kz3WritePoint(sessionUrl(sessionId), name, descriptor.bind, value)
       if (!isActiveSession(sessionId))
         throw new Error('写入响应到达时调试会话已结束，结果未知且不会重试')
       event.httpStatus = response.status
@@ -1123,12 +1192,13 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
             : 'unknown'
       } catch (error) {
         event.readbackObserved = 'unknown'
-        appendLog('warning', 'write', `点位 ${name} 写入已接受，但写后读回失败`, errorDetail(error))
+        disableWrites('写后读回失败，结果未知')
+        throw error
       }
 
       if (descriptor.category === 'parameter' && event.readbackObserved !== 'passed') {
         disableWrites('parameter 写后读回未通过，北向写入许可已自动解除')
-      } else {
+      } else if (permit === permitGeneration && hasWritePermit() && isActiveSession(sessionId)) {
         writePermitUntil.value = Date.now() + WRITE_PERMIT_MS
       }
       appendLog(
@@ -1145,7 +1215,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
     } catch (error) {
       if (error instanceof HttpResponseError) {
         event.errorCode = error.code
-        event.acceptedByOwner = false
+        if (event.acceptedByOwner !== true) event.acceptedByOwner = false
       }
       appendLog(
         'error',
@@ -1202,6 +1272,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         consecutiveErrors: consecutiveErrors.value
       },
       diagnostics: JSON.parse(JSON.stringify(diagnostics.value)) as Kz3Diagnostics,
+      deviceVerification: { serialNumber: boundSerial, packageIdentity: boundPackage, ota: otaState.value },
       // 保留 v1 报告字段名以兼容既有导出消费者；现在记录的是全部自动采样点位。
       monitoredPoints: pointDescriptors.value.map((item) => item.name),
       samples: Object.values(samples.value).map((item) => ({ ...item })),
@@ -1212,6 +1283,14 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       }))
     }
   }
+
+  watch(baseUrl, () => {
+    if (session.value && session.value.endedAt === undefined) {
+      identityVerified.value = false
+      otaState.value = null
+      disableWrites('目标地址已修改，请重新连接')
+    }
+  }, { flush: 'sync' })
 
   watch(operatorName, (value) => {
     if (typeof localStorage !== 'undefined') localStorage.setItem(OPERATOR_STORAGE_KEY, value)
@@ -1236,6 +1315,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   )
 
   return {
+    otaState,
+    identityVerified,
     baseUrl,
     operatorName,
     siteName,

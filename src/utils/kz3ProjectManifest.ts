@@ -10,10 +10,18 @@ export interface Kz3PointManifest {
   pointCount: number
 }
 
-function manifestType(type: NorthboundField['c_type']): string {
+function manifestType(type: string): string {
   switch (type) {
     case 'float':
+    case 'f32':
       return 'f32'
+    case 'uint8_t': return 'u8'
+    case 'uint16_t': return 'u16'
+    case 'uint32_t': return 'u32'
+    case 'int32_t': return 'i32'
+    case 'u8':
+    case 's32':
+      return type
     case 'bool':
     case 'u16':
     case 'u32':
@@ -25,9 +33,9 @@ function manifestType(type: NorthboundField['c_type']): string {
   }
 }
 
-function firmwareFieldWidth(type: NorthboundField['c_type']): number {
-  // 必须镜像 point_config_gen.py::field_width()，包含其当前 i32=1 的行为。
-  return type === 'float' || type === 'u32' ? 2 : 1
+export function kz3FieldWidth(type: string): number {
+  // 必须镜像 point_config_gen.py::field_width()，包含 i32 的两个寄存器宽度。
+  return type === 'float' || type === 'u32' || type === 'i32' || type === 's32' || type === 'f32' || type === 'uint32_t' || type === 'int32_t' ? 2 : 1
 }
 
 async function sha256Hex(text: string): Promise<string> {
@@ -51,7 +59,7 @@ export async function buildKz3PointManifest(
     manifestType(field.c_type),
     String(field.access),
     String(field.reference),
-    firmwareFieldWidth(field.c_type)
+    kz3FieldWidth(field.c_type)
   ])
   const canonicalJson = JSON.stringify(['kz3-point-manifest/v1', canonicalFields])
   return {

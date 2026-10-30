@@ -44,3 +44,12 @@ export async function kz3WritePoint(
     value
   })
 }
+
+/** 会话外info/status/info1，只读；不继承或接管升级会话。 */
+export async function kz3GetOtaState(baseUrl: string): Promise<{
+  info: { sn: string; board_type: string; ota_protocol: number; phase: number; flags: number }
+  status: { state: number; phase: number; flags: number; active: string; candidate: string; error: number }
+  identity: { present: number; project_id: string; project_version: string; revision: number; package_id: string }
+}> {
+  return await invoke('kz3_http_get_ota_state', { baseUrl })
+}

@@ -47,7 +47,17 @@ impl Kz3HttpClient {
     ) -> Result<Kz3HttpResponse, String> {
         let _request_guard = self.request_lock.lock().await;
         let started = Instant::now();
-        let mut request = self.client.request(method, url);
+        let mut request = self
+            .client
+            .request(method, url)
+            .header("Connection", "close");
+        // 会话外只读查询固定peer；它不是维护会话凭据，不调用open。
+        if body
+            .as_ref()
+            .is_some_and(|v| matches!(v["op"].as_str(), Some("info" | "status")))
+        {
+            request = request.header("X-KZ3-OTA-Peer", "4294967295");
+        }
         if let Some(json) = body {
             request = request
                 .header("Content-Type", "application/json")
@@ -298,5 +308,124 @@ mod tests {
         assert!(validate_write_target("state.running", &serde_json::json!(true)).is_err());
         assert!(validate_write_target("parameter.note", &serde_json::json!("x")).is_err());
         assert!(validate_write_target("../parameter.x", &serde_json::json!(true)).is_err());
+    }
+}
+
+/// 只读查询：不会建立维护会话或推进会话内 pending 操作。
+#[tauri::command]
+pub async fn kz3_http_get_ota_state(
+    base_url: String,
+    state: tauri::State<'_, Kz3HttpClient>,
+) -> Result<Value, String> {
+    read_ota_state(&state, &base_url).await
+}
+
+async fn read_ota_state(client: &Kz3HttpClient, base_url: &str) -> Result<Value, String> {
+    let url = normalize_base_url(&base_url)?
+        .join("api/v1/ota")
+        .map_err(|e| e.to_string())?;
+    let mut output = serde_json::Map::new();
+    for (key, request) in [
+        ("info", serde_json::json!({"op":"info", "flags":0})),
+        ("status", serde_json::json!({"op":"status"})),
+        ("identity", serde_json::json!({"op":"info", "flags":1})),
+    ] {
+        let response = client
+            .execute(reqwest::Method::POST, url.clone(), Some(request))
+            .await?;
+        if response.status != 200 {
+            return Err(format!("OTA 查询 HTTP {}", response.status));
+        }
+        let data: Value = serde_json::from_str(&response.body).map_err(|e| e.to_string())?;
+        if data["code"].as_u64() != Some(0) {
+            return Err("OTA 状态不可确认".into());
+        }
+        if response.body.len() > 640
+            || data["op"].as_str() != Some(if key == "status" { "status" } else { "info" })
+        {
+            return Err("OTA 响应格式或长度不符".into());
+        }
+        if key == "info"
+            && (data["query"].as_u64() != Some(0)
+                || data["channel"].as_u64() != Some(4)
+                || data["peer"].as_u64() != Some(4294967295))
+        {
+            return Err("OTA 响应来源不匹配".into());
+        }
+        if key == "identity" && data["query"].as_u64() != Some(1) {
+            return Err("OTA 工程身份响应不匹配".into());
+        }
+        if data["sid"].as_u64() != Some(0) || data["seq"].as_u64() != Some(0) {
+            return Err("只读OTA查询意外返回会话应答".into());
+        }
+        output.insert(key.into(), data);
+    }
+    Ok(Value::Object(output))
+}
+
+#[cfg(test)]
+mod ota_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // 穿过真实reqwest与HTTP封装，验证只读查询不open/接管维护会话。
+    #[tokio::test]
+    async fn ota_queries_use_fixed_read_only_operations_and_check_source() {
+        for failure in ["none", "peer", "identity_query", "session"] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                for (index, (op, flags)) in [("info", Some(0)), ("status", None), ("info", Some(1))]
+                    .iter()
+                    .enumerate()
+                {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let mut bytes = Vec::new();
+                    loop {
+                        let mut chunk = [0u8; 2048];
+                        let size = socket.read(&mut chunk).await.unwrap();
+                        assert!(size > 0);
+                        bytes.extend_from_slice(&chunk[..size]);
+                        let text = String::from_utf8_lossy(&bytes);
+                        if let Some((header, body)) = text.split_once("\r\n\r\n") {
+                            let length: usize = header
+                                .lines()
+                                .find_map(|line| {
+                                    line.to_lowercase()
+                                        .strip_prefix("content-length:")
+                                        .map(|v| v.trim().parse().unwrap())
+                                })
+                                .unwrap();
+                            if body.len() < length {
+                                continue;
+                            }
+                            assert!(header.starts_with("POST /api/v1/ota HTTP/1.1"));
+                            assert!(header.to_lowercase().contains("x-kz3-ota-peer: 4294967295"));
+                            let request: Value = serde_json::from_str(body).unwrap();
+                            assert_eq!(request["op"], *op);
+                            assert_eq!(
+                                request.get("flags").and_then(Value::as_u64),
+                                flags.map(|v| v as u64)
+                            );
+                            assert!(request.get("sid").is_none());
+                            break;
+                        }
+                    }
+                    let reply = serde_json::json!({"op":op,"code":0,"sid":if failure == "session" {1} else {0},"seq":0,"query":if failure == "identity_query" && index == 2 {Some(0)} else {*flags},"channel":4,"peer":if failure == "peer" {0u64} else {4294967295u64}}).to_string();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        reply.len(),
+                        reply
+                    );
+                    socket.write_all(response.as_bytes()).await.unwrap();
+                    if (failure == "peer" || failure == "session") && index == 0 {
+                        break;
+                    }
+                }
+            });
+            let result = read_ota_state(&Kz3HttpClient::new(), &url).await;
+            assert_eq!(result.is_err(), failure != "none");
+            server.await.unwrap();
+        }
     }
 }

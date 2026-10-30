@@ -6,7 +6,7 @@ import { createPinia, disposePinia, setActivePinia } from 'pinia'
 // 复用 Vite 的 TypeScript 加载器；只模拟桌面 IPC，不连接控制器。
 const server = await createServer({
   configFile: false,
-  server: { middlewareMode: true, watch: null, hmr: false },
+  server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   optimizeDeps: { noDiscovery: true, include: [] },
   appType: 'custom'
 })
@@ -258,6 +258,7 @@ async function setupVerifiedKz3(
     __TAURI_INTERNALS__: {
       invoke: async (command, args) => {
         calls.push({ command, args })
+        if (command === 'kz3_http_get_ota_state') return ota
         if (command === 'kz3_http_get_diagnostic') {
           const data = diagnostics[args.resource]
           if (data === undefined) throw new Error(`测试未声明诊断资源：${args.resource}`)
@@ -348,13 +349,19 @@ async function setupVerifiedKz3(
   const pointValues = Object.fromEntries(
     projectFields.map((item) => [item.name, values[item.name] ?? (item.c_type === 'bool' ? false : 0)])
   )
+  const ota = {
+    info: { sn: '020325090117', board_type: 'kz3_f427_standard', ota_protocol: 2, phase: 1, flags: 140 },
+    status: { phase: 1, state: 0, flags: 140, active: 'a'.repeat(64), candidate: '0'.repeat(64), error: 0 },
+    identity: { present: 1, project_id: controller.doc.project.id, project_version: controller.doc.project.version,
+      revision: 1, package_id: 'a'.repeat(64) }
+  }
   const diagnostics = {
-    device: { device_type: 'KZ3-F427' },
-    hardware: {},
+    device: { device_type: 'KZ3-F427', serial_number: '020325090117' },
+    hardware: { mcu: 'STM32F427VG', di_count: 12, do_count: 8, ai_count: 4, ao_count: 2 },
     project: {
       project_id: controller.doc.project.id,
       project_version: controller.doc.project.version,
-      schema_version: 5,
+      schema_version: 7,
       firmware_build_id: 'host-test-build',
       configuration_hash: 0xb2ff5c80,
       config_revision: 7,
@@ -379,7 +386,7 @@ async function setupVerifiedKz3(
   debug.operatorName = '自动化测试'
   await debug.connect()
   debug.stopPolling()
-  return { controller, debug, calls, diagnostics, manifest, pointValues }
+  return { controller, debug, calls, diagnostics, manifest, pointValues, ota }
 }
 
 function xtqStatus({ sequence = 1, jsonLength = 0, rules = 0 } = {}) {
@@ -529,9 +536,9 @@ test('KZ3 点表 manifest 字节序列与固件生成器一致', async () => {
   assert.equal(result.algorithm, 'sha256-kz3-north-fields-canonical-v1')
   assert.equal(
     result.canonicalJson,
-    '["kz3-point-manifest/v1",[["command.start","command.start","bool","read_write","00001",1],["parameter.gain","parameter.gain","f32","read_write","40001",2],["state.counter","state.counter","u32","read","30001",2],["state.mode","state.mode","i32","read","30003",1]]]'
+    '["kz3-point-manifest/v1",[["command.start","command.start","bool","read_write","00001",1],["parameter.gain","parameter.gain","f32","read_write","40001",2],["state.counter","state.counter","u32","read","30001",2],["state.mode","state.mode","i32","read","30003",2]]]'
   )
-  assert.equal(result.hash, '0544a922fa1a90ad1e794a042aac4370da91fe57b9beb9f1025a53c3e1621b2c')
+  assert.equal(result.hash, '4fd95cbd63421b1b28dc650f40f1b8e6eb162989d9a488c750c24fd93a0ee217')
   await assert.rejects(
     kz3Manifest.buildKz3PointManifest([
       field({ name: 'parameter.legacy_i16', bind: 'parameter.legacy_i16', c_type: 'i16' })
@@ -1381,4 +1388,207 @@ test('KZ3 身份查询兼容可选的逻辑代码块版本字段', () => {
   assert.equal(legacy?.fields.SN, '020325090118')
   assert.equal(legacy?.fields.LOGIC_VER, undefined)
   assert.equal(current?.fields.LOGIC_VER, '1.2.3')
+})
+
+
+test('KZ3 型号、SN、schema和OTA状态变更均阻断实际写请求', async (t) => {
+  for (const kind of ['model', 'sn', 'schema', 'hold', 'data', 'phase', 'package']) {
+    await t.test(kind, async (st) => {
+      const { debug, diagnostics, ota, calls } = await setupVerifiedKz3(st)
+      assert.equal(debug.canEnableWrites, true)
+      debug.enableWrites('测试依据')
+      if (kind === 'model') diagnostics.device.device_type = 'SJZDV3'
+      if (kind === 'sn') diagnostics.device.serial_number = '020325090118'
+      if (kind === 'schema') diagnostics.project.schema_version = 8
+      if (kind === 'hold') { ota.status.flags |= 1; ota.info.flags |= 1 }
+      if (kind === 'data') { ota.status.flags = 128; ota.info.flags = 128 }
+      if (kind === 'phase') { ota.status.phase = 5; ota.info.phase = 5 }
+      if (kind === 'package') { ota.status.active = 'b'.repeat(64); ota.identity.package_id = 'b'.repeat(64) }
+      await assert.rejects(debug.writePoint('parameter.gain', 1, '测试'))
+      assert.equal(debug.writesEnabled, false)
+      assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+    })
+  }
+})
+
+test('KZ3 预读期间撤销许可后不得发送POST', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t)
+  debug.enableWrites('测试')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    const response = await invoke(command, args)
+    if (command === 'kz3_http_get_point') debug.disableWrites('等待期间撤销')
+    return response
+  }
+  await assert.rejects(debug.writePoint('parameter.gain', 1, '测试'))
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+test('KZ3 command已接受但读回断线时解除许可且不重试', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t, {
+    fields: [field({ name: 'command.start', bind: 'command.start', c_type: 'bool', reference: '00001' })]
+  })
+  debug.enableWrites('测试')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    if (command === 'kz3_http_get_point' && calls.some(c => c.command === 'kz3_http_write_point'))
+      throw new Error('读回断线')
+    return invoke(command, args)
+  }
+  await assert.rejects(debug.writePoint('command.start', true, '测试'))
+  assert.equal(debug.writesEnabled, false)
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 1)
+})
+
+test('KZ3 YAML往返保留未知字段、启动门禁、外部输入、PID零值和Runtime条件', async (t) => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  t.after(() => disposePinia(pinia))
+  const { deserializeProjectIoYaml, serializeProjectIoYaml } = await server.ssrLoadModule('/src/utils/yamlHelper.ts')
+  const { load } = await import('js-yaml')
+  const controller = useControllerStore()
+  const raw = load(controller.getYamlString())
+  raw.future = { enabled: false }
+  raw.project.contract = { identity: 'future' }
+  raw.project.startup = { parameter_restore: 'require_valid', future: 0 }
+  raw.project.input_quality = { board_ai_stale_after_ms: 500 }
+  raw.project.application_variables.external_inputs = [{ name: 'level', c_type: 'float', stale_after_ms: 1000 }]
+  raw.project.pids = [{ name: 'pid', kp: 0, ki: 0, kd: 0, derivative_filter_ms: 0, future: false }]
+  raw.project.runtime_counters = [{ name: 'run', trigger: { bind: 'state.running', active_value: true } }]
+  const { dump } = await import('js-yaml')
+  const exported = load(serializeProjectIoYaml(deserializeProjectIoYaml(dump(raw))))
+  assert.deepEqual(exported.future, raw.future)
+  assert.deepEqual(exported.project.contract, raw.project.contract)
+  assert.deepEqual(exported.project.startup, { ...raw.project.startup, ao_deferred_activation: false })
+  assert.deepEqual(exported.project.application_variables.external_inputs, raw.project.application_variables.external_inputs)
+  assert.equal(exported.project.pids[0].kp, 0)
+  assert.equal(exported.project.pids[0].ki, 0)
+  assert.equal(exported.project.pids[0].derivative_filter_ms, 0)
+  assert.deepEqual(exported.project.runtime_counters[0].trigger, raw.project.runtime_counters[0].trigger)
+})
+
+
+test('KZ3 OTA查询不可用时保持只读且不发送业务POST', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t)
+  debug.enableWrites('测试')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    if (command === 'kz3_http_get_ota_state') throw new Error('HTTP 503')
+    return invoke(command, args)
+  }
+  await assert.rejects(debug.writePoint('parameter.gain', 1, '测试'))
+  assert.equal(debug.writesEnabled, false)
+  assert.equal(debug.canEnableWrites, false)
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+
+test('KZ3 manifest严格镜像SDK的s32原名与f32别名', async () => {
+  const signed = await kz3Manifest.buildKz3PointManifest([field({ c_type: 's32' })])
+  assert.ok(signed.canonicalJson.includes('"s32","read_write","40011",2'))
+  const float = await kz3Manifest.buildKz3PointManifest([field({ c_type: 'f32' })])
+  assert.ok(float.canonicalJson.includes('"f32","read_write","40011",2'))
+})
+
+
+test('KZ3 预读跨越许可截止时间后不得发送POST', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t)
+  const realNow = Date.now
+  t.after(() => { Date.now = realNow })
+  debug.enableWrites('过期测试')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    const response = await invoke(command, args)
+    if (command === 'kz3_http_get_point') Date.now = () => realNow() + 11 * 60 * 1000
+    return response
+  }
+  await assert.rejects(debug.writePoint('parameter.gain', 1, '测试'))
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+
+test('KZ3 写前预读后修改URL不能把POST发到新设备', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t)
+  debug.enableWrites('目标切换测试')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    const response = await invoke(command, args)
+    if (command === 'kz3_http_get_point') debug.baseUrl = 'http://192.168.11.60:8080'
+    return response
+  }
+  await assert.rejects(debug.writePoint('parameter.gain', 1, '测试'))
+  assert.equal(debug.writesEnabled, false)
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+test('KZ3 类型别名在descriptor、地址分配与值校验中一致', async (t) => {
+  const { debug, controller } = await setupVerifiedKz3(t, { fields: [
+    field({ id:'a', name:'parameter.gain', bind:'parameter.gain', c_type:'f32' }),
+    field({ id:'b', name:'parameter.count', bind:'parameter.count', c_type:'uint32_t' })
+  ] })
+  assert.equal(debug.pointDescriptors[0].c_type, 'float')
+  assert.equal(debug.pointDescriptors[0].writeSupported, true)
+  assert.equal(debug.pointDescriptors[1].c_type, 'u32')
+  assert.equal(pointValueMatchesType('s32', 1.5), false)
+  assert.equal(pointValueMatchesType('s32', -2147483649), false)
+  assert.equal(pointValueMatchesType('s32', -2147483648), true)
+  assert.equal(pointValueMatchesType('unexpected', 1), false)
+  controller.autoAssignNorthboundAddresses()
+  assert.deepEqual(controller.doc.project.northbound.fields.map(f => f.reference), ['40001','40003'])
+  assert.deepEqual(controller.doc.project.northbound.fields.map(f => f.c_type), ['f32','uint32_t'])
+})
+
+test('KZ3 HTTP读回失败保留owner已经接受的证据', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t)
+  debug.enableWrites('读回错误测试')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    if (command === 'kz3_http_get_point' && calls.some(c => c.command === 'kz3_http_write_point'))
+      return {status:503,body:JSON.stringify({error:{code:'busy'}}),elapsedMs:1}
+    return invoke(command,args)
+  }
+  await assert.rejects(debug.writePoint('parameter.gain', 1, '测试'))
+  const event = debug.writeEvents[0]
+  assert.equal(event.acceptedByOwner, true)
+  assert.equal(event.readbackObserved, 'unknown')
+  assert.equal(debug.writesEnabled, false)
+})
+
+test('KZ3 未知故障状态或非布尔健康字段禁止业务写入', async (t) => {
+  for (const kind of ['fault','health']) await t.test(kind, async (st) => {
+    const { debug, diagnostics, calls } = await setupVerifiedKz3(st)
+    debug.enableWrites('诊断格式测试')
+    if (kind === 'fault') diagnostics.io.controller_fault = {}
+    else diagnostics.health.storage_healthy = 'true'
+    await assert.rejects(debug.writePoint('parameter.gain',1,'测试'))
+    assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length,0)
+  })
+})
+
+test('KZ3 YAML保持显式normal命令策略与未识别枚举供权威校验', async (t) => {
+  const pinia = createPinia(); setActivePinia(pinia); t.after(() => disposePinia(pinia))
+  const { deserializeProjectIoYaml, serializeProjectIoYaml } = await server.ssrLoadModule('/src/utils/yamlHelper.ts')
+  const { load, dump } = await import('js-yaml')
+  const raw = load(useControllerStore().getYamlString())
+  raw.project.application_variables.commands = [{name:'start',c_type:'bool',effect:'normal'}]
+  raw.project.pids = [{name:'pid',direction:'future_direction'}]
+  raw.project.northbound.fields[0].access = 'future_access'
+  const exported = load(serializeProjectIoYaml(deserializeProjectIoYaml(dump(raw))))
+  assert.equal(exported.project.application_variables.commands[0].effect,'normal')
+  assert.equal(exported.project.pids[0].direction,'future_direction')
+  assert.equal(exported.project.northbound.fields[0].access,'future_access')
+})
+
+
+test('KZ3 YAML不把字符串布尔值、非有限数或循环引用静默改成发布配置', async (t) => {
+  const pinia = createPinia(); setActivePinia(pinia); t.after(() => disposePinia(pinia))
+  const { deserializeProjectIoYaml } = await server.ssrLoadModule('/src/utils/yamlHelper.ts')
+  const { load, dump } = await import('js-yaml')
+  const raw = load(useControllerStore().getYamlString())
+  raw.project.application_variables.parameters = [{name:'mode',c_type:'bool',default:false,persistent:'false'}]
+  assert.throws(() => deserializeProjectIoYaml(dump(raw)), /persistent.*boolean/)
+  raw.project.application_variables.parameters = []
+  raw.project.pids = [{name:'pid',kp:NaN}]
+  assert.throws(() => deserializeProjectIoYaml(dump(raw)), /有限数值/)
+  assert.throws(() => deserializeProjectIoYaml('schema: kz3-project-io/v3\nproject: &p {future: *p}'), /循环/)
 })

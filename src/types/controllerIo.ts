@@ -106,7 +106,7 @@ export interface CommandConfig {
   id: string
   name: string
   c_type: 'bool'
-  effect?: 'protective'
+  effect?: 'normal' | 'protective'
   description?: string
 }
 

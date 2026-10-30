@@ -1,7 +1,7 @@
 # KZ3 在线调试工具交付与现场使用说明
 
 > 交付状态：HTTP 诊断、工程身份核对、点位观察和受控北向写入已接入；真实设备、HIL 与现场验证未完成。
-> 软件版本：NP-Tools 1.0.4；HTTP API：KZ3 v1；文档更新日期：2026-09-16。
+> 软件版本：NP-Tools 1.1.0工作树；HTTP API：KZ3 v1；文档更新日期：2026-10-30。
 
 ## 1. 当前范围
 
@@ -69,13 +69,33 @@
 ## 5. 仍需固件补齐的 P1 能力
 
 - HTTP 写入请求没有 `request_id` 或客户端可传的 `expected_parameter_revision`；无法提供幂等查询或 CAS 冲突证据。
-- 成功响应只有 `{name,ok}`；失败主要归并为 `403 point_write_failed`，没有稳定的类型、范围、忙、冲突和持久化错误码。
+- 成功响应只有 `{name,ok}`；当前固件已提供read_only/type_mismatch/out_of_range/busy/revision_conflict/rejected/persistence_error等稳定错误，工具保留原始响应。
 - HTTP 不提供认证、授权或 TLS；只能在受控隔离网络中使用，不能视为远程生产控制接口。
 - `/api/v1/points` 已提供分页实时值，但尚不提供设备侧 schema 元数据、跨页原子快照或采样 revision；工具仍以已核对的本地点表解释类型与权限。
 - HTTP 变量/软件输出目标不等于物理反馈；测试模式、反馈映射、互锁和 HIL 需要单独工艺与实板证据。
 
-详细源码差距与接口建议见 [KZ3 固件接口差距记录](../../KZ3_F427_SLE_V1/docs/NP-Tools固件接口差距记录.md)。
+详细源码差距与接口建议见 [KZ3 固件接口差距记录](../../../KZ3_F427_SLE_V1/docs/NP-Tools固件接口差距记录.md)。
 
 ## 6. 验证边界
 
 本说明不把工具构建、主机协议测试、HTTP 连通、工程 manifest 匹配、诊断读取、写后读回或人工备注描述为生产、现场或 HIL 通过。电气端子、负载、联锁、PID、RS485、Ethernet 长稳和现场网络均需独立的实板/现场记录。
+
+## 7. 2026-10-30配套修复后的使用条件
+
+写入还要求：标准KZ3型号/板型/MCU及12DI8DO4AI2AO、固定12位SN、schema7；只读OTA查询确认phase=1、无HOLD/候选/错误、参数/runtime有效或不适用、执行包与info1身份一致。
+连接/监视/写前都会复核；任何缺失、不支持、换SN/地址/包或OTA维护状态均保持只读。升级后重新连接并取得新许可。
+最终POST前按真实时间复查许可；command读回失败同样解除许可，不自动重试。导出报告含SN、确认包身份和OTA快照。
+新增适配器只发会话外info/status/info1，不open/接管升级会话，不能执行上传或自动accept_data/exit。
+
+YAML已保留未知/未编辑字段及合法零值，61份工程导出后全部生成通过。只保证配置语义保留，注释/排版不作字节保持；未知schema拒绝导入，导出仍须绑定SDK权威校验。
+当前没有设备认证、HTTP客户端CAS或跨客户端原子写事务；真实设备、HIL和现场验收仍须执行。
+
+
+## 8. 提交前复审补充（2026-10-30）
+
+目标URL与会话绑定，修改地址立即撤销许可，所有请求使用绑定地址；最终POST不读取临时改动的新目标。
+在线descriptor单独规范化f32/原生整数/s32别名，原YAML和manifest拼写保留；地址分配与冲突检查共用SDK宽度规则。
+显式effect:normal和未知枚举不再静默省略/替换；错误类型布尔、非有限数值及循环YAML引用明确拒绝。
+故障状态缺失或健康字段不是布尔true时不能写入；写后读回HTTP错误不会覆盖owner已经接受的证据。
+OTA只读响应还验证info1.query=1及sid/seq=0，错误来源或会话响应保持失败。
+权威生成复验脚本已纳入tests/kz3_compatibility_audit.py与tests/kz3CompatibilityAudit.mjs，不依赖未提交的works脚本。

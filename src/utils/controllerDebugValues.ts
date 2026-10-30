@@ -3,6 +3,16 @@ import type { NorthboundField } from '../types/controllerIo'
 
 type PointType = NorthboundField['c_type']
 
+/** 在线使用规范类型，YAML和manifest仍保留生成器的原始类型拼写。 */
+export function normalizePointType(type: string): PointType | undefined {
+  const aliases: Record<string, PointType> = {
+    bool: 'bool', float: 'float', f32: 'float', u16: 'u16', uint16_t: 'u16',
+    u32: 'u32', uint32_t: 'u32', i16: 'i16', s16: 'i16',
+    i32: 'i32', s32: 'i32', int32_t: 'i32'
+  }
+  return aliases[type]
+}
+
 const INTEGER_RANGES = {
   u16: { min: 0, max: 65535 },
   u32: { min: 0, max: 4294967295 },
@@ -11,7 +21,8 @@ const INTEGER_RANGES = {
 } as const
 
 function integerRange(type: PointType) {
-  return type === 'bool' || type === 'float' ? undefined : INTEGER_RANGES[type]
+  const normalized = normalizePointType(type)
+  return normalized && normalized !== 'bool' && normalized !== 'float' ? INTEGER_RANGES[normalized] : undefined
 }
 
 export function numericWriteConstraints(descriptor: PointDescriptor) {
@@ -28,7 +39,9 @@ export function isRuntimeClearBinding(binding: string): boolean {
 }
 
 export function pointValueMatchesType(type: PointType, value: unknown): value is Kz3Scalar {
-  if (type === 'bool') return typeof value === 'boolean'
+  const normalized = normalizePointType(type)
+  if (!normalized) return false
+  if (normalized === 'bool') return typeof value === 'boolean'
   if (typeof value !== 'number' || !Number.isFinite(value)) return false
   const range = integerRange(type)
   return !range || (Number.isInteger(value) && value >= range.min && value <= range.max)
@@ -36,7 +49,7 @@ export function pointValueMatchesType(type: PointType, value: unknown): value is
 
 // 只有 FLOAT 允许固件序列化产生的舍入误差；整数变化 1 也必须被观察到。
 export function pointValuesEqual(a: Kz3Scalar, b: Kz3Scalar, type?: PointType): boolean {
-  if (type === 'float' && typeof a === 'number' && typeof b === 'number') {
+  if (type && normalizePointType(type) === 'float' && typeof a === 'number' && typeof b === 'number') {
     return (
       Number.isFinite(a) &&
       Number.isFinite(b) &&

@@ -1,3 +1,4 @@
+import { kz3FieldWidth } from '../utils/kz3ProjectManifest'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type {
@@ -437,7 +438,7 @@ export const useControllerStore = defineStore('controller', () => {
         if (outKeys.length > 0 && outKeys.length < 4) {
           issues.push({
             code: 'INCOMPLETE_705_AO_GROUP',
-            severity: 'warning',
+            severity: 'error',
             tab: 'hardware',
             entity: `device:${dev.name}`,
             message: `705 模块使用 FC16 整组写入，建议将 ao01~ao04 全部 4 路输出均纳入声明并确认安全值`,
@@ -575,7 +576,7 @@ export const useControllerStore = defineStore('controller', () => {
       // Modbus Reference 格式与地址区检查 (含 32 位连续双寄存器冲突检查)
       const refStr = String(f.reference).padStart(5, '0')
       const refNum = parseInt(refStr, 10)
-      const is32Bit = f.c_type === 'u32' || f.c_type === 'i32' || f.c_type === 'float'
+      const is32Bit = kz3FieldWidth(f.c_type) === 2
       const registersOccupied = is32Bit && !isNaN(refNum)
         ? [refStr, String(refNum + 1).padStart(5, '0')]
         : [refStr]
@@ -641,13 +642,13 @@ export const useControllerStore = defineStore('controller', () => {
 
     // 6. 持久化参数容量检查 (FR-04)
     const persistentParams = p.application_variables.parameters.filter((param) => param.persistent)
-    if (persistentParams.length > 32) {
+    if (persistentParams.length > 30) {
       issues.push({
         code: 'PERSISTENT_PARAMS_CAPACITY_EXCEEDED',
-        severity: 'warning',
+        severity: 'error',
         tab: 'variables',
         entity: 'parameters',
-        message: `持久化参数数量为 ${persistentParams.length}，超过固件推荐的 EEPROM 32 个持久化参数容量上限`,
+        message: `持久化参数数量为 ${persistentParams.length}，超过固件EEPROM 30 个持久化参数容量上限`,
       })
     }
 
@@ -884,7 +885,7 @@ export const useControllerStore = defineStore('controller', () => {
           coilRef++
         }
       } else {
-        const width = f.c_type === 'u32' || f.c_type === 'float' || f.c_type === 'i32' ? 2 : 1
+        const width = kz3FieldWidth(f.c_type)
         if (!isRead || f.bind.startsWith('parameter.')) {
           f.reference = hrRef.toString().padStart(5, '0')
           hrRef += width
@@ -929,7 +930,7 @@ export const useControllerStore = defineStore('controller', () => {
         })
         diRef++
       } else {
-        const width = ptType === 'float' ? 2 : 1
+        const width = kz3FieldWidth(ptType)
         fields.push({
           id: `nb_${Date.now()}_${pt.name}`,
           name: `input.${pt.name}`,
@@ -956,7 +957,7 @@ export const useControllerStore = defineStore('controller', () => {
         })
         coilRef++
       } else {
-        const width = ptType === 'float' ? 2 : 1
+        const width = kz3FieldWidth(ptType)
         fields.push({
           id: `nb_${Date.now()}_${pt.name}`,
           name: `output.${pt.name}`,
@@ -982,7 +983,7 @@ export const useControllerStore = defineStore('controller', () => {
         })
         coilRef++
       } else {
-        const width = p.c_type === 'u32' || p.c_type === 'float' || p.c_type === 'i32' ? 2 : 1
+        const width = kz3FieldWidth(p.c_type)
         fields.push({
           id: `nb_${Date.now()}_${p.name}`,
           name: `param.${p.name}`,
@@ -1021,7 +1022,7 @@ export const useControllerStore = defineStore('controller', () => {
         })
         diRef++
       } else {
-        const width = s.c_type === 'u32' || s.c_type === 'float' || s.c_type === 'i32' ? 2 : 1
+        const width = kz3FieldWidth(s.c_type)
         fields.push({
           id: `nb_${Date.now()}_${s.name}`,
           name: `state.${s.name}`,

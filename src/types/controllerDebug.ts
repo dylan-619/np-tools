@@ -261,6 +261,7 @@ export interface DebugSessionReport {
     lastSuccessAt: number | null
     consecutiveErrors: number
   }
+  deviceVerification?: { serialNumber: string; packageIdentity: string; ota: unknown }
   diagnostics: Kz3Diagnostics
   /** v1 兼容字段：当前记录全部自动采样的北向点位名称。 */
   monitoredPoints: string[]

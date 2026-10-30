@@ -136,6 +136,7 @@ const writePermitBlockReason = computed(() => {
   if (debug.compatibilityState === 'partial') return debug.compatibilityReason
   if (debug.compatibilityState === 'unverified') return '设备工程身份与点表预检尚未完成'
   if (!debug.diagnostics.device) return '缺少设备身份诊断结果'
+  if (!debug.identityVerified) return '型号/SN或OTA已确认包状态未核实，保持只读；请查看会话预检日志'
   if (!debug.diagnostics.health || !debug.diagnostics.io) return '健康或 IO 诊断结果尚未就绪'
   if (debug.controllerFaultActive) return '控制器存在 active fault，请先排除故障'
   if (!debug.allHealthHealthy) return '四项健康门禁未全部通过'

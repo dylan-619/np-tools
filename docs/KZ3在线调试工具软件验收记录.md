@@ -100,3 +100,29 @@ notarization；Windows 安装包必须在 Windows 构建机执行并验证，当
 可以把本版本作为“KZ3 在线诊断与受控北向写入测试工具”交给内部工程师执行验证，但安装包发布负责人
 仍需根据目标平台完成正式签名/公证或 Windows 构建。写入测试开放不等于 HIL 通过，不得对外宣称已经
 具备生产写控制、HIL 闭环或现场投产验证。
+
+
+## 2026-10-30 固件配套兼容修复
+
+基于工具997d2d9工作树与固件2e3d7f1，修复完整配置树往返、零值、Runtime隐式字段、i32/别名manifest、型号/SN/schema/已确认OTA包与许可联动。
+61/61原始与导出配置生成通过，61个manifest及i32/s32/f32边界一致；无原字段丢失/改值，仅3份required_profiles排序。
+`pnpm test:protocol` 84/84（KZ3相关54项），Rust HTTP测试6/6含真实本地伪设备；vue-tsc及前端构建通过。
+新增测试覆盖HOLD、数据无效、换SN/型号/包、未知schema、查询失败、等待中撤销/到期及command读回失败。未作实板OTA/HIL或现场验收。
+证据：`works/2026-10-30-kz3-compatibility/`；详细当前状态见固件仓库[差距记录第9节](../../../KZ3_F427_SLE_V1/docs/NP-Tools固件接口差距记录.md#9-2026-10-30-兼容修复与复验)。
+
+
+## 2026-10-30 提交前复审
+
+复审修正目标URL切换窗口、类型别名在在线校验/地址宽度中的漂移、normal命令策略被省略、读回失败覆盖owner接受证据；补齐异常YAML/诊断类型、info1查询号及会话外sid/seq检查。
+最终`pnpm test:protocol` **92/92**（controllerDebug套件62项）；Rust HTTP测试 **6/6**（真实本地伪设备覆盖正常、错peer、错info1 query、意外会话sid）；前端构建/类型检查、修改TS/Vue文件定向ESLint及git diff --check通过。Vite保留既有大chunk提示。
+61份原始/导出配置生成通过；无原字段删除/改值，仅3份required_profiles排序，61个manifest和i32/s32/f32三个边界一致。
+
+可复现跨仓库审计（Python需PyYAML，工具node_modules需已安装）：
+
+```sh
+python3 tests/kz3_compatibility_audit.py \
+  --firmware-root /absolute/KZ3_F427_SLE_V1 \
+  --output-dir /absolute/new-audit-output
+```
+
+上述为源码软件验证；没有烧录、设备OTA、实板HIL或现场操作。日志保存在works/2026-10-30-kz3-review/。
