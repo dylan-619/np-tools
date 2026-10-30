@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - Before_OTA
   pull_request:
     branches:
       - main
