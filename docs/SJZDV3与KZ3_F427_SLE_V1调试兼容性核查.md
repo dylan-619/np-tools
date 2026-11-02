@@ -56,6 +56,16 @@ KZ3 UART1 固定为 `115200 8N1`、无流控。当前分支没有 `@CFG,IO,SHOW`
 
 工具将 `ONLINE=1` 标为“固件 TCP 客户端在线”，但不将其描述为网关已接入、下行已执行、数据已被平台消费或现场工艺已验收。当前代码中直连 Edge TCP 的网关路由和最新镜像 Ethernet HIL 仍需独立验证。
 
+### 2.4 2026-11-02 OTA_DEV 三种通信模式互斥配套
+
+本增补对照 `/Users/Dylan/work_project/new-yunteng/iot-project/KZ3_F427_SLE_V1` 的 `OTA_DEV` 本轮修改，不把同级 `TCP_NETTY` 或已安装旧 Base 直接视为具备互斥能力。
+
+固件保持 EEPROM 记录布局、版本和 UART 命令格式：有效 `EDGE enabled=1` 选择 TCP，重启后关闭星闪/4G；否则运行无线公共记录选定的 SLE 或 CAT1。选择 `WIRELESS,MODE,SLE/CAT1` 会保存无线目标并关闭有效 TCP 开关、保留地址和端口；无线参数、Cat.1 参数和上报周期写入不切换通道。保存后安全重启生效，更换模组必须断电；TCP 断线不自动启用无线。这里的 TCP 特指 Edge TCP / Netty，HTTP 和 Modbus TCP 不参与三选一，服务及原有写入门禁保持不变；没有把诊断字段 `remote_write_allowed` 改为新的协议权限开关。
+
+维护页显示实际运行模式与下次启动选择。TCP 下无线 `SAVED=SLE/CAT1` 是保留配置，`RUN=DISABLED,PORT=0` 才表示无线已停用。每次模式保存后自动查询 `WIRELESS/EDGE` 两组；选择无线时复核 TCP 已关闭，保存 TCP 时比对 IP/端口/开关。ACK 后回读失败返回复核失败，不沿用旧快照；固件返回模式保存 ERR 时仍尝试回读两组，保留错误且不重发写命令。旧 Base 回读显示 TCP 未关闭时不标为模式切换成功；重启后 TCP 与无线端口同时启用时显示冲突，需更新支持互斥的 Base。
+
+本轮仅执行本地模拟协议、Pinia store、前端及 Rust/桌面构建验证，不连接串口、不重启控制器、不烧录或发布固件。实际硬件三种模式和重启闭环仍待实板验证。日志见 `works/2026-11-02-communication-exclusive/`。
+
 ## 3. 本次工具调整
 
 1. 增加“设备调试导航”首页，按 SJZDV3 / KZ3 产品线展示串口前置条件、能力范围和快捷入口。

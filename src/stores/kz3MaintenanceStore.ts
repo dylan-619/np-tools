@@ -11,7 +11,9 @@ import type {
 } from '../types/kz3Maintenance'
 import {
   getCommandGroup,
-  getFollowUpQuery,
+  getFollowUpGroups,
+  communicationSaveError,
+  getCommunicationMode,
   isProtocolLine,
   KZ3_UART_CONFIG,
   KZ3_QUERY_COMMANDS,
@@ -56,6 +58,10 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
       (snapshot) => !snapshot || snapshot.port === serial.connectedPort
     )
   )
+  const communicationMode = computed(() => ({
+    run: getCommunicationMode(snapshots.value.wireless?.fields || {}, snapshots.value.edge?.fields || {}, 'run'),
+    saved: getCommunicationMode(snapshots.value.wireless?.fields || {}, snapshots.value.edge?.fields || {}, 'saved'),
+  }))
 
   function finishPending(resultStatus: Kz3CommandResult['status'], error?: string) {
     if (!pending) return
@@ -238,16 +244,39 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
     lastError.value = ''
     const result = await transact(command)
     appendRecord(result, 'write', port)
-    if (result.status !== 'ok') {
-      lastError.value = result.error || result.protocolLine || '设备拒绝写入'
-      status.value = 'error'
-      return result
+    const writeRecord = records.value[records.value.length - 1]
+    const groups = getFollowUpGroups(command)
+    const modeChange = groups.length === 2
+    let verificationError = ''
+    // 模式保存可能只完成第一条 EEPROM 记录；ERR 后也回读两组，不重发写命令。
+    if (result.status === 'ok' || (modeChange && result.status === 'device_error')) {
+      for (const group of groups) delete snapshots.value[group]
+      for (const group of groups) {
+        const queryResult = await runQuery(group, true)
+        if (queryResult.status !== 'ok') {
+          verificationError = queryResult.error || queryResult.protocolLine || '写后查询失败'
+          break
+        }
+        if (!snapshots.value[group]) {
+          verificationError = '写后未收到对应配置域的 SHOW 快照'
+          break
+        }
+      }
+      if (!verificationError && modeChange) {
+        verificationError = communicationSaveError(command,
+          snapshots.value.wireless?.fields || {}, snapshots.value.edge?.fields || {}) || ''
+      }
     }
-
-    const followUp = getFollowUpQuery(command)
-    if (followUp) {
-      const queryResult = await runQuery(getCommandGroup(command), true)
-      if (queryResult.status !== 'ok') return result
+    if (result.status !== 'ok' || verificationError) {
+      lastError.value = result.status !== 'ok'
+        ? result.error || result.protocolLine || '设备拒绝写入'
+        : verificationError
+      status.value = 'error'
+      if (result.status === 'ok' && verificationError) {
+        writeRecord.status = 'verification_error'
+        writeRecord.error = verificationError
+      }
+      return result.status !== 'ok' ? result : { ...result, status: 'verification_error', error: verificationError }
     }
     status.value = hasRebootPending.value ? 'waiting_reboot' : 'connected'
     return result
@@ -318,6 +347,7 @@ export const useKz3MaintenanceStore = defineStore('kz3Maintenance', () => {
     isBusy,
     hasRebootPending,
     snapshotPortMatches,
+    communicationMode,
     initialize,
     runQuery,
     runWrite,

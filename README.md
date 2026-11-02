@@ -27,6 +27,7 @@
   - 提供工程组态与独立的 HTTP 在线调试工作模式；可按 `project_io.yaml` 还原双 RS-485 端口、标准扩展模块和 ET703 等第三方 Profile。大点表设备在 I/O 拓扑中以摘要卡展示，悬停或键盘聚焦可查看全部已配置点的中文含义、当前值和质量。在线模式支持固定诊断、`/api/v1/project` 工程身份与点表 manifest 核对，并在连接后按 30 条一页自动采样全部北向点位，无需逐点加入监视；同时提供质量/时效判断、诊断侧栏和会话报告导出。参数调试期间可打开可拖动、缩放和收起的 I/O 拓扑伴随浮窗，浮窗共享同一调试会话和样本，不额外建立连接或轮询器。
   - 北向通信字段可继续导出工程审阅 CSV，也可生成 `smart-edge-gateway` 采集点全量导入格式的 `.xlsx`。网关 Excel 固定输出 14 列契约，按 KZ3 五位 Modicon 地址推导功能码，规范映射 `BOOLEAN/INT16/UINT16/INT32/UINT32/FLOAT`，保持 `00001` 等地址为文本，并使用 Modbus TCP Unit ID 1、1000 ms 采集间隔；导入前仍需在网关页面选中对应的 `MODBUS_TCP` 设备并备份原点表。
   - 提供独立的 UART1 设备初始化与维护工作台：固定 `115200 8N1`，结构化配置生产 SN、Ethernet、星闪 SLE、Cat.1/MQTT、Edge TCP 和调试日志；支持写前校验、写后查询、RUN/SAVED 对照、SLE 多层生效状态及会话记录导出。Ethernet 重启后只能由 `SAVED_*` 回读值生成单一 HTTP 复连候选，不扫描网络；Edge TCP 的 `ONLINE` 仅表示固件客户端状态，不等同于网关路由或现场业务验收。
+  - 配套本次 `OTA_DEV` 互斥 Base 时，星闪、4G、TCP 直连三选一：保存无线模式会关闭 TCP，启用 TCP 后重启会关闭无线；参数更新不切换通道。这里的 TCP 直连特指 Edge TCP / Netty，HTTP 和 Modbus TCP 服务及原有写入门禁保持不变。维护页在模式保存后回读两组并显示当前/下次启动选择，旧 Base 未关闭 TCP 或仍同时运行无线时明确提示，保存后需安全重启复核。
   - 当前 `KZ3_F427_SLE_V1` 的 `TCP_NETTY` 固件分支不提供旧版 `@CFG,IO,*` 系统角色命令；工具已收敛为当前支持的 `@CFG,EDGE,*`。详见 [SJZDV3 与 KZ3 F427 调试兼容性核查](docs/SJZDV3与KZ3_F427_SLE_V1调试兼容性核查.md)。
   - 仅当工程 ID、版本、manifest 算法/hash、点数匹配，且健康、无 active fault、操作员信息和 10 分钟显式许可均满足时，才允许 BOOL/FLOAT/U32 parameter 与 BOOL 单次 command（含累计运行时间清零）受控写入。U16/I16/I32、`point.*`、`state.*` 和物理 I/O 保持禁用；HTTP 缺少 CAS、request ID、认证和 TLS，失败不重试。任何工具端接口都不代表 HIL 或现场验证通过。使用前阅读 [KZ3 在线调试工具交付与现场使用说明](docs/KZ3在线调试工具交付与现场使用说明.md)。
 - **STM32F407/F427 双星闪级联协调器**：

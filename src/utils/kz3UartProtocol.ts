@@ -521,6 +521,63 @@ export function getFollowUpQuery(command: string): string | null {
   return KZ3_QUERY_COMMANDS[getCommandGroup(command)]
 }
 
+/** 模式选择会影响两组保存值；普通参数保存仍只查询所属配置域。 */
+export function getFollowUpGroups(command: string): Kz3ConfigGroup[] {
+  if (!getFollowUpQuery(command)) return []
+  if (command.startsWith('@CFG,WIRELESS,MODE,') || command.startsWith('@CFG,EDGE,SET,')) {
+    return ['wireless', 'edge']
+  }
+  return [getCommandGroup(command)]
+}
+
+/** 按实际 SHOW 回包核对保存结果，不能把旧固件的单组 ACK 当作互斥切换成功。 */
+export function communicationSaveError(
+  command: string,
+  wireless: Record<string, string>,
+  edge: Record<string, string>
+): string | null {
+  if (command.startsWith('@CFG,WIRELESS,MODE,')) {
+    const target = ['SLE', '1'].includes(command.split(',')[3]) ? 'SLE' : 'CAT1'
+    if (wireless.VALID !== '1' || wireless.SAVED !== target) {
+      return '无线模式保存值未通过回读复核，请重新查询设备状态'
+    }
+    if (edge.VALID !== '0' && (edge.VALID !== '1' || edge.SAVED_ENABLE !== '0')) {
+      return '无线模式已保存，但 TCP 未确认关闭；请检查 Base 固件是否支持三种模式互斥'
+    }
+  }
+  if (command.startsWith('@CFG,EDGE,SET,')) {
+    const parts = command.split(',')
+    if (edge.VALID !== '1' || edge.SAVED_ENABLE !== parts[5] ||
+        edge.SAVED_IP !== normalizeEdgeTcpServerIp(parts[3]) ||
+        Number(edge.SAVED_PORT) !== Number(parts[4])) {
+      return 'TCP 地址、端口或开关未通过保存值回读复核，请重新查询设备状态'
+    }
+  }
+  return null
+}
+
+export type Kz3CommunicationMode = 'TCP' | 'SLE' | 'CAT1' | 'DISABLED' | 'UNKNOWN' | 'CONFLICT'
+
+/** TCP 开关选择通道；无线 SAVED 在 TCP 下仅为保留配置，ONLINE 不参与模式判定。 */
+export function getCommunicationMode(
+  wireless: Record<string, string>,
+  edge: Record<string, string>,
+  source: 'run' | 'saved'
+): Kz3CommunicationMode {
+  const enable = source === 'run' ? edge.RUN_ENABLE : edge.SAVED_ENABLE
+  if (enable === undefined || (source === 'saved' && edge.VALID === undefined)) return 'UNKNOWN'
+  if (enable === '1' && (source === 'run' || edge.VALID === '1')) {
+    if (source === 'run') {
+      if (wireless.RUN === undefined || wireless.PORT === undefined) return 'UNKNOWN'
+      if (wireless.PORT === '1') return 'CONFLICT'
+    }
+    return 'TCP'
+  }
+  const mode = source === 'run' ? wireless.RUN : wireless.SAVED
+  if (mode === 'SLE' || mode === 'CAT1') return mode
+  return mode === 'DISABLED' ? 'DISABLED' : 'UNKNOWN'
+}
+
 function decodeSleName(value: string): string {
   return value.replace(/%2C/gi, ',').replace(/%25/gi, '%')
 }

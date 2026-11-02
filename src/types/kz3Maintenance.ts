@@ -33,7 +33,7 @@ export interface Kz3Snapshot {
 export interface Kz3CommandResult {
   command: string
   group: Kz3ConfigGroup
-  status: 'ok' | 'device_error' | 'timeout' | 'communication_error'
+  status: 'ok' | 'device_error' | 'timeout' | 'communication_error' | 'verification_error'
   protocolLine: string
   rawLines: string[]
   startedAt: string

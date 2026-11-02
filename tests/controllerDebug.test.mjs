@@ -23,6 +23,7 @@ const { useControllerDebugStore } = await server.ssrLoadModule(
 )
 const kz3Manifest = await server.ssrLoadModule('/src/utils/kz3ProjectManifest.ts')
 const protocol = await server.ssrLoadModule('/src/utils/kz3UartProtocol.ts')
+const { useKz3MaintenanceStore } = await server.ssrLoadModule('/src/stores/kz3MaintenanceStore.ts')
 const xtqProtocol = await server.ssrLoadModule('/src/utils/xtqCoordinatorProtocol.ts')
 const sjzdModbusDebug = await server.ssrLoadModule('/src/utils/sjzdModbusDebug.ts')
 const { useSerialStore } = await server.ssrLoadModule('/src/stores/serialStore.ts')
@@ -1591,4 +1592,143 @@ test('KZ3 YAML不把字符串布尔值、非有限数或循环引用静默改成
   raw.project.pids = [{name:'pid',kp:NaN}]
   assert.throws(() => deserializeProjectIoYaml(dump(raw)), /有限数值/)
   assert.throws(() => deserializeProjectIoYaml('schema: kz3-project-io/v3\nproject: &p {future: *p}'), /循环/)
+})
+
+test('KZ3 三种通信模式按 TCP 开关单选，保留无线记录不等于无线正在运行', () => {
+  assert.equal(protocol.getCommunicationMode({ RUN: 'DISABLED', SAVED: 'SLE', PORT: '0' },
+    { VALID: '1', RUN_ENABLE: '1', SAVED_ENABLE: '1', ONLINE: '0' }, 'run'), 'TCP')
+  assert.equal(protocol.getCommunicationMode({ SAVED: 'SLE' },
+    { VALID: '1', SAVED_ENABLE: '1' }, 'saved'), 'TCP')
+  for (const mode of ['SLE', 'CAT1']) {
+    assert.equal(protocol.getCommunicationMode({ RUN: mode, SAVED: mode, PORT: '1' },
+      { VALID: '1', RUN_ENABLE: '0', SAVED_ENABLE: '0' }, 'run'), mode)
+    assert.equal(protocol.getCommunicationMode({ SAVED: mode },
+      { VALID: '0', SAVED_ENABLE: '0' }, 'saved'), mode)
+  }
+  assert.equal(protocol.getCommunicationMode({ RUN: 'SLE', PORT: '1' },
+    { RUN_ENABLE: '1' }, 'run'), 'CONFLICT')
+  assert.equal(protocol.getCommunicationMode({}, { RUN_ENABLE: '1' }, 'run'), 'UNKNOWN')
+  assert.equal(protocol.getCommunicationMode({ RUN: 'SLE' }, {}, 'run'), 'UNKNOWN')
+})
+
+test('KZ3 只有模式选择要求双组回读，参数写入不会发送切换命令', () => {
+  assert.deepEqual(protocol.getFollowUpGroups('@CFG,WIRELESS,MODE,SLE'), ['wireless', 'edge'])
+  assert.deepEqual(protocol.getFollowUpGroups('@CFG,WIRELESS,MODE,CAT1'), ['wireless', 'edge'])
+  assert.deepEqual(protocol.getFollowUpGroups('@CFG,EDGE,SET,192.168.1.10,9000,1'), ['wireless', 'edge'])
+  assert.deepEqual(protocol.getFollowUpGroups('@CFG,WIRELESS,REPORT,15'), ['wireless'])
+  assert.deepEqual(protocol.getFollowUpGroups('@CFG,4G,HOST,broker'), ['cat1'])
+  assert.deepEqual(protocol.getFollowUpGroups('@CFG,SLE,PWR,5'), ['sle'])
+  assert.deepEqual(protocol.getFollowUpGroups('@RST'), [])
+})
+
+async function setupMaintenance(t, replies) {
+  const previousWindow = globalThis.window
+  globalThis.window = {
+    setTimeout: (callback, delay = 0) => setTimeout(callback, delay >= 2000 ? 200 : 0),
+    clearTimeout,
+  }
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const serial = useSerialStore()
+  serial.config = { path: 'mock-kz3', ...protocol.KZ3_UART_CONFIG }
+  serial.connectedPort = 'mock-kz3'
+  let receive = () => {}
+  const calls = []
+  t.mock.method(serial, 'registerLineListener', (_id, listener) => { receive = listener })
+  t.mock.method(serial, 'sendRaw', async (command) => {
+    calls.push(command)
+    const response = typeof replies === 'function' ? replies(command) : replies[command]
+    assert.ok(response, `未声明维护回包：${command}`)
+    for (const line of Array.isArray(response) ? response : [response]) receive(line)
+  })
+  const maintenance = useKz3MaintenanceStore()
+  t.after(() => {
+    disposePinia(pinia)
+    globalThis.window = previousWindow
+  })
+  return { maintenance, calls }
+}
+
+test('KZ3 切回无线回读两组保存值，运行模式直到重启后查询才变化', async (t) => {
+  let rebooted = false
+  const { maintenance, calls } = await setupMaintenance(t, (command) => {
+    if (command === '@CFG,WIRELESS,MODE,SLE') return 'OK,MODE_SAVED,POWER_CYCLE_REQUIRED'
+    if (command === '@CFG,WIRELESS,SHOW') return rebooted
+      ? 'OK,WIRELESS,RUN=SLE,SAVED=SLE,VALID=1,PORT=1,REBOOT_REQUIRED=0'
+      : 'OK,WIRELESS,RUN=DISABLED,SAVED=SLE,VALID=1,PORT=0,REBOOT_REQUIRED=1'
+    if (command === '@CFG,EDGE,SHOW') return rebooted
+      ? 'OK,EDGE,VALID=1,RUN_ENABLE=0,SAVED_ENABLE=0,REBOOT_REQUIRED=0'
+      : 'OK,EDGE,VALID=1,RUN_ENABLE=1,SAVED_ENABLE=0,REBOOT_REQUIRED=1'
+  })
+  assert.equal((await maintenance.runWrite('@CFG,WIRELESS,MODE,SLE')).status, 'ok')
+  assert.deepEqual(calls, ['@CFG,WIRELESS,MODE,SLE', '@CFG,WIRELESS,SHOW', '@CFG,EDGE,SHOW'])
+  assert.deepEqual(maintenance.communicationMode, { run: 'TCP', saved: 'SLE' })
+  assert.equal(maintenance.status, 'waiting_reboot')
+  rebooted = true
+  await maintenance.runQuery('wireless')
+  await maintenance.runQuery('edge')
+  assert.deepEqual(maintenance.communicationMode, { run: 'SLE', saved: 'SLE' })
+  assert.equal(maintenance.status, 'connected')
+})
+
+test('KZ3 启用 TCP 后只确认下次选择，当前星闪保持运行', async (t) => {
+  const command = '@CFG,EDGE,SET,192.168.1.10,9000,1'
+  const { maintenance, calls } = await setupMaintenance(t, {
+    [command]: 'OK,EDGE_SAVED,POWER_CYCLE_REQUIRED',
+    '@CFG,WIRELESS,SHOW': 'OK,WIRELESS,RUN=SLE,SAVED=SLE,VALID=1,PORT=1,REBOOT_REQUIRED=1',
+    '@CFG,EDGE,SHOW': 'OK,EDGE,VALID=1,RUN_ENABLE=0,SAVED_ENABLE=1,SAVED_IP=192.168.1.10,SAVED_PORT=9000,REBOOT_REQUIRED=1',
+  })
+  assert.equal((await maintenance.runWrite(command)).status, 'ok')
+  assert.deepEqual(maintenance.communicationMode, { run: 'SLE', saved: 'TCP' })
+  assert.equal(maintenance.status, 'waiting_reboot')
+  assert.equal(calls.filter((item) => !item.endsWith(',SHOW')).length, 1)
+})
+
+test('KZ3 旧固件 ACK 未关闭 TCP 时工具拒绝宣称互斥保存成功', async (t) => {
+  const { maintenance, calls } = await setupMaintenance(t, {
+    '@CFG,WIRELESS,MODE,CAT1': 'OK,MODE_SAVED,POWER_CYCLE_REQUIRED',
+    '@CFG,WIRELESS,SHOW': 'OK,WIRELESS,RUN=SLE,SAVED=CAT1,VALID=1,PORT=1,REBOOT_REQUIRED=1',
+    '@CFG,EDGE,SHOW': 'OK,EDGE,VALID=1,RUN_ENABLE=1,SAVED_ENABLE=1,REBOOT_REQUIRED=0',
+  })
+  const result = await maintenance.runWrite('@CFG,WIRELESS,MODE,CAT1')
+  assert.equal(result.status, 'verification_error')
+  assert.match(result.error, /TCP 未确认关闭/)
+  assert.equal(maintenance.records.find((record) => record.operation === 'write').status, 'verification_error')
+  assert.equal(maintenance.status, 'error')
+  assert.equal(maintenance.communicationMode.run, 'CONFLICT')
+  assert.equal(calls.length, 3)
+})
+
+test('KZ3 无线已保存而 TCP 关闭失败时回读两组，保留 ERR 且不重发', async (t) => {
+  const { maintenance, calls } = await setupMaintenance(t, {
+    '@CFG,WIRELESS,MODE,SLE': 'ERR,EDGE_SAVE',
+    '@CFG,WIRELESS,SHOW': 'OK,WIRELESS,RUN=DISABLED,SAVED=SLE,VALID=1,PORT=0,REBOOT_REQUIRED=0',
+    '@CFG,EDGE,SHOW': 'OK,EDGE,VALID=1,RUN_ENABLE=1,SAVED_ENABLE=1,REBOOT_REQUIRED=0',
+  })
+  assert.equal((await maintenance.runWrite('@CFG,WIRELESS,MODE,SLE')).status, 'device_error')
+  assert.equal(maintenance.snapshots.wireless.fields.SAVED, 'SLE')
+  assert.equal(maintenance.lastError, 'ERR,EDGE_SAVE')
+  assert.equal(maintenance.status, 'error')
+  assert.equal(calls.length, 3)
+})
+
+test('KZ3 保存后查询失败不得沿用旧快照或返回保存复核成功', async (t) => {
+  const { maintenance } = await setupMaintenance(t, {
+    '@CFG,WIRELESS,MODE,SLE': 'OK,MODE_SAVED,POWER_CYCLE_REQUIRED',
+    '@CFG,WIRELESS,SHOW': 'OK,WIRELESS,RUN=DISABLED,SAVED=SLE,VALID=1,PORT=0,REBOOT_REQUIRED=1',
+    '@CFG,EDGE,SHOW': 'ERR,EDGE_READ',
+  })
+  maintenance.snapshots.edge = { group: 'edge', fields: { VALID: '1', SAVED_ENABLE: '0' }, port: 'mock-kz3' }
+  assert.equal((await maintenance.runWrite('@CFG,WIRELESS,MODE,SLE')).status, 'verification_error')
+  assert.equal(maintenance.snapshots.edge, undefined)
+  assert.equal(maintenance.status, 'error')
+})
+
+test('KZ3 无线周期更新只发送原参数命令和无线查询', async (t) => {
+  const { maintenance, calls } = await setupMaintenance(t, {
+    '@CFG,WIRELESS,REPORT,12': 'OK,WIRELESS_UPDATED',
+    '@CFG,WIRELESS,SHOW': 'OK,WIRELESS,RUN=DISABLED,SAVED=SLE,VALID=1,PORT=0,REPORT_RAW=12,REBOOT_REQUIRED=0',
+  })
+  assert.equal((await maintenance.runWrite('@CFG,WIRELESS,REPORT,12')).status, 'ok')
+  assert.deepEqual(calls, ['@CFG,WIRELESS,REPORT,12', '@CFG,WIRELESS,SHOW'])
 })

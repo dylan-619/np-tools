@@ -112,7 +112,7 @@ const sections: Array<{
   { id: 'system', label: '生产身份', caption: 'SN / 型号 / 地址', icon: Fingerprint },
   { id: 'ethernet', label: 'Ethernet', caption: 'RUN / SAVED', icon: EthernetPort },
   { id: 'sle', label: '星闪 SLE', caption: 'EEPROM / 模组确认', icon: Radio },
-  { id: 'wireless', label: '无线承载', caption: 'SLE / Cat.1 模式', icon: Activity },
+  { id: 'wireless', label: '无线承载', caption: 'SLE / Cat.1 · 与 TCP 互斥', icon: Activity },
   { id: 'cat1', label: 'Cat.1 / MQTT', caption: '首配 / 差异 / 重连', icon: Settings2 },
   { id: 'edge', label: 'Edge TCP', caption: 'RUN / SAVED / 客户端', icon: EthernetPort },
   { id: 'debug', label: '调试日志', caption: '持久化 DEBUG 开关', icon: TerminalSquare },
@@ -140,6 +140,12 @@ const statusText = computed(() => {
   }
   return labels[maintenance.status]
 })
+const communicationModeLabels = {
+  TCP: 'TCP 直连', SLE: '星闪 SLE', CAT1: '4G Cat.1',
+  DISABLED: '关闭 / 未配置', UNKNOWN: '待查询两组状态', CONFLICT: 'TCP 与无线同时启用',
+}
+const runningCommunicationMode = computed(() => communicationModeLabels[maintenance.communicationMode.run])
+const savedCommunicationMode = computed(() => communicationModeLabels[maintenance.communicationMode.saved])
 const sleLevel = computed(() =>
   sleConfirmationLevel(maintenance.snapshots.sle?.fields || {})
 )
@@ -201,9 +207,15 @@ function formatTime(iso: string) {
 
 async function query(group: Kz3ConfigGroup) {
   try {
-    const result = await maintenance.runQuery(group)
-    if (result.status === 'ok') showMessage(`${sections.find((item) => item.id === group)?.label}查询完成`)
-    else showMessage(result.error || result.protocolLine || '查询失败', true)
+    const groups: Kz3ConfigGroup[] = group === 'wireless' || group === 'edge' ? ['wireless', 'edge'] : [group]
+    for (const queryGroup of groups) {
+      const result = await maintenance.runQuery(queryGroup)
+      if (result.status !== 'ok') {
+        showMessage(result.error || result.protocolLine || '查询失败', true)
+        return
+      }
+    }
+    showMessage(groups.length === 2 ? '无线与 TCP 状态已同时读取' : `${sections.find((item) => item.id === group)?.label}查询完成`)
   } catch (error) {
     showMessage(String(error), true)
   }
@@ -638,10 +650,10 @@ onMounted(() => {
               </small>
             </button>
             <button class="summary-card" @click="activeSection = 'wireless'">
-              <div class="card-top"><Activity :size="18" /><span>无线承载</span></div>
-              <strong>{{ field('wireless', 'RUN') }}</strong>
+              <div class="card-top"><Activity :size="18" /><span>通信模式</span></div>
+              <strong>{{ runningCommunicationMode }}</strong>
               <small :class="hasSnapshot('wireless') && !isOne('wireless', 'REBOOT_REQUIRED') ? 'good' : 'warn'">
-                {{ !hasSnapshot('wireless') ? '尚未查询' : isOne('wireless', 'REBOOT_REQUIRED') ? '保存值待断电复核' : '运行 / 保存状态已读取' }}
+                下次启动：{{ savedCommunicationMode }}
               </small>
             </button>
             <button class="summary-card" @click="activeSection = 'cat1'">
@@ -750,16 +762,17 @@ onMounted(() => {
           <div class="editor-card">
             <div class="section-heading compact"><div><span class="section-kicker">WIRELESS OWNER · EEPROM 96..127</span><h2>无线承载与报告周期</h2></div><button class="button small" :disabled="!maintenanceReady || maintenance.isBusy" @click="query('wireless')"><RefreshCw :size="13" /> 查询</button></div>
             <div class="form-grid">
-              <label class="form-field"><span>下次启动无线承载</span><select v-model="wireless.mode"><option value="SLE">SLE</option><option value="CAT1">Cat.1 / MQTT</option></select><small>固件会先校验目标承载的保存记录；切换后需断电复核。</small></label>
+              <label class="form-field"><span>下次启动无线承载</span><select v-model="wireless.mode"><option value="SLE">SLE</option><option value="CAT1">Cat.1 / MQTT</option></select><small>选择无线模式会同时关闭 TCP 启动开关；保存后重启生效。</small></label>
               <label class="form-field"><span>报告周期原始值</span><input v-model="wireless.reportSeconds" class="mono" inputmode="numeric"><small>0..255；设备同时回显换算后的 REPORT_SEC。</small></label>
             </div>
-            <p class="warning-box">模式切换的 OK 只证明 EEPROM 已保存。固件返回 POWER_CYCLE_REQUIRED 后，必须在安全条件下断电再上电、重新 SHOW，不能把串口软重启当作无线承载已经切换。</p>
-            <div class="debug-actions"><button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认保存无线承载模式', '保存的无线承载在下次断电上电后才会成为 RUN。请先确认目标 SLE 或 Cat.1 记录有效。', () => buildWirelessModeCommand(wireless.mode))"><Radio :size="14" /> 保存承载模式</button><button class="button secondary" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认更新无线报告周期', '仅更新无线公共记录；工具会在 ACK 后读取 SHOW 复核保存值。', () => buildWirelessReportCommand(wireless.reportSeconds))"><Save :size="14" /> 更新报告周期</button></div>
+            <p class="warning-box">星闪、4G、TCP 直连三种模式互斥。保存无线模式会关闭 TCP；保存参数或上报周期不会切换模式。工具同时回读两组状态，保存后仍需安全重启并重新查询；更换无线模组必须断电。</p>
+            <div class="debug-actions"><button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认保存无线承载模式', '将保存目标无线模式，并关闭 TCP 启动开关，保留 TCP 地址和端口。当前通道继续运行，安全重启后生效；工具会回读无线与 TCP 两组保存值。', () => buildWirelessModeCommand(wireless.mode))"><Radio :size="14" /> 保存承载模式</button><button class="button secondary" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认更新无线报告周期', '仅更新无线公共记录；工具会在 ACK 后读取 SHOW 复核保存值。', () => buildWirelessReportCommand(wireless.reportSeconds))"><Save :size="14" /> 更新报告周期</button></div>
           </div>
           <div class="snapshot-card">
             <h3>RUN / SAVED 与链路状态</h3>
+            <p class="info-box">当前通信：{{ runningCommunicationMode }}；下次启动：{{ savedCommunicationMode }}。TCP 模式下无线 SAVED 仅为保留配置。</p>
             <dl><div><dt>RUN</dt><dd>{{ field('wireless', 'RUN') }}</dd></div><div><dt>SAVED</dt><dd>{{ field('wireless', 'SAVED') }}</dd></div><div><dt>配置有效</dt><dd :class="isOne('wireless', 'VALID') ? 'good' : 'warn'">{{ field('wireless', 'VALID') }}</dd></div><div><dt>报告周期</dt><dd class="mono">{{ field('wireless', 'REPORT_SEC') }} s / RAW {{ field('wireless', 'REPORT_RAW') }}</dd></div><div><dt>Cat.1 链路</dt><dd>{{ field('wireless', 'CAT1_ONLINE') === '1' ? 'ONLINE' : '未确认' }} / STATE {{ field('wireless', 'CAT1_STATE') }}</dd></div></dl>
-            <div class="state-banner" :class="isOne('wireless', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('wireless', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('wireless', 'REBOOT_REQUIRED') ? '保存模式尚未成为 RUN，待断电复核' : '未报告承载切换等待状态' }}</div>
+            <div class="state-banner" :class="isOne('wireless', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('wireless', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('wireless', 'REBOOT_REQUIRED') ? '模式已保存，等待安全重启后复核' : '未报告承载切换等待状态' }}</div>
             <small>PORT=READY 仅表示无线端口资源就绪；Cat.1 ONLINE 也不证明 MQTT broker 鉴权、上报或现场链路通过。</small>
           </div>
         </section>
@@ -794,13 +807,15 @@ onMounted(() => {
               <label class="form-field"><span>服务端 IPv4</span><input v-model="edge.serverIp" class="mono" placeholder="192.168.30.100"><small>固件仅接受首段 1..223、且不是 127 的单播地址</small></label>
               <label class="form-field"><span>服务端端口</span><input v-model="edge.port" class="mono" inputmode="numeric" placeholder="9000"><small>1..65535</small></label>
             </div>
-            <label class="toggle-field"><input v-model="edge.enabled" type="checkbox"><span><strong>启动时启用 Edge TCP 客户端</strong><small>关闭时仍保留可复用的服务端地址与端口。</small></span></label>
-            <p class="info-box">当前 UART1 使用单条 <code>@CFG,EDGE,SET</code> 原子保存 IP、端口与开关。固件即使保存为 disabled，也要求提供非零端口和可用单播地址；保存后须重启才能成为 RUN 配置。</p>
+            <label class="toggle-field"><input v-model="edge.enabled" type="checkbox"><span><strong>下次启动使用 TCP 直连（关闭无线）</strong><small>取消后使用已保存的星闪或 4G 模式；服务端地址与端口保留。</small></span></label>
+            <p class="info-box">当前 UART1 使用单条 <code>@CFG,EDGE,SET</code> 原子保存 IP、端口与开关。固件即使保存为 disabled，也要求提供非零端口和可用单播地址；保存后须安全重启；TCP 模式期间无线不上报、不接收控制，TCP 断线也不会自动切到无线。</p>
             <p class="warning-box">ONLINE=1 只表示固件 TCP 客户端已上线；不代表网关已路由、下行已执行或现场业务验收通过。</p>
-            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认保存 Edge TCP 配置', '将原子写入服务端地址、端口与启动开关。写入完成后需要安全重启并再次 SHOW 复核 RUN / SAVED。', () => buildEdgeTcpCommand(edge))"><Save :size="14" /> 保存 Edge TCP 配置</button>
+            <button class="button danger-outline" :disabled="!maintenanceReady || maintenance.isBusy" @click="requestWrite('确认保存 Edge TCP 配置', edge.enabled ? '将保存 TCP 直连选择，重启后关闭星闪和 4G。当前通道继续运行；工具会同时回读无线与 TCP 状态。' : '将关闭 TCP 启动开关，重启后使用已保存的星闪或 4G 模式。TCP 地址和端口保留；工具会同时回读两组状态。', () => buildEdgeTcpCommand(edge))"><Save :size="14" /> 保存 Edge TCP 配置</button>
           </div>
           <div class="snapshot-card">
             <h3>RUN / SAVED 与客户端状态</h3>
+            <p class="info-box">当前通信：{{ runningCommunicationMode }}；下次启动：{{ savedCommunicationMode }}。</p>
+            <p v-if="maintenance.communicationMode.run === 'CONFLICT'" class="warning-box">设备仍同时启用 TCP 和无线，请核对并更新支持互斥的 Base 固件。</p>
             <div class="compare-table"><div class="compare-head"><span>字段</span><span>RUN</span><span>SAVED</span></div><div><strong>IP</strong><code>{{ field('edge', 'RUN_IP') }}</code><code>{{ field('edge', 'SAVED_IP') }}</code></div><div><strong>PORT</strong><code>{{ field('edge', 'RUN_PORT') }}</code><code>{{ field('edge', 'SAVED_PORT') }}</code></div><div><strong>ENABLE</strong><code>{{ field('edge', 'RUN_ENABLE') }}</code><code>{{ field('edge', 'SAVED_ENABLE') }}</code></div></div>
             <div class="state-banner" :class="isOne('edge', 'REBOOT_REQUIRED') ? 'warning' : 'success'"><AlertTriangle v-if="isOne('edge', 'REBOOT_REQUIRED')" :size="15" /><CheckCircle2 v-else :size="15" />{{ isOne('edge', 'REBOOT_REQUIRED') ? '已保存，尚未成为 RUN 配置' : 'RUN 与 SAVED 已读取；仍需看客户端状态' }}</div>
             <dl class="edge-state-grid"><div><dt>VALID</dt><dd :class="isOne('edge', 'VALID') ? 'good' : 'warn'">{{ field('edge', 'VALID') }}</dd></div><div><dt>STATE</dt><dd>{{ field('edge', 'STATE') }}</dd></div><div><dt>ONLINE</dt><dd :class="isOne('edge', 'ONLINE') ? 'good' : 'warn'">{{ field('edge', 'ONLINE') }}</dd></div><div><dt>LAST_ERROR</dt><dd class="mono">{{ field('edge', 'LAST_ERROR') }}</dd></div><div><dt>RECONNECTS</dt><dd class="mono">{{ field('edge', 'RECONNECTS') }}</dd></div></dl>
