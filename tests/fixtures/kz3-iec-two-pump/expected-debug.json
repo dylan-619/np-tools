@@ -1,0 +1,327 @@
+{
+  "manifestHash": "cd1c8911b9f8b8bccca32530486cc3a236165dce6aaf6191a33e4893cecfd76b",
+  "fields": [
+    {
+      "name": "P1_REM",
+      "bind": "point.p1_remote",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10001"
+    },
+    {
+      "name": "P1_RUN",
+      "bind": "point.p1_run_feedback",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10002"
+    },
+    {
+      "name": "P1_FLT",
+      "bind": "point.p1_fault_feedback",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10003"
+    },
+    {
+      "name": "P1_DO",
+      "bind": "point.p1_run_output",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10004"
+    },
+    {
+      "name": "P1_AUTO",
+      "bind": "parameter.p1_auto",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00001"
+    },
+    {
+      "name": "P1_STA",
+      "bind": "command.p1_sta",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00002"
+    },
+    {
+      "name": "P1_STP",
+      "bind": "command.p1_stp",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00003"
+    },
+    {
+      "name": "P1_RST",
+      "bind": "command.p1_rst",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00004"
+    },
+    {
+      "name": "P1_RUN_M",
+      "bind": "parameter.p1_run_m",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40001"
+    },
+    {
+      "name": "P1_STP_M",
+      "bind": "parameter.p1_stp_m",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40003"
+    },
+    {
+      "name": "P1_F_DEV",
+      "bind": "state.p1_f_dev",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10005"
+    },
+    {
+      "name": "P1_F_STA",
+      "bind": "state.p1_f_sta",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10006"
+    },
+    {
+      "name": "P1_F_STP",
+      "bind": "state.p1_f_stp",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10007"
+    },
+    {
+      "name": "P1_F_RUN",
+      "bind": "state.p1_f_run",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10008"
+    },
+    {
+      "name": "P1_F_IO",
+      "bind": "state.p1_f_io",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10009"
+    },
+    {
+      "name": "P1_F_L",
+      "bind": "state.p1_f_l",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10010"
+    },
+    {
+      "name": "P1_VLD",
+      "bind": "state.p1_vld",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10011"
+    },
+    {
+      "name": "P1_HZ",
+      "bind": "state.p1_hz",
+      "c_type": "float",
+      "access": "read",
+      "reference": "30001"
+    },
+    {
+      "name": "P1_PHASE",
+      "bind": "state.p1_phase",
+      "c_type": "u16",
+      "access": "read",
+      "reference": "30003"
+    },
+    {
+      "name": "P1_ARM",
+      "bind": "state.p1_arm",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10012"
+    },
+    {
+      "name": "P1_CFG",
+      "bind": "state.p1_cfg",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10013"
+    },
+    {
+      "name": "P1_RUN_ACT_M",
+      "bind": "state.p1_run_act_m",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30004"
+    },
+    {
+      "name": "P1_STP_ACT_M",
+      "bind": "state.p1_stp_act_m",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30006"
+    },
+    {
+      "name": "P2_REM",
+      "bind": "point.p2_remote",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10014"
+    },
+    {
+      "name": "P2_RUN",
+      "bind": "point.p2_run_feedback",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10015"
+    },
+    {
+      "name": "P2_FLT",
+      "bind": "point.p2_fault_feedback",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10016"
+    },
+    {
+      "name": "P2_DO",
+      "bind": "point.p2_run_output",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10017"
+    },
+    {
+      "name": "P2_AUTO",
+      "bind": "parameter.p2_auto",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00005"
+    },
+    {
+      "name": "P2_STA",
+      "bind": "command.p2_sta",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00006"
+    },
+    {
+      "name": "P2_STP",
+      "bind": "command.p2_stp",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00007"
+    },
+    {
+      "name": "P2_RST",
+      "bind": "command.p2_rst",
+      "c_type": "bool",
+      "access": "read_write",
+      "reference": "00008"
+    },
+    {
+      "name": "P2_RUN_M",
+      "bind": "parameter.p2_run_m",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40005"
+    },
+    {
+      "name": "P2_STP_M",
+      "bind": "parameter.p2_stp_m",
+      "c_type": "u32",
+      "access": "read_write",
+      "reference": "40007"
+    },
+    {
+      "name": "P2_F_DEV",
+      "bind": "state.p2_f_dev",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10018"
+    },
+    {
+      "name": "P2_F_STA",
+      "bind": "state.p2_f_sta",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10019"
+    },
+    {
+      "name": "P2_F_STP",
+      "bind": "state.p2_f_stp",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10020"
+    },
+    {
+      "name": "P2_F_RUN",
+      "bind": "state.p2_f_run",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10021"
+    },
+    {
+      "name": "P2_F_IO",
+      "bind": "state.p2_f_io",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10022"
+    },
+    {
+      "name": "P2_F_L",
+      "bind": "state.p2_f_l",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10023"
+    },
+    {
+      "name": "P2_VLD",
+      "bind": "state.p2_vld",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10024"
+    },
+    {
+      "name": "P2_HZ",
+      "bind": "state.p2_hz",
+      "c_type": "float",
+      "access": "read",
+      "reference": "30008"
+    },
+    {
+      "name": "P2_PHASE",
+      "bind": "state.p2_phase",
+      "c_type": "u16",
+      "access": "read",
+      "reference": "30010"
+    },
+    {
+      "name": "P2_ARM",
+      "bind": "state.p2_arm",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10025"
+    },
+    {
+      "name": "P2_CFG",
+      "bind": "state.p2_cfg",
+      "c_type": "bool",
+      "access": "read",
+      "reference": "10026"
+    },
+    {
+      "name": "P2_RUN_ACT_M",
+      "bind": "state.p2_run_act_m",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30011"
+    },
+    {
+      "name": "P2_STP_ACT_M",
+      "bind": "state.p2_stp_act_m",
+      "c_type": "u32",
+      "access": "read",
+      "reference": "30013"
+    }
+  ]
+}

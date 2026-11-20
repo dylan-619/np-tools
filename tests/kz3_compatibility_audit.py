@@ -18,6 +18,7 @@ OUT = args.output_dir.resolve()
 OUT.mkdir(parents=True, exist_ok=True)
 TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sdk/generators"))
+sys.path.insert(0, str(ROOT / "sdk/tools"))
 from point_config_gen import _point_manifest, generate
 
 
@@ -46,12 +47,26 @@ def changes(before, after, location=""):
 
 
 inputs = []
+runtime_models = {}
+
+
+def runtime_model(file, raw):
+    if raw.get("schema") == "kz3-iec-project-io/v1":
+        from iec.model import ProjectModel
+        return ProjectModel((file.parent / "plc.xml").read_bytes(), raw,
+                            ROOT / "sdk/definitions").derive().legacy
+    return raw
+
+
 for file in sorted((ROOT / "projects").rglob("project_io.yaml")):
     raw = yaml.safe_load(file.read_text())
+    runtime = runtime_model(file, raw)
+    runtime_models[str(file.relative_to(ROOT))] = runtime
     inputs.append({"path": str(file.relative_to(ROOT)), "yaml": file.read_text(),
-                   "manifestHash": _point_manifest(raw["project"])[1]})
+                   "manifestHash": _point_manifest(runtime["project"])[1]})
 for kind in ("i32", "s32", "f32"):
-    raw = yaml.safe_load(inputs[0]["yaml"])
+    raw = yaml.safe_load(next(item["yaml"] for item in inputs
+                             if yaml.safe_load(item["yaml"])["schema"] == "kz3-project-io/v3"))
     raw["project"]["northbound"]["fields"] = [
         {"name": "state.probe", "bind": "state.probe", "c_type": kind,
          "access": "read", "reference": "30001"}]
@@ -67,7 +82,9 @@ for result in results:
     source = yaml.safe_load(next(i["yaml"] for i in inputs if i["path"] == result["path"]))
     exported = yaml.safe_load(result.pop("exportedYaml"))
     result["semanticChanges"] = list(changes(source, exported))
-    result["exportedManifestMatches"] = _point_manifest(exported["project"])[1] == result["firmwareManifest"]
+    file = ROOT / result["path"]
+    runtime_exported = runtime_model(file, exported)
+    result["exportedManifestMatches"] = _point_manifest(runtime_exported["project"])[1] == result["firmwareManifest"]
     result["frontendErrors"] = sum(i["severity"] == "error" for i in result["issues"])
     if not result["path"].startswith("probe/"):
         # 与独立构建一样在隔离目录绑定当前 SDK 硬件定义，不改工程源/活动副本。
@@ -75,7 +92,7 @@ for result in results:
             workspace = Path(temporary)
             (workspace / "io_definitions").symlink_to(ROOT / "sdk/definitions", target_is_directory=True)
             config = workspace / "project_io.yaml"
-            for name, model in (("original", source), ("exported", exported)):
+            for name, model in (("original", runtime_models[result["path"]]), ("exported", runtime_exported)):
                 config.write_text(yaml.safe_dump(model, allow_unicode=True, sort_keys=False))
                 try:
                     generate(config, workspace / name)
@@ -89,6 +106,7 @@ summary = {
     "npToolsCommit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=TOOL, text=True).strip(),
     "projects": len(results),
     "manifestMatched": sum(r.get("manifestMatches", False) for r in results),
+    "exportedManifestMatched": sum(r.get("exportedManifestMatches", False) for r in results),
     "manifestMismatchProjects": [r["path"] for r in results if not r.get("manifestMatches", False)],
     "roundtripChangedProjects": sum(bool(r.get("semanticChanges")) for r in results),
     "nonCosmeticChangedProjects": sum(any(
@@ -107,6 +125,7 @@ print(json.dumps(summary, ensure_ascii=False, indent=2))
 if (summary['originalGenerationPassed'] != summary['projects'] or
         summary['exportedGenerationPassed'] != summary['projects'] or
         summary['manifestMatched'] != summary['projects'] or
+        summary['exportedManifestMatched'] != summary['projects'] or
         summary['nonCosmeticChangedProjects'] != 0 or
         not all(r['manifestMatches'] for r in summary['typeProbes'])):
     raise SystemExit('兼容性审计失败，查看project-audit.json')

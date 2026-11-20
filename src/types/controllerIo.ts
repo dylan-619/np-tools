@@ -93,7 +93,7 @@ export interface ParameterConfig {
   id: string
   name: string
   c_type: 'bool' | 'u16' | 'u32' | 'i16' | 'i32' | 'float'
-  default: boolean | number
+  default?: boolean | number // IEC 单文件调试导入无法读取 plc.xml 初值
   min?: number
   max?: number
   unit?: string
@@ -114,7 +114,8 @@ export interface StateConfig {
   id: string
   name: string
   c_type: 'bool' | 'u16' | 'u32' | 'i16' | 'i32' | 'float'
-  default: boolean | number
+  default?: boolean | number
+  unit?: string
   description?: string
 }
 
@@ -156,14 +157,15 @@ export interface NorthboundField {
 }
 
 export interface ProjectIoDocument {
-  schema: string        // 'kz3-project-io/v3' 或 'kz3-project-io/v2'
+  schema: string        // v3 工程，或 IEC v1 只读组态/可调试视图
+  iecSource?: { yaml: string; projectSignature: string }
   project: {
     name: string
     id: string
     version: string
     board: string       // 'kz3_f427_standard'
     required_profiles: string[]
-    scan_period_ms: number
+    scan_period_ms?: number // IEC 任务周期由 plc.xml 定义
     startup?: {
       ao_deferred_activation?: boolean
     }

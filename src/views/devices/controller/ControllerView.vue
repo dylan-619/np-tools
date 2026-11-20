@@ -29,14 +29,20 @@ import NorthboundTab from './NorthboundTab.vue'
 import YamlDiagnosisTab from './YamlDiagnosisTab.vue'
 import OnlineDebugTab from './OnlineDebugTab.vue'
 import FloatingTopologyMonitor from './FloatingTopologyMonitor.vue'
+import { KZ3_IEC_PROJECT_IO_SCHEMA } from '../../../utils/iecProjectIo'
 
 const controller = useControllerStore()
 const workspace = useWorkspaceStore()
 const route = useRoute()
 const router = useRouter()
 const isDebugMode = computed(() => route.name === 'ControllerDebug')
+const isIecDocument = computed(() => controller.doc.schema === KZ3_IEC_PROJECT_IO_SCHEMA)
 const topologyFloatOpen = ref(false)
 const manualSerialNumber = ref(workspace.activeSerialNumber)
+
+watch(isIecDocument, (enabled) => {
+  if (enabled && !isDebugMode.value) router.push({ name: 'ControllerDebug' })
+}, { immediate: true })
 
 const workspaceName = computed(() => {
   const normalized = workspace.rootPath.replace(/\\/g, '/').replace(/\/$/, '')
@@ -103,10 +109,14 @@ function leaveDebugMode() {
 
 <template>
   <div class="controller-view-container" :class="{ 'debug-mode': isDebugMode }">
+    <p v-if="isIecDocument" class="iec-import-notice" role="status">
+      已载入 PLC IDE 调试点表（{{ controller.doc.project.northbound.fields.length }} 个已发布字段）。
+      可监测及按原有门禁调参；组态请在 PLC IDE 修改后重新导入。默认值和扫描周期由 plc.xml 定义，导出保留原始 YAML。
+    </p>
     <template v-if="isDebugMode">
       <header class="debug-mode-header">
         <button class="mode-back-btn" @click="leaveDebugMode">
-          <ArrowLeft :size="14" /> 返回工程组态
+          <ArrowLeft :size="14" /> {{ isIecDocument ? '返回工作台' : '返回工程组态' }}
         </button>
         <div class="debug-project-identity">
           <strong :title="controller.doc.project.name || '未命名工程'">{{ controller.doc.project.name || '未命名工程' }}</strong>
@@ -154,13 +164,14 @@ function leaveDebugMode() {
           <!-- Validation status pill -->
           <button
             class="status-btn"
+            :disabled="isIecDocument"
             :class="controller.errorCount > 0 ? 'err' : 'ok'"
             @click="controller.activeTab = 'yaml'"
           >
             <AlertTriangle v-if="controller.errorCount > 0" :size="15" />
             <CheckCircle2 v-else :size="15" />
             <span>{{
-              controller.errorCount > 0 ? `${controller.errorCount} 处错误需修复` : '工程校验通过'
+              isIecDocument ? 'PLC IDE 调试点表' : controller.errorCount > 0 ? `${controller.errorCount} 处错误需修复` : '工程校验通过'
             }}</span>
           </button>
 
@@ -223,7 +234,7 @@ function leaveDebugMode() {
       </section>
 
       <!-- Navigation Tabs Bar -->
-      <nav class="nav-tabs-bar">
+      <nav v-if="!isIecDocument" class="nav-tabs-bar">
         <button
           class="tab-btn"
           :class="{ active: controller.activeTab === 'overview' }"
@@ -312,7 +323,14 @@ function leaveDebugMode() {
 
       <!-- Main Active Tab Content -->
       <main class="tab-viewport">
-        <ProjectOverviewTab v-if="controller.activeTab === 'overview'" />
+        <section v-if="isIecDocument" class="iec-import-notice">
+          <p>
+            {{ controller.doc.project.name }}：{{ controller.doc.project.northbound.fields.length }} 个已发布字段，
+            {{ controller.doc.project.points.inputs.length }} 个物理输入绑定，{{ controller.doc.project.points.outputs.length }} 个物理输出绑定。
+          </p>
+          <button class="btn btn-primary" @click="enterDebugMode">查看调试点表</button>
+        </section>
+        <ProjectOverviewTab v-else-if="controller.activeTab === 'overview'" />
         <HardwareSouthboundTab v-else-if="controller.activeTab === 'hardware'" />
         <PointsTableTab v-else-if="controller.activeTab === 'points'" />
         <VariablesLogicTab v-else-if="controller.activeTab === 'variables'" />
@@ -337,6 +355,18 @@ function leaveDebugMode() {
 </template>
 
 <style scoped>
+.iec-import-notice {
+  margin: 0;
+  padding: 10px 12px;
+  flex-shrink: 0;
+  color: var(--text-main, #17212b);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #b9c5cf);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .controller-view-container {
   display: flex;
   flex-direction: column;

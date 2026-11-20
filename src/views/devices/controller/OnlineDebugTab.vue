@@ -31,6 +31,7 @@ import { useControllerStore } from '../../../stores/controllerStore'
 import { useControllerDebugStore } from '../../../stores/controllerDebugStore'
 import { useWorkspaceStore } from '../../../stores/workspaceStore'
 import { numericWriteConstraints, writeValueError } from '../../../utils/controllerDebugValues'
+import { KZ3_IEC_PROJECT_IO_SCHEMA } from '../../../utils/iecProjectIo'
 import type {
   Kz3Scalar,
   ObservationState,
@@ -92,6 +93,7 @@ const POINT_GROUPS: Array<{
 ]
 
 const controller = useControllerStore()
+const isIecDocument = computed(() => controller.doc.schema === KZ3_IEC_PROJECT_IO_SCHEMA)
 const debug = useControllerDebugStore()
 const workspace = useWorkspaceStore()
 const searchText = ref('')
@@ -702,7 +704,10 @@ onUnmounted(() => {
         <header class="panel-toolbar">
           <div class="panel-heading">
             <Eye :size="15" />
-            <div><strong>实时点表</strong><small>连接后自动分页采样全部北向点位，每页 30 条</small></div>
+            <div>
+              <strong>实时点表</strong><small>{{ isIecDocument && !debug.isConnected
+                ? '已载入本地点表；实时值尚无设备采样' : '连接后自动分页采样全部北向点位，每页 30 条' }}</small>
+            </div>
             <span class="monitor-count" title="全部北向点位参与周期分页采样">共
               {{ debug.pointDescriptors.length }} 点</span>
           </div>
@@ -840,7 +845,7 @@ onUnmounted(() => {
               </tr>
             </tbody>
           </table>
-          <div v-if="!debug.isConnected" class="table-evidence-mask">
+          <div v-if="!debug.isConnected && !isIecDocument" class="table-evidence-mask">
             <div>
               <EyeOff :size="22" /><strong>尚无有效设备采样</strong><span>连接并完成身份预检后开始在线监视；空值不会显示为 0 或 OFF。</span>
             </div>

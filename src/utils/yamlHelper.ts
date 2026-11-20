@@ -1,6 +1,7 @@
 import { dump, load } from 'js-yaml'
 import type { ProjectIoDocument } from '../types/controllerIo'
 import { controllerSourceOrder, sortControllerPoints } from './controllerPointOrder'
+import { KZ3_IEC_PROJECT_IO_SCHEMA, projectIecDebugView } from './iecProjectIo'
 
 /** 拒绝会被JSON克隆改写的YAML值，以及循环别名；不把异常输入转换成可发布默认值。 */
 function assertSerializable(value: unknown, path = 'project_io', ancestors = new Set<object>()) {
@@ -26,6 +27,11 @@ function assertTypedFields(object: any, fields: string[], type: 'number' | 'bool
  * 序列化 ProjectIoDocument 为标准格式的 YAML 字符串
  */
 export function serializeProjectIoYaml(doc: ProjectIoDocument): string {
+  if (doc.schema === KZ3_IEC_PROJECT_IO_SCHEMA) {
+    if (!doc.iecSource || JSON.stringify(doc.project) !== doc.iecSource.projectSignature)
+      throw new Error('IEC 调试视图不能修改或转换为构建配置，请在 PLC IDE 修改后重新导入')
+    return doc.iecSource.yaml
+  }
   // 保留未由页面编辑的固件字段；只剥离工具自己注入的实体 UUID。
   // 不从 UI 字段白名单重建配置，否则启动门禁/外部输入等新字段会静默丢失。
   assertSerializable(doc)
@@ -54,10 +60,23 @@ export function deserializeProjectIoYaml(yamlText: string): ProjectIoDocument {
     throw new Error('无效的 YAML 结构，根节点必须为对象')
   }
 
-  if (raw.schema !== 'kz3-project-io/v3' || !raw.project || Array.isArray(raw.project) || typeof raw.project !== 'object') {
-    throw new Error('仅支持当前固件 kz3-project-io/v3 工程对象；请审查后显式迁移旧schema')
-  }
   assertSerializable(raw)
+  if (raw.schema === KZ3_IEC_PROJECT_IO_SCHEMA) {
+    const projected = projectIecDebugView(raw)
+    const doc = normalizeProjectIo({ schema: raw.schema, project: projected })
+    delete doc.project.scan_period_ms
+    for (const variable of [...doc.project.application_variables.parameters, ...doc.project.application_variables.states])
+      delete variable.default
+    doc.iecSource = { yaml: yamlText, projectSignature: JSON.stringify(doc.project) }
+    return doc
+  }
+  if (raw.schema !== 'kz3-project-io/v3' || !raw.project || Array.isArray(raw.project) || typeof raw.project !== 'object') {
+    throw new Error('仅支持 kz3-project-io/v3 或 kz3-iec-project-io/v1 工程对象；请审查后显式迁移旧schema')
+  }
+  return normalizeProjectIo(raw)
+}
+
+function normalizeProjectIo(raw: any): ProjectIoDocument {
   const p = raw.project
   assertTypedFields(p, ['scan_period_ms'], 'number', 'project')
   assertTypedFields(p.features, ['pid', 'counter', 'retained'], 'boolean', 'project.features')

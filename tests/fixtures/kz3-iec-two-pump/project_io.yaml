@@ -1,0 +1,114 @@
+schema: kz3-iec-project-io/v1
+
+project:
+  id: demo-two-pump-time-run
+  name: IOT1-1 双泵独立间歇控制
+  version: 1.0.0
+  board: kz3_f427_standard
+  required_profiles: []
+  startup:
+    parameter_restore: defaults
+  input_quality:
+    board_ai_stale_after_ms: 1000
+
+bindings:
+  - {runtime_key: scan_ms, role: scan_clock, binding_id: binding_186e818c1cbd4aa0845a9eb846cd7a07, variable_id: kz3_5854f4203ee84cc5853968733a098555, options: {}}
+  - {runtime_key: p1_remote, role: input, channel: board.di01, binding_id: binding_77acdff84bfb4c84a5a879ef1a060320, variable_id: kz3_932b14cc4af44e62bba7f1d9a3518165, options: {description: 1号泵远程反馈}, quality_id: kz3_1121eedf534544b79ddffd38c7a815f3}
+  - {runtime_key: p1_run_feedback, role: input, channel: board.di02, binding_id: binding_3774f57d53bf415aa7d78db12627c535, variable_id: kz3_b24286917bd540b89b46bc89527d8e30, options: {description: 1号泵运行反馈}, quality_id: kz3_cad2ca104a1c442396d712c234c31a42}
+  - {runtime_key: p1_fault_feedback, role: input, channel: board.di03, binding_id: binding_131b241f712f4a339c811b305338a3ee, variable_id: kz3_1b7c2c4fcd5742b7b092bf99c828ca07, options: {description: 1号泵实时故障反馈}, quality_id: kz3_e9f0ca78a9344ecc9709865c45ff6348}
+  - {runtime_key: p1_frequency_ma, role: input, channel: board.ai01, binding_id: binding_5ef0411f8e8f4f91887638457d61ee3a, variable_id: kz3_91d1c27be02943269eb3d81f09a01a29, options: {description: 1号泵频率电流，4–20mA对应0–50Hz}, quality_id: kz3_6d53b13c1c974d47b2162e4700f7207d}
+  - {runtime_key: p1_run_output, role: output, channel: board.do01, binding_id: binding_5c5fa2976bdb42f6b3b09e87bc90e39d, variable_id: kz3_324598a9b771460a9a191c89887d02b5, options: {description: 1号泵保持型启停，FALSE撤销运行请求, require_good: [binding_77acdff84bfb4c84a5a879ef1a060320, binding_3774f57d53bf415aa7d78db12627c535, binding_131b241f712f4a339c811b305338a3ee]}}
+  - {runtime_key: p1_auto, role: parameter, binding_id: binding_2e1f03e85cac4cc1bbe36c0d444868b0, variable_id: kz3_36737d28feae4c9ab13e218a0fc559ba, options: {persistent: false, description: FALSE手动；TRUE独立间歇自动，须重新投入解除中断}}
+  - {runtime_key: p1_sta, role: command, binding_id: binding_96ea9dcc8a6e4fde9066b71348a886ec, variable_id: kz3_b33dda3bc8754f3b9826b2991d7bed8b, options: {effect: normal}}
+  - {runtime_key: p1_stp, role: command, binding_id: binding_2af9bfcb20674c60b6944a9c48965740, variable_id: kz3_0666c2765a004a34af3551006c5f181c, options: {effect: protective}}
+  - {runtime_key: p1_rst, role: command, binding_id: binding_094f410f81564865b8c3476dd145198d, variable_id: kz3_e576251bae5b4d2ba8e1f8647c4b02e6, options: {effect: normal}}
+  - {runtime_key: p1_run_m, role: parameter, binding_id: binding_302bc0ae0cb44b529167f94ae64de0ca, variable_id: kz3_e748a131dc8449359300761eb82b1028, options: {min: 0, max: 1440, persistent: true, unit: min, description: 1号泵运行分钟；0禁止自动；与配对时长在下一轮快照生效}}
+  - {runtime_key: p1_stp_m, role: parameter, binding_id: binding_180f903235e14bd790e2fc7a6eecfc8c, variable_id: kz3_56eec95d1de844339605c263f7a09712, options: {min: 0, max: 1440, persistent: true, unit: min, description: 1号泵停止分钟；0禁止自动；与配对时长在下一轮快照生效}}
+  - {runtime_key: p1_f_dev, role: state, binding_id: binding_bedeeaebe5bf42a0b585e77ded492c24, variable_id: kz3_dc70aee36bc8481c81f158f5bd7e9dfe, options: {}}
+  - {runtime_key: p1_f_sta, role: state, binding_id: binding_9b988435da63424faac2a75664484d95, variable_id: kz3_4c7f8a9ee95043a580ab023a8de0cc2b, options: {}}
+  - {runtime_key: p1_f_stp, role: state, binding_id: binding_ae24cd2bd8c94035a764a2cf532676ab, variable_id: kz3_4f02a794ca2443999c436129da05727a, options: {}}
+  - {runtime_key: p1_f_run, role: state, binding_id: binding_c956c046c3aa4a6bb7f1be3c49a4842b, variable_id: kz3_61b6874393dc4655a2545c391207cda4, options: {}}
+  - {runtime_key: p1_f_io, role: state, binding_id: binding_1cda6bee73144143b58ecde90b9291cb, variable_id: kz3_49f0fdb80ab640eeb9abd627df7aaef0, options: {}}
+  - {runtime_key: p1_f_l, role: state, binding_id: binding_4c74b5ed74be4240b15dbd63a0e5bb62, variable_id: kz3_69fa6955b34a46b4ade461bc482a6449, options: {}}
+  - {runtime_key: p1_vld, role: state, binding_id: binding_d5470342bd764d74bead97c7312e2e03, variable_id: kz3_7cd316274a024c409be500728d5e81ac, options: {}}
+  - {runtime_key: p1_hz, role: state, binding_id: binding_9088b96bc67a414e9b3f0b3eac0cb8ae, variable_id: kz3_876a06b12f0d48aeb72da1ce311aea9c, options: {unit: Hz}}
+  - {runtime_key: p1_phase, role: state, binding_id: binding_457e44a1c5824f0a9f0eede05af1ff05, variable_id: kz3_3dafef052fe54c08ba2ea97e26bc85b3, options: {}}
+  - {runtime_key: p1_arm, role: state, binding_id: binding_93f2b55f0e52448fb0719001fbb25950, variable_id: kz3_cccd43d22ac54636a47ac045104afd37, options: {}}
+  - {runtime_key: p1_cfg, role: state, binding_id: binding_939ee983f03949b38335957d7896e904, variable_id: kz3_b8113c7dd1214a318c793c5c0d0cb147, options: {}}
+  - {runtime_key: p1_run_act_m, role: state, binding_id: binding_01d34ced04eb4354be7b0b42e0b9ccea, variable_id: kz3_639e911c3a5a45d4bd011d897c03518f, options: {unit: min}}
+  - {runtime_key: p1_stp_act_m, role: state, binding_id: binding_87f90b93b4114cd39302d69dbb8db546, variable_id: kz3_3303e0791e2744a599592900bcb39e94, options: {unit: min}}
+  - {runtime_key: p2_remote, role: input, channel: board.di05, binding_id: binding_4743faa26e5f4b039bc9a2dba642d99d, variable_id: kz3_c3f1033487fe4abab90a0b62ed318c6d, options: {description: 2号泵远程反馈}, quality_id: kz3_a04940a8f78f4d34a515635b51804474}
+  - {runtime_key: p2_run_feedback, role: input, channel: board.di06, binding_id: binding_33f0a45fe97b409daa6f316142d30d7d, variable_id: kz3_303c124fa832430a9970b34f73b440d5, options: {description: 2号泵运行反馈}, quality_id: kz3_dde675aa648842fca0708bbadb74181d}
+  - {runtime_key: p2_fault_feedback, role: input, channel: board.di07, binding_id: binding_add8a88121c84e71917a0da4ea48299c, variable_id: kz3_4ecc08ecb4194ee496ac044eb032d142, options: {description: 2号泵实时故障反馈}, quality_id: kz3_040e2bbce23343109017bab3c5a962af}
+  - {runtime_key: p2_frequency_ma, role: input, channel: board.ai02, binding_id: binding_082de010621a48e082fb3cf3fd794676, variable_id: kz3_b3702b7014094b83ac2e5130563216f0, options: {description: 2号泵频率电流，4–20mA对应0–50Hz}, quality_id: kz3_a4f64382c2f640239329a78a86800f14}
+  - {runtime_key: p2_run_output, role: output, channel: board.do02, binding_id: binding_84b8ada45a564cfea536eaec991e0a08, variable_id: kz3_55f22978790149e18c2cfa8aa5fc378b, options: {description: 2号泵保持型启停，FALSE撤销运行请求, require_good: [binding_4743faa26e5f4b039bc9a2dba642d99d, binding_33f0a45fe97b409daa6f316142d30d7d, binding_add8a88121c84e71917a0da4ea48299c]}}
+  - {runtime_key: p2_auto, role: parameter, binding_id: binding_73b435285928499e8e120047cc4f3664, variable_id: kz3_353d255b4d6945e6942948c1388db875, options: {persistent: false, description: FALSE手动；TRUE独立间歇自动，须重新投入解除中断}}
+  - {runtime_key: p2_sta, role: command, binding_id: binding_a2b075a2c088467e9f02ce7ac13b2934, variable_id: kz3_f05c9d81956a48f9837887df9e52b755, options: {effect: normal}}
+  - {runtime_key: p2_stp, role: command, binding_id: binding_9e40f528b0674d208558d0d0d9b94fe1, variable_id: kz3_cb29d8f3179b4c91b1f9c24325e2d099, options: {effect: protective}}
+  - {runtime_key: p2_rst, role: command, binding_id: binding_886e70ba14654d6d89bd6d63ee0936eb, variable_id: kz3_8ab167f5205d4c75b7ffadf201635b36, options: {effect: normal}}
+  - {runtime_key: p2_run_m, role: parameter, binding_id: binding_b009b816d61e4604929d590a1f2aac1a, variable_id: kz3_68bcb5bf2ea643dea026e4c45ee89f86, options: {min: 0, max: 1440, persistent: true, unit: min, description: 2号泵运行分钟；0禁止自动；与配对时长在下一轮快照生效}}
+  - {runtime_key: p2_stp_m, role: parameter, binding_id: binding_dc9f73bf8e5449428a103c3c6bb76ea8, variable_id: kz3_5ada2f54c5ca4359bc6a55531ccf4c6b, options: {min: 0, max: 1440, persistent: true, unit: min, description: 2号泵停止分钟；0禁止自动；与配对时长在下一轮快照生效}}
+  - {runtime_key: p2_f_dev, role: state, binding_id: binding_9a7e1aeaa51b4ce581fd8186354c9d9b, variable_id: kz3_c20e340ab018489dbabd7bbfba143153, options: {}}
+  - {runtime_key: p2_f_sta, role: state, binding_id: binding_60882ec310e74d4f9cb8272bf9082ab3, variable_id: kz3_43a2e1e56c4442959bb687a358358933, options: {}}
+  - {runtime_key: p2_f_stp, role: state, binding_id: binding_67412535bbf54e5c87ed4b27d3fb914f, variable_id: kz3_b3738d99515d46a799952f43d1eebf40, options: {}}
+  - {runtime_key: p2_f_run, role: state, binding_id: binding_da0477ba7fd44753b5eef9f9685813b9, variable_id: kz3_950fce88ee154c8f8ed9df2a3f7c18db, options: {}}
+  - {runtime_key: p2_f_io, role: state, binding_id: binding_8460b8ce41f84f28af8cf7e5333474bf, variable_id: kz3_a789a75d57f9442fb62eb0ae7de50d2e, options: {}}
+  - {runtime_key: p2_f_l, role: state, binding_id: binding_3cf3ca3b0eb947fe97ab44d1cc499ab1, variable_id: kz3_c615693ce3194767a96a2b07f446e4f7, options: {}}
+  - {runtime_key: p2_vld, role: state, binding_id: binding_dc87b6617dcc4728b20e0a9b72288df4, variable_id: kz3_2ddb4ce538ef4b4a9489afd572a631f8, options: {}}
+  - {runtime_key: p2_hz, role: state, binding_id: binding_0abf4cff5520499ea69474745eb41d52, variable_id: kz3_012504be2b6641d9beb91e6a44123e77, options: {unit: Hz}}
+  - {runtime_key: p2_phase, role: state, binding_id: binding_bfd520f9e69f4bad9e34d98c174ab235, variable_id: kz3_d333ccce2d6045c89fd6763608d8fcfd, options: {}}
+  - {runtime_key: p2_arm, role: state, binding_id: binding_3e396526546047ebb6e2cc6d01b77e81, variable_id: kz3_351771de7f5d4d48896cea3302e1f623, options: {}}
+  - {runtime_key: p2_cfg, role: state, binding_id: binding_0bee570766fb4e93a757bdae7abe3bc7, variable_id: kz3_2314aabd25ff469dad43a52bf68fb5b3, options: {}}
+  - {runtime_key: p2_run_act_m, role: state, binding_id: binding_730554592e6b4ab7badfff400eb2b2f1, variable_id: kz3_5ffeb3dca74e4955ba851990e4c25be7, options: {unit: min}}
+  - {runtime_key: p2_stp_act_m, role: state, binding_id: binding_3103c15d781d4b8286aaf940a55006d5, variable_id: kz3_a84ef846c8604ec78ae2ba1558296903, options: {unit: min}}
+
+northbound:
+  protocols: [modbus_tcp, http, sle]
+  reserved: []
+  layout:
+    - {field: {name: P1_REM, bind: point.p1_remote, c_type: bool, access: read, reference: '10001', description: 1号泵远程控制许可}, status: active, publish_id: binding_77acdff84bfb4c84a5a879ef1a060320}
+    - {field: {name: P1_RUN, bind: point.p1_run_feedback, c_type: bool, access: read, reference: '10002', description: 1号泵真实运行反馈}, status: active, publish_id: binding_3774f57d53bf415aa7d78db12627c535}
+    - {field: {name: P1_FLT, bind: point.p1_fault_feedback, c_type: bool, access: read, reference: '10003', description: 1号泵实时硬接故障反馈}, status: active, publish_id: binding_131b241f712f4a339c811b305338a3ee}
+    - {field: {name: P1_DO, bind: point.p1_run_output, c_type: bool, access: read, reference: '10004', description: 1号泵启停DO输出}, status: active, publish_id: binding_5c5fa2976bdb42f6b3b09e87bc90e39d}
+    - {field: {name: P1_AUTO, bind: parameter.p1_auto, c_type: bool, access: read_write, reference: '00001', description: 1号泵自动模式选择}, status: active, publish_id: binding_2e1f03e85cac4cc1bbe36c0d444868b0}
+    - {field: {name: P1_STA, bind: command.p1_sta, c_type: bool, access: read_write, reference: '00002', description: 1号泵手动启动命令}, status: active, publish_id: binding_96ea9dcc8a6e4fde9066b71348a886ec}
+    - {field: {name: P1_STP, bind: command.p1_stp, c_type: bool, access: read_write, reference: '00003', description: 1号泵停止命令}, status: active, publish_id: binding_2af9bfcb20674c60b6944a9c48965740}
+    - {field: {name: P1_RST, bind: command.p1_rst, c_type: bool, access: read_write, reference: '00004', description: 1号泵故障复位命令}, status: active, publish_id: binding_094f410f81564865b8c3476dd145198d}
+    - {field: {name: P1_RUN_M, bind: parameter.p1_run_m, c_type: u32, access: read_write, reference: '40001', description: 1号泵运行时长设定（分钟）}, status: active, publish_id: binding_302bc0ae0cb44b529167f94ae64de0ca}
+    - {field: {name: P1_STP_M, bind: parameter.p1_stp_m, c_type: u32, access: read_write, reference: '40003', description: 1号泵停歇时长设定（分钟）}, status: active, publish_id: binding_180f903235e14bd790e2fc7a6eecfc8c}
+    - {field: {name: P1_F_DEV, bind: state.p1_f_dev, c_type: bool, access: read, reference: '10005', description: 1号泵硬接故障记录}, status: active, publish_id: binding_bedeeaebe5bf42a0b585e77ded492c24}
+    - {field: {name: P1_F_STA, bind: state.p1_f_sta, c_type: bool, access: read, reference: '10006', description: 1号泵启动反馈超时}, status: active, publish_id: binding_9b988435da63424faac2a75664484d95}
+    - {field: {name: P1_F_STP, bind: state.p1_f_stp, c_type: bool, access: read, reference: '10007', description: 1号泵停机反馈超时}, status: active, publish_id: binding_ae24cd2bd8c94035a764a2cf532676ab}
+    - {field: {name: P1_F_RUN, bind: state.p1_f_run, c_type: bool, access: read, reference: '10008', description: 1号泵运行反馈丢失}, status: active, publish_id: binding_c956c046c3aa4a6bb7f1be3c49a4842b}
+    - {field: {name: P1_F_IO, bind: state.p1_f_io, c_type: bool, access: read, reference: '10009', description: 1号泵必要输入质量异常}, status: active, publish_id: binding_1cda6bee73144143b58ecde90b9291cb}
+    - {field: {name: P1_F_L, bind: state.p1_f_l, c_type: bool, access: read, reference: '10010', description: 1号泵总故障}, status: active, publish_id: binding_4c74b5ed74be4240b15dbd63a0e5bb62}
+    - {field: {name: P1_VLD, bind: state.p1_vld, c_type: bool, access: read, reference: '10011', description: 1号泵频率反馈有效}, status: active, publish_id: binding_d5470342bd764d74bead97c7312e2e03}
+    - {field: {name: P1_HZ, bind: state.p1_hz, c_type: float, access: read, reference: '30001', description: 1号泵反馈频率（Hz）}, status: active, publish_id: binding_9088b96bc67a414e9b3f0b3eac0cb8ae}
+    - {field: {name: P1_PHASE, bind: state.p1_phase, c_type: u16, access: read, reference: '30003', description: 1号泵自动周期阶段}, status: active, publish_id: binding_457e44a1c5824f0a9f0eede05af1ff05}
+    - {field: {name: P1_ARM, bind: state.p1_arm, c_type: bool, access: read, reference: '10012', description: 1号泵自动投入有效}, status: active, publish_id: binding_93f2b55f0e52448fb0719001fbb25950}
+    - {field: {name: P1_CFG, bind: state.p1_cfg, c_type: bool, access: read, reference: '10013', description: 1号泵自动时长配置有效}, status: active, publish_id: binding_939ee983f03949b38335957d7896e904}
+    - {field: {name: P1_RUN_ACT_M, bind: state.p1_run_act_m, c_type: u32, access: read, reference: '30004', description: 1号泵本轮运行时长（分钟）}, status: active, publish_id: binding_01d34ced04eb4354be7b0b42e0b9ccea}
+    - {field: {name: P1_STP_ACT_M, bind: state.p1_stp_act_m, c_type: u32, access: read, reference: '30006', description: 1号泵本轮停歇时长（分钟）}, status: active, publish_id: binding_87f90b93b4114cd39302d69dbb8db546}
+    - {field: {name: P2_REM, bind: point.p2_remote, c_type: bool, access: read, reference: '10014', description: 2号泵远程控制许可}, status: active, publish_id: binding_4743faa26e5f4b039bc9a2dba642d99d}
+    - {field: {name: P2_RUN, bind: point.p2_run_feedback, c_type: bool, access: read, reference: '10015', description: 2号泵真实运行反馈}, status: active, publish_id: binding_33f0a45fe97b409daa6f316142d30d7d}
+    - {field: {name: P2_FLT, bind: point.p2_fault_feedback, c_type: bool, access: read, reference: '10016', description: 2号泵实时硬接故障反馈}, status: active, publish_id: binding_add8a88121c84e71917a0da4ea48299c}
+    - {field: {name: P2_DO, bind: point.p2_run_output, c_type: bool, access: read, reference: '10017', description: 2号泵启停DO输出}, status: active, publish_id: binding_84b8ada45a564cfea536eaec991e0a08}
+    - {field: {name: P2_AUTO, bind: parameter.p2_auto, c_type: bool, access: read_write, reference: '00005', description: 2号泵自动模式选择}, status: active, publish_id: binding_73b435285928499e8e120047cc4f3664}
+    - {field: {name: P2_STA, bind: command.p2_sta, c_type: bool, access: read_write, reference: '00006', description: 2号泵手动启动命令}, status: active, publish_id: binding_a2b075a2c088467e9f02ce7ac13b2934}
+    - {field: {name: P2_STP, bind: command.p2_stp, c_type: bool, access: read_write, reference: '00007', description: 2号泵停止命令}, status: active, publish_id: binding_9e40f528b0674d208558d0d0d9b94fe1}
+    - {field: {name: P2_RST, bind: command.p2_rst, c_type: bool, access: read_write, reference: 00008, description: 2号泵故障复位命令}, status: active, publish_id: binding_886e70ba14654d6d89bd6d63ee0936eb}
+    - {field: {name: P2_RUN_M, bind: parameter.p2_run_m, c_type: u32, access: read_write, reference: '40005', description: 2号泵运行时长设定（分钟）}, status: active, publish_id: binding_b009b816d61e4604929d590a1f2aac1a}
+    - {field: {name: P2_STP_M, bind: parameter.p2_stp_m, c_type: u32, access: read_write, reference: '40007', description: 2号泵停歇时长设定（分钟）}, status: active, publish_id: binding_dc9f73bf8e5449428a103c3c6bb76ea8}
+    - {field: {name: P2_F_DEV, bind: state.p2_f_dev, c_type: bool, access: read, reference: '10018', description: 2号泵硬接故障记录}, status: active, publish_id: binding_9a7e1aeaa51b4ce581fd8186354c9d9b}
+    - {field: {name: P2_F_STA, bind: state.p2_f_sta, c_type: bool, access: read, reference: '10019', description: 2号泵启动反馈超时}, status: active, publish_id: binding_60882ec310e74d4f9cb8272bf9082ab3}
+    - {field: {name: P2_F_STP, bind: state.p2_f_stp, c_type: bool, access: read, reference: '10020', description: 2号泵停机反馈超时}, status: active, publish_id: binding_67412535bbf54e5c87ed4b27d3fb914f}
+    - {field: {name: P2_F_RUN, bind: state.p2_f_run, c_type: bool, access: read, reference: '10021', description: 2号泵运行反馈丢失}, status: active, publish_id: binding_da0477ba7fd44753b5eef9f9685813b9}
+    - {field: {name: P2_F_IO, bind: state.p2_f_io, c_type: bool, access: read, reference: '10022', description: 2号泵必要输入质量异常}, status: active, publish_id: binding_8460b8ce41f84f28af8cf7e5333474bf}
+    - {field: {name: P2_F_L, bind: state.p2_f_l, c_type: bool, access: read, reference: '10023', description: 2号泵总故障}, status: active, publish_id: binding_3cf3ca3b0eb947fe97ab44d1cc499ab1}
+    - {field: {name: P2_VLD, bind: state.p2_vld, c_type: bool, access: read, reference: '10024', description: 2号泵频率反馈有效}, status: active, publish_id: binding_dc87b6617dcc4728b20e0a9b72288df4}
+    - {field: {name: P2_HZ, bind: state.p2_hz, c_type: float, access: read, reference: '30008', description: 2号泵反馈频率（Hz）}, status: active, publish_id: binding_0abf4cff5520499ea69474745eb41d52}
+    - {field: {name: P2_PHASE, bind: state.p2_phase, c_type: u16, access: read, reference: '30010', description: 2号泵自动周期阶段}, status: active, publish_id: binding_bfd520f9e69f4bad9e34d98c174ab235}
+    - {field: {name: P2_ARM, bind: state.p2_arm, c_type: bool, access: read, reference: '10025', description: 2号泵自动投入有效}, status: active, publish_id: binding_3e396526546047ebb6e2cc6d01b77e81}
+    - {field: {name: P2_CFG, bind: state.p2_cfg, c_type: bool, access: read, reference: '10026', description: 2号泵自动时长配置有效}, status: active, publish_id: binding_0bee570766fb4e93a757bdae7abe3bc7}
+    - {field: {name: P2_RUN_ACT_M, bind: state.p2_run_act_m, c_type: u32, access: read, reference: '30011', description: 2号泵本轮运行时长（分钟）}, status: active, publish_id: binding_730554592e6b4ab7badfff400eb2b2f1}
+    - {field: {name: P2_STP_ACT_M, bind: state.p2_stp_act_m, c_type: u32, access: read, reference: '30013', description: 2号泵本轮停歇时长（分钟）}, status: active, publish_id: binding_3103c15d781d4b8286aaf940a55006d5}

@@ -362,7 +362,7 @@ export const useControllerStore = defineStore('controller', () => {
         message: '项目名称建议填写有意义的中文工程名称',
       })
     }
-    if (p.scan_period_ms <= 0 || p.scan_period_ms > 1000) {
+    if (p.scan_period_ms !== undefined && (p.scan_period_ms <= 0 || p.scan_period_ms > 1000)) {
       issues.push({
         code: 'INVALID_SCAN_PERIOD',
         severity: 'error',

@@ -240,6 +240,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
         category = 'state'
         const name = field.bind.slice('state.'.length)
         const state = project.application_variables.states.find((item) => item.name === name)
+        unit = state?.unit
         description = state?.description?.trim() || fieldDescription || '应用逻辑可观测状态'
         valueSemantic = '应用逻辑状态'
       } else if (field.bind.startsWith('point.')) {
