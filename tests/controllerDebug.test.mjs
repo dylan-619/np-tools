@@ -240,6 +240,10 @@ async function setupVerifiedKz3(
   {
     fields,
     values = {},
+    deviceOverrides = {},
+    hardwareOverrides = {},
+    initialSerialNumber = '',
+    otaFlags = 140,
     projectOverrides = {},
     writeStatus = 200,
     pageChunkSize = 100,
@@ -351,14 +355,15 @@ async function setupVerifiedKz3(
     projectFields.map((item) => [item.name, values[item.name] ?? (item.c_type === 'bool' ? false : 0)])
   )
   const ota = {
-    info: { sn: '020325090117', board_type: 'kz3_f427_standard', ota_protocol: 2, phase: 1, flags: 140 },
-    status: { phase: 1, state: 0, flags: 140, active: 'a'.repeat(64), candidate: '0'.repeat(64), error: 0 },
+    info: { sn: '020325090117', board_type: 'kz3_f427_standard', ota_protocol: 2, phase: 1, flags: otaFlags },
+    status: { phase: 1, state: 0, flags: otaFlags, active: 'a'.repeat(64), candidate: '0'.repeat(64), error: 0 },
     identity: { present: 1, project_id: controller.doc.project.id, project_version: controller.doc.project.version,
       revision: 1, package_id: 'a'.repeat(64) }
   }
   const diagnostics = {
-    device: { device_type: 'KZ3-F427', serial_number: '020325090117' },
-    hardware: { mcu: 'STM32F427VG', di_count: 12, do_count: 8, ai_count: 4, ao_count: 2 },
+    // 模拟网络 owner 的实际输出，不再只覆盖 HttpApiContext_SetDefaults() 的模板型号。
+    device: { device_type: 'KZ3-203', serial_number: '020325090117', ...deviceOverrides },
+    hardware: { mcu: 'STM32F427', di_count: 12, do_count: 8, ai_count: 4, ao_count: 2, ...hardwareOverrides },
     project: {
       project_id: controller.doc.project.id,
       project_version: controller.doc.project.version,
@@ -383,6 +388,7 @@ async function setupVerifiedKz3(
     },
     io: { controller_fault: { active: false } }
   }
+  if (initialSerialNumber) useWorkspaceStore().setActiveSerialNumber(initialSerialNumber)
   const debug = useControllerDebugStore()
   debug.operatorName = '自动化测试'
   await debug.connect()
@@ -1391,6 +1397,54 @@ test('KZ3 身份查询兼容可选的逻辑代码块版本字段', () => {
   assert.equal(current?.fields.LOGIC_VER, '1.2.3')
 })
 
+
+test('KZ3 真实 KZ3-203 型号通过身份预检且不自动解锁', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t, {
+    deviceOverrides: { device_type: 'KZ3-203' }, hardwareOverrides: { mcu: 'STM32F427' }, otaFlags: 142
+  })
+  assert.equal(debug.canEnableWrites, true)
+  assert.equal(debug.writesEnabled, false)
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+test('KZ3 HTTP 直连按真实 SN 进入同一工作空间，不依赖先连串口或沿用上一台 SN', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t, { initialSerialNumber: '020325090118' })
+  assert.equal(useWorkspaceStore().activeSerialNumber, '020325090117')
+  assert.equal(debug.canEnableWrites, true)
+  assert.equal(debug.writesEnabled, false)
+  assert.ok(calls.every(call => call.command.startsWith('kz3_http_')))
+})
+
+test('KZ3 旧 KZ3-F427 标识仍通过相同硬件与 OTA 门禁', async (t) => {
+  const { debug, calls } = await setupVerifiedKz3(t, {
+    deviceOverrides: { device_type: 'KZ3-F427' }, hardwareOverrides: { mcu: 'STM32F427VG' }
+  })
+  assert.equal(debug.canEnableWrites, true)
+  assert.equal(debug.writesEnabled, false)
+  assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+test('KZ3 身份不匹配指出具体字段并阻断写入，不按相似型号或隐式类型放行', async (t) => {
+  for (const item of [
+    { name: '相似型号', deviceOverrides: { device_type: 'KZ3-2030' }, detail: 'device_type="KZ3-2030"' },
+    { name: '空SN', deviceOverrides: { serial_number: '' }, detail: 'serial_number=""' },
+    { name: '数字SN', deviceOverrides: { serial_number: 20325090117 }, detail: 'serial_number=20325090117' },
+    { name: '错误MCU', hardwareOverrides: { mcu: 'STM32F407' }, detail: 'hardware.mcu="STM32F407"' },
+    { name: '缺失MCU', hardwareOverrides: { mcu: undefined }, detail: 'hardware.mcu=undefined' },
+    { name: 'DI数量字符串', hardwareOverrides: { di_count: '12' }, detail: 'hardware.di_count="12"' },
+    { name: 'DO数量错误', hardwareOverrides: { do_count: 7 }, detail: 'hardware.do_count=7' },
+    { name: 'AI数量错误', hardwareOverrides: { ai_count: 0 }, detail: 'hardware.ai_count=0' },
+    { name: 'AO数量错误', hardwareOverrides: { ao_count: 4 }, detail: 'hardware.ao_count=4' }
+  ]) {
+    await t.test(item.name, async (st) => {
+      const { debug, calls } = await setupVerifiedKz3(st, item)
+      assert.equal(debug.canEnableWrites, false)
+      assert.equal(debug.writesEnabled, false)
+      assert.ok(debug.logs.some(entry => entry.detail?.includes(item.detail)))
+      assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+    })
+  }
+})
 
 test('KZ3 型号、SN、schema和OTA状态变更均阻断实际写请求', async (t) => {
   for (const kind of ['model', 'sn', 'schema', 'hold', 'data', 'phase', 'package']) {

@@ -1,4 +1,4 @@
-# NP-Tools 工业硬件产品调试与配置平台 (v1.1.1)
+# NP-Tools 工业硬件产品调试与配置平台 (v1.1.2)
 
 > 基于 **Tauri v2 + Rust + Vue 3 (Vite + TypeScript) + Pinia + ECharts** 构建的高性能、跨平台（Windows / macOS）现代化工业硬件调试与产线生产配置工具。
 
@@ -114,7 +114,7 @@ pnpm tauri build
 
 #### 打包输出产物路径：
 编译完成后，可在以下路径获取独立的 Windows 安装程序：
-- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.1.1_x64-setup.exe`
+- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.1.2_x64-setup.exe`
 - **单文件便携可执行程序**：`src-tauri\target\release\np-tools.exe`
 
 ---
@@ -195,3 +195,7 @@ np-tools/
 
 本轮配套目标为上级固件仓库的OTA_DEV / Base 3.5.0、工程ABI2路径；早期TCP_NETTY核查记录不替代该OTA契约。
 提交前复审补齐URL绑定、类型别名、YAML异常输入与证据保留边界，协议92项、Rust HTTP6项和61工程生成复验通过。
+
+### KZ3 身份预检兼容（2026-11-23，v1.1.2）
+
+修复将正常生产型号 `KZ3-203` 误判为不支持的问题，同时保留既有 `KZ3-F427`；不变更 Base、SDK、UART1/HTTP 的 SN 工作空间流程或 OTA/写入门禁。失败日志明确指出型号、板型、SN、MCU 或 I/O 数量中的具体不匹配项。实际设备只读连接完成身份/OTA 预检与当前双泵 49 点采样，未执行业务写入。

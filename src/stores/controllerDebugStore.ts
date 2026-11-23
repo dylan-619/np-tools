@@ -48,6 +48,8 @@ const MIN_WRITE_INTERVAL_MS = 700
 const POLL_DRAIN_TIMEOUT_MS = 10000
 const OPERATOR_STORAGE_KEY = 'np-tools:kz3-debug-operator'
 const SITE_STORAGE_KEY = 'np-tools:kz3-debug-site'
+// network_service.c 用生产类型 203 返回 KZ3-203；保留既有 KZ3-F427 标识，不能按任意 KZ3 前缀放行。
+const KZ3_SUPPORTED_DEVICE_TYPES: readonly string[] = ['KZ3-203', 'KZ3-F427']
 
 class HttpResponseError extends Error {
   readonly status: number
@@ -448,11 +450,20 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       const device = diagnostics.value.device?.data
       const hardware = diagnostics.value.hardware?.data
       const sn = device?.serial_number
-      if (device?.device_type !== 'KZ3-F427' || controller.doc.project.board !== 'kz3_f427_standard' ||
-          !sn || !/^\d{12}$/.test(sn) || (boundSerial && boundSerial !== sn) ||
-          !hardware || hardware.di_count !== 12 || hardware.do_count !== 8 ||
-          hardware.ai_count !== 4 || hardware.ao_count !== 2 || !/STM32F427/i.test(hardware.mcu))
-        throw new Error('设备型号、硬件能力或SN不匹配')
+      if (!KZ3_SUPPORTED_DEVICE_TYPES.includes(device?.device_type ?? ''))
+        throw new Error(`设备型号不匹配：device_type=${JSON.stringify(device?.device_type)}，支持 KZ3-203 / KZ3-F427`)
+      if (controller.doc.project.board !== 'kz3_f427_standard')
+        throw new Error(`工程板型不匹配：board=${JSON.stringify(controller.doc.project.board)}，期望 kz3_f427_standard`)
+      if (typeof sn !== 'string' || !/^\d{12}$/.test(sn))
+        throw new Error(`设备 SN 格式不匹配：serial_number=${JSON.stringify(sn)}，期望 12 位数字字符串`)
+      if (boundSerial && boundSerial !== sn)
+        throw new Error(`设备 SN 已变化：本会话=${boundSerial}，当前=${sn}，请重新连接`)
+      for (const [key, expected] of [['di_count', 12], ['do_count', 8], ['ai_count', 4], ['ao_count', 2]] as const) {
+        if (hardware?.[key] !== expected)
+          throw new Error(`硬件能力不匹配：hardware.${key}=${JSON.stringify(hardware?.[key])}，期望 ${expected}`)
+      }
+      if (typeof hardware?.mcu !== 'string' || !/STM32F427/i.test(hardware.mcu))
+        throw new Error(`硬件 MCU 不匹配：hardware.mcu=${JSON.stringify(hardware?.mcu)}，期望 STM32F427`)
       const { info, status, identity } = ota
       if (info.sn !== sn || info.board_type !== 'kz3_f427_standard' || info.ota_protocol !== 2 ||
           diagnostics.value.project?.data.schema_version !== 7 ||
@@ -852,7 +863,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
 
     try {
       await readDiagnostic('device', false, sessionId)
-      const detectedSerialNumber = diagnostics.value.device?.data.serial_number?.trim()
+      const reportedSerialNumber = diagnostics.value.device?.data.serial_number
+      const detectedSerialNumber = typeof reportedSerialNumber === 'string' ? reportedSerialNumber.trim() : ''
       if (detectedSerialNumber) {
         try {
           const storedConfig = await controller.loadWorkspaceConfigForSerial(detectedSerialNumber)
