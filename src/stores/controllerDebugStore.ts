@@ -441,7 +441,8 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
   }
 
   async function verifyDeviceState(expectedSessionId = session.value?.sessionId) {
-    identityVerified.value = false
+    // 后台查询中沿用上次有效身份，避免每轮查询让确认按钮失能闪烁。
+    // 真正写入仍先等待轮询让路，再重新预检；失败时立即撤销身份和写许可。
     try {
       await readDiagnostic('device', true, expectedSessionId)
       await readDiagnostic('hardware', true, expectedSessionId)
@@ -483,6 +484,7 @@ export const useControllerDebugStore = defineStore('controllerDebug', () => {
       otaState.value = ota
       identityVerified.value = true
     } catch (error) {
+      identityVerified.value = false
       otaState.value = null
       disableWrites(errorDetail(error))
       appendLog('warning', 'session', '设备/OTA预检未通过，保持只读', errorDetail(error))

@@ -1,4 +1,4 @@
-# NP-Tools 工业硬件产品调试与配置平台 (v1.1.2)
+# NP-Tools 工业硬件产品调试与配置平台 (v1.1.3)
 
 > 基于 **Tauri v2 + Rust + Vue 3 (Vite + TypeScript) + Pinia + ECharts** 构建的高性能、跨平台（Windows / macOS）现代化工业硬件调试与产线生产配置工具。
 
@@ -114,7 +114,7 @@ pnpm tauri build
 
 #### 打包输出产物路径：
 编译完成后，可在以下路径获取独立的 Windows 安装程序：
-- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.1.2_x64-setup.exe`
+- **NSIS 一键安装包**：`src-tauri\target\release\bundle\nsis\NP-Tools_1.1.3_x64-setup.exe`
 - **单文件便携可执行程序**：`src-tauri\target\release\np-tools.exe`
 
 ---
@@ -199,3 +199,7 @@ np-tools/
 ### KZ3 身份预检兼容（2026-11-23，v1.1.2）
 
 修复将正常生产型号 `KZ3-203` 误判为不支持的问题，同时保留既有 `KZ3-F427`；不变更 Base、SDK、UART1/HTTP 的 SN 工作空间流程或 OTA/写入门禁。失败日志明确指出型号、板型、SN、MCU 或 I/O 数量中的具体不匹配项。实际设备只读连接完成身份/OTA 预检与当前双泵 49 点采样，未执行业务写入。
+
+### 写入弹窗轮询交互（2026-11-23，v1.1.3）
+
+修复“触发一次”和“确认写入”随后台身份查询反复禁用、闪烁及难以点击的问题。查询进行中保留已验证身份，查询失败仍立即上锁；点击后继续等待在途轮询、重新预检与核对许可，再单次提交。命令、BOOL、U32、FLOAT、掉电保持参数及 HOLD 阻断回归通过，协议测试 126/126；实际浏览器使用离线模拟设备验证，没有向真实控制器写入。

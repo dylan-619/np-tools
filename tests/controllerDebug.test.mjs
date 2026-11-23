@@ -339,7 +339,8 @@ async function setupVerifiedKz3(
       c_type: item.c_type,
       default: item.c_type === 'bool' ? false : 0,
       min: item.min,
-      max: item.max
+      max: item.max,
+      persistent: item.persistent
     }))
   controller.doc.project.application_variables.commands = projectFields
     .filter((item) => item.bind.startsWith('command.'))
@@ -1422,6 +1423,93 @@ test('KZ3 旧 KZ3-F427 标识仍通过相同硬件与 OTA 门禁', async (t) => 
   assert.equal(debug.canEnableWrites, true)
   assert.equal(debug.writesEnabled, false)
   assert.equal(calls.filter(c => c.command === 'kz3_http_write_point').length, 0)
+})
+
+test('KZ3 后台身份查询等待期间提交资格保持稳定，各类写入等待轮询后只发送一次', async (t) => {
+  for (const item of [
+    { label: '单次命令', name: 'P1_STA', bind: 'command.p1_sta', c_type: 'bool', reference: '00002', value: true },
+    { label: 'BOOL参数', name: 'P1_AUTO', bind: 'parameter.p1_auto', c_type: 'bool', reference: '00001', value: true },
+    { label: 'U32参数', name: 'P1_RUN_M', bind: 'parameter.p1_run_m', c_type: 'u32', reference: '40001', value: 3 },
+    { label: 'FLOAT参数', name: 'GAIN', bind: 'parameter.gain', c_type: 'float', reference: '40003', value: 1.5 },
+    { label: '掉电保持参数', name: 'RETAINED', bind: 'parameter.retained', c_type: 'u32', reference: '40005', persistent: true, value: 0 }
+  ]) {
+    await t.test(item.label, async (st) => {
+      const { debug, calls } = await setupVerifiedKz3(st, { fields: [field(item)] })
+      debug.enableWrites('模拟轮询交互回归')
+      const invoke = window.__TAURI_INTERNALS__.invoke
+      let started, release
+      const queryStarted = new Promise(resolve => { started = resolve })
+      const queryPending = new Promise(resolve => { release = resolve })
+      let held = false
+      window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+        if (command === 'kz3_http_get_ota_state' && !held) {
+          held = true
+          started()
+          await queryPending
+        }
+        return invoke(command, args)
+      }
+      const poll = debug.pollOnce()
+      await queryStarted
+      try {
+        assert.equal(debug.pollInFlight, true)
+        assert.equal(debug.canEnableWrites, true)
+        assert.equal(debug.writesEnabled, true)
+        const before = item.c_type === 'bool' ? false : 0
+        const write = debug.writePoint(item.name, item.value, '模拟轮询交互回归', before)
+        assert.equal(debug.writeInFlight, true)
+        assert.equal(calls.filter(call => call.command === 'kz3_http_write_point').length, 0)
+        release()
+        await poll
+        const event = await write
+        assert.equal(event.acceptedByOwner, true)
+        const posts = calls.filter(call => call.command === 'kz3_http_write_point')
+        assert.equal(posts.length, 1)
+        assert.equal(posts[0].args.value, item.value)
+      } finally {
+        release()
+        await poll
+      }
+    })
+  }
+})
+
+test('KZ3 后台查询发现 HOLD 时取消等待中的命令并解除许可，不发送 POST', async (t) => {
+  const { debug, calls, ota } = await setupVerifiedKz3(t, {
+    fields: [field({ name: 'P1_STA', bind: 'command.p1_sta', c_type: 'bool', reference: '00002' })]
+  })
+  debug.enableWrites('模拟刷新发现故障')
+  const invoke = window.__TAURI_INTERNALS__.invoke
+  let started, release
+  const queryStarted = new Promise(resolve => { started = resolve })
+  const queryPending = new Promise(resolve => { release = resolve })
+  let held = false
+  window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+    if (command === 'kz3_http_get_ota_state' && !held) {
+      held = true
+      started()
+      await queryPending
+    }
+    return invoke(command, args)
+  }
+  const poll = debug.pollOnce()
+  await queryStarted
+  try {
+    const rejected = assert.rejects(debug.writePoint('P1_STA', true, '模拟刷新发现故障', false))
+    assert.equal(debug.writeInFlight, true)
+    ota.info.flags |= 1
+    ota.status.flags |= 1
+    release()
+    await poll
+    await rejected
+    assert.equal(debug.identityVerified, false)
+    assert.equal(debug.writesEnabled, false)
+    assert.equal(debug.canEnableWrites, false)
+    assert.equal(calls.filter(call => call.command === 'kz3_http_write_point').length, 0)
+  } finally {
+    release()
+    await poll
+  }
 })
 
 test('KZ3 身份不匹配指出具体字段并阻断写入，不按相似型号或隐式类型放行', async (t) => {
