@@ -1,0 +1,11 @@
+
+/Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools/src/views/devices/sjzdv3/SleConfigView.vue
+  229:17  warning  Disallow self-closing on HTML void elements (<input/>)                            vue/html-self-closing
+  234:18  warning  Expected 1 line break after opening tag (`<button>`), but no line breaks found    vue/multiline-html-element-content-newline
+  234:22  warning  Expected 1 line break before closing tag (`</button>`), but no line breaks found  vue/multiline-html-element-content-newline
+  260:17  warning  Disallow self-closing on HTML void elements (<input/>)                            vue/html-self-closing
+  492:15  warning  Disallow self-closing on HTML void elements (<input/>)                            vue/html-self-closing
+
+✖ 5 problems (0 errors, 5 warnings)
+  0 errors and 5 warnings potentially fixable with the `--fix` option.
+

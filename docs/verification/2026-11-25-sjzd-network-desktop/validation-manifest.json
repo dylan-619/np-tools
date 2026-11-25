@@ -1,0 +1,47 @@
+{
+  "capturedAt": "2026-11-25T20:22:00.483280+08:00",
+  "baseline": "b2eec7e6a7c56ad7607f9ef7dbaa7568c948f64c",
+  "validationSource": "working tree before feature commit",
+  "protocolTests": {
+    "tests": 157,
+    "pass": 157,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0
+  },
+  "frontendBuild": "passed: vue-tsc --noEmit and vite build",
+  "lint": {
+    "errors": 0,
+    "existingFormattingWarningsInSleView": 5
+  },
+  "nativeApp": "Native app verification includes router lifecycle fix; latest quick-entry disabled patch has SSR/type/build coverage; final native rebuild/recheck pending manual continuation",
+  "pending": [
+    "SLE switch manual confirmation",
+    "restore .55:502 AI247 flags=2 and Netty target=0/0",
+    "release UART1 and stop temporary Netty receiver"
+  ],
+  "sourceSha256": {
+    "src/App.vue": "fcf8ebf7ed5f1efe9a3fb94c94fe8df8de26a747b23d47f1f92c62611c0f41f6",
+    "src/components/common/SjzdHardwareSelector.vue": "a26a2a67605edbf174b4d4844a11fa5e214d14d07f16055032596a2250abb7c8",
+    "src/components/layout/AppSidebar.vue": "d8fcfbc43ecf5b5ae8ffbaff6d921f209c0a3be29b85a56006aca914887cf0e1",
+    "src/router/index.ts": "24fe244152b6ebce1c115b6630b97e0fb054ecb13394bce0866058b4798fb42f",
+    "src/stores/sjzdStore.ts": "f7f657f8bf2f6e6d5d329193ca1a2a1cd89e13365cd7f657ceff6c2274ad749f",
+    "src/types/sjzd.ts": "9f0d2a5c6592566263afc24c7e501a5a796e9858b8de34dd6ae4e5a481fa6aff",
+    "src/utils/sjzdNetwork.ts": "7d71699130d1fdd86401484b5d80c221bb81768ce9f91da29a18995498ef16f8",
+    "src/utils/sjzdConsoleProtocol.ts": "0724687e1f4426df8ac96c2c46d317aac4ad9910d16f697d9917f09e47103fef",
+    "src/views/ModbusDebuggerView.vue": "5d1867ff561c45044c2f0081fdba37a51f3e54e2bd65231362e85e80a7b84057",
+    "src/views/devices/sjzdv3/NetworkConfigView.vue": "53ae5751fd5da50b9451d4bea0b92f2ea9d744459f9baf6452e6134953b6ca6c",
+    "src/views/devices/sjzdv3/SleConfigView.vue": "bddcfa6ce66a220d6f6d703e698767af68f6b0bc1757948447a7fbd93f7d5fdb",
+    "src/views/devices/sjzdv3/FourGConfigView.vue": "aa5dc4df2802eb0d3efaea65f27b46e04bb067565b5f069ef991fe6bcc1a536d",
+    "tests/sjzdNetwork.test.mjs": "0768359d39863d87f3fbb4b9ddd330d4d35a1330f368344b46624d53a288e0d9",
+    "tests/sjzdProtocol.test.mjs": "ee7700d5dff2b1d1e26c6d05144273eb1488c6869d7ccdbefa1959710c9d99c3",
+    "package.json": "818f3d4061b2f329951265a55783d0bdf7bf5317223464e4b3cfa82a760c7858"
+  },
+  "evidenceSha256": {
+    "frontend-build.txt": "409d3c6a48cb7d1e190c9037fb71995bf384266f66148cdd324aedaba12388a6",
+    "lint.txt": "a9592167d9ee620ebc5141e9f88d98055a7213ac38e3e8272520f6dff0c46a74",
+    "native-app-build-before-quick-guard.txt": "45fa9b2aea24f57aef8ddb246caabe19707ad65ad6c6d028317cc474f277fc71",
+    "netty-receiver-at-commit.txt": "1d638be776671866f0e1f4aeaa3c34bf378332cf6e130452ef4ad7eeffafd08c",
+    "protocol-tests.txt": "7ed691a6e6ec32932382e9db0d26497a6a069e1870c6a19cece8746c854d4c8c"
+  }
+}

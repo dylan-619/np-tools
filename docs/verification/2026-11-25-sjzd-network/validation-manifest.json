@@ -1,0 +1,35 @@
+{
+  "createdAt": "2026-11-25T11:37:32.447802+00:00",
+  "baseline": "b2eec7e6a7c56ad7607f9ef7dbaa7568c948f64c",
+  "sourceState": "uncommitted working tree",
+  "protocolTests": {
+    "tests": 154,
+    "pass": 154,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0
+  },
+  "nativeVisualAcceptance": "pending: Mac locked; user unlock requested",
+  "physicalIntegration": "Actual Store/parser; physical UART1 bridge replaces only Tauri transport",
+  "sourceSha256": {
+    "src/components/common/SjzdHardwareSelector.vue": "a26a2a67605edbf174b4d4844a11fa5e214d14d07f16055032596a2250abb7c8",
+    "src/utils/sjzdNetwork.ts": "7d71699130d1fdd86401484b5d80c221bb81768ce9f91da29a18995498ef16f8",
+    "src/utils/sjzdConsoleProtocol.ts": "0724687e1f4426df8ac96c2c46d317aac4ad9910d16f697d9917f09e47103fef",
+    "src/stores/sjzdStore.ts": "f7f657f8bf2f6e6d5d329193ca1a2a1cd89e13365cd7f657ceff6c2274ad749f",
+    "src/types/sjzd.ts": "9f0d2a5c6592566263afc24c7e501a5a796e9858b8de34dd6ae4e5a481fa6aff",
+    "src/views/devices/sjzdv3/NetworkConfigView.vue": "d85bc5f61c238357d400455d0f67e0665cc113a640dcf9594b18b29d94b72551",
+    "src/views/ModbusDebuggerView.vue": "d210f00e673099404a253bcc9f103eaca672b536ea0d187077e27f0d737bb3cc",
+    "tests/sjzdNetwork.test.mjs": "e735862c9ff91e3c8754d6b10d3ab5290bac4898f5c148b04c5189f050abdb47",
+    "tests/sjzdProtocol.test.mjs": "ee7700d5dff2b1d1e26c6d05144273eb1488c6869d7ccdbefa1959710c9d99c3",
+    "package.json": "818f3d4061b2f329951265a55783d0bdf7bf5317223464e4b3cfa82a760c7858"
+  },
+  "evidenceSha256": {
+    "board-store-result.json": "ffb34b6a8aec6b5a87cd9584d487ff1c1bef555908f7a8bc9dfaadbd0f6772b9",
+    "board-store.txt": "5cc297bc02a1bfb7a6493aadacd3bbf2cdfcea0154ddde83c9cdbc1ab1966f68",
+    "lint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "protocol-tests.txt": "602a35c64d485fe632b13e248a4e626f1387ad46893b46d1d338e84e41819c91",
+    "restore-after-failure.json": "cdb437080316d92219c75caf7e7af4a18490847d6af1d599f4d21a02aa5e60e1",
+    "tauri-build.txt": "fc2955b44b6a37f03b126924e506a662327c484d10299303ae602bdf26cb8cca"
+  },
+  "applicationExecutableSha256": "1ab09d80f256256711c7754c42611b18c43838595b646e866f684e6c536c8185"
+}

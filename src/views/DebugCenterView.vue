@@ -12,9 +12,11 @@ import {
   Wrench,
 } from 'lucide-vue-next'
 import { useSerialStore } from '../stores/serialStore'
+import { useSjzdStore } from '../stores/sjzdStore'
 
 const router = useRouter()
 const serial = useSerialStore()
+const sjzd = useSjzdStore()
 
 const serialSummary = computed(() => {
   if (!serial.connectedPort) return '未连接：请先在左下角选择目标串口'
@@ -61,10 +63,12 @@ function open(path: string) {
           <div><Cpu :size="15" /><span><strong>生产与设备</strong><small>DEVINFO、SN 写入、固件烧录</small></span></div>
           <div><Radio :size="15" /><span><strong>无线与上行</strong><small>SLE / 4G 配置、重连与状态回读</small></span></div>
           <div><Activity :size="15" /><span><strong>现场数据</strong><small>Modbus 点位、仪表盘、诊断与维护</small></span></div>
+          <div><EthernetPort :size="15" /><span><strong>F412 网口</strong><small>IP / Netty / Modbus TCP，保存值与运行值回显；F411 不支持</small></span></div>
         </div>
         <div class="lane-actions">
           <button class="primary-action" @click="open('/devices/sjzdv3')">从设备信息开始 <ArrowRight :size="15" /></button>
           <button class="quiet-action" @click="open('/devices/sjzdv3/modbus')">进入 Modbus 点位</button>
+          <button class="quiet-action" :disabled="sjzd.hardwareVariant === 'f411'" @click="open('/devices/sjzdv3/network')">F412 网口配置</button>
           <button class="quiet-action" @click="open('/devices/sjzdv3/maintenance')">维护与 EEPROM</button>
         </div>
       </article>

@@ -1,0 +1,2 @@
+# 正式验证目录中的文本文件为原始工具输出，保留末尾空行等现场格式。
+docs/verification/**/*.txt -whitespace

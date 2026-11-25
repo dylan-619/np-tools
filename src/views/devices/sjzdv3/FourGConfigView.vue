@@ -32,6 +32,8 @@ import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
+const transportLabel = computed(() => !sjzd.wlanTypeInfo.lastSyncTime ? '尚未查询'
+  : sjzd.wlanTypeInfo.reportTransport || `实际承载未返回（无线选择 ${sjzd.wlanTypeInfo.mode}）`)
 
 // Active sub-tab
 type ActiveTab = 'params' | 'wizard' | 'logs'
@@ -420,7 +422,7 @@ async function handleBatchSave() {
 
 // Wireless Mode Switch logic
 function promptModeSwitch(targetMode: WirelessMode) {
-  if (targetMode === sjzd.wlanTypeInfo.mode) {
+  if (targetMode === sjzd.wlanTypeInfo.mode && sjzd.wlanTypeInfo.reportTransport !== 'NETTY') {
     sjzd.showMessage(`当前设备已处于 ${targetMode} 模式`, false)
     return
   }
@@ -522,7 +524,7 @@ async function startWizard() {
     wizardStep.value = 5
 
     // Step 5: Switch to 4G if in SLE
-    if (sjzd.wlanTypeInfo.mode !== '4G') {
+    if (sjzd.wlanTypeInfo.mode !== '4G' || sjzd.wlanTypeInfo.reportTransport === 'NETTY') {
       addWizardLog('第 5 步: 切换设备至 4G Cat.1 模式 (WLAN_TYPE:4G)...')
       await sjzd.setWirelessMode('4G')
       addWizardLog('设备正在复位重启，等待 4G 模组初始化与 MQTT 上线...')
@@ -575,7 +577,7 @@ onMounted(async () => {
             class="mode-badge"
             :class="sjzd.wlanTypeInfo.mode === '4G' ? 'badge-4g' : 'badge-sle'"
           >
-            {{ sjzd.wlanTypeInfo.mode === '4G' ? '4G Cat.1 模式' : '星闪 (SLE) 模式' }}
+            实际承载：{{ transportLabel }}
           </span>
         </div>
         <p class="subtitle">
@@ -595,7 +597,7 @@ onMounted(async () => {
         </button>
 
         <button
-          v-if="sjzd.wlanTypeInfo.mode === '4G'"
+          v-if="sjzd.wlanTypeInfo.mode === '4G' && sjzd.wlanTypeInfo.reportTransport !== 'NETTY'"
           class="btn btn-secondary"
           :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
           title="强制 4G 模组断开重连 (4G:RECONNECT)"
@@ -635,23 +637,23 @@ onMounted(async () => {
           <Radio v-else :size="20" />
         </div>
         <div class="metric-content">
-          <span class="metric-label">当前无线通信模式</span>
+          <span class="metric-label">实际上报承载（无线选择 {{ sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.mode : '未读取' }}）</span>
           <div class="metric-value-row">
             <span class="metric-value">
-              {{ sjzd.wlanTypeInfo.mode === '4G' ? '4G Cat.1 蜂窝模式' : '星闪 (SLE) 无线模式' }}
+              {{ transportLabel }}
             </span>
             <span class="sub-baud-tag">
-              UART2: {{ sjzd.wlanTypeInfo.uart2Baud }} bps
+              UART2: {{ sjzd.wlanTypeInfo.uart2Active === false ? '不参与上报' : sjzd.wlanTypeInfo.lastSyncTime ? `${sjzd.wlanTypeInfo.uart2Baud} bps` : '未读取' }}
             </span>
           </div>
         </div>
         <button
           class="switch-mode-btn"
           :disabled="!serial.connectedPort || !mcuConsoleReady || sjzd.isBusy"
-          :title="sjzd.wlanTypeInfo.mode === '4G' ? '切换为 SLE 星闪模式' : '切换为 4G Cat.1 模式'"
-          @click="promptModeSwitch(sjzd.wlanTypeInfo.mode === '4G' ? 'SLE' : '4G')"
+          :title="sjzd.wlanTypeInfo.mode === '4G' || sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? '切换为 SLE 星闪模式' : '切换为 4G Cat.1 模式'"
+          @click="promptModeSwitch(sjzd.wlanTypeInfo.mode === '4G' || sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? 'SLE' : '4G')"
         >
-          <span>切换至 {{ sjzd.wlanTypeInfo.mode === '4G' ? 'SLE' : '4G' }}</span>
+          <span>切换至 {{ sjzd.wlanTypeInfo.mode === '4G' || sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? 'SLE' : '4G' }}</span>
         </button>
       </div>
 
@@ -713,7 +715,7 @@ onMounted(async () => {
     </div>
 
     <!-- Mode Warning Banner if in SLE mode -->
-    <div v-if="sjzd.wlanTypeInfo.mode === 'SLE'" class="alert-banner warning">
+    <div v-if="sjzd.wlanTypeInfo.mode === 'SLE' && sjzd.wlanTypeInfo.reportTransport !== 'NETTY'" class="alert-banner warning">
       <ShieldAlert :size="18" class="banner-icon" />
       <div class="banner-text">
         <strong>提示：当前设备工作于【星闪 (SLE) 模式】。</strong>

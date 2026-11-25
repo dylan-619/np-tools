@@ -19,6 +19,7 @@ import {
 import { useSjzdStore } from '../../../stores/sjzdStore'
 import { useSerialStore } from '../../../stores/serialStore'
 import ConfirmModal from '../../../components/common/ConfirmModal.vue'
+import SjzdHardwareSelector from '../../../components/common/SjzdHardwareSelector.vue'
 
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
@@ -155,6 +156,7 @@ onMounted(() => {
 
 <template>
   <div class="view-container">
+    <SjzdHardwareSelector />
     <!-- View Header -->
     <header class="view-header">
       <div class="title-col">
@@ -327,16 +329,16 @@ onMounted(() => {
             <span class="b-value mono-text">{{ sjzd.deviceInfo.reportFreqSec !== undefined ? `${sjzd.deviceInfo.reportFreqSec} 秒` : '--' }}</span>
           </div>
           <div class="breakdown-item">
-            <span class="b-label"><Wifi :size="13" style="display:inline;vertical-align:-2px;margin-right:2px;" /> 无线通信模式 (WLAN)：</span>
+            <span class="b-label"><Wifi :size="13" style="display:inline;vertical-align:-2px;margin-right:2px;" /> 实际上报承载：</span>
             <div class="b-value-wrap">
               <span class="b-value mono-text highlight">
-                {{ sjzd.wlanTypeInfo.mode === '4G' ? '4G Cat.1 模式 (115200bps)' : '星闪 (SLE) 模式 (230400bps)' }}
+                {{ sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.reportTransport || `未返回（无线选择 ${sjzd.wlanTypeInfo.mode}）` : '尚未查询' }}
               </span>
               <router-link
-                :to="sjzd.wlanTypeInfo.mode === '4G' ? '/devices/sjzdv3/4g' : '/devices/sjzdv3/sle'"
+                :to="sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? '/devices/sjzdv3/network' : sjzd.wlanTypeInfo.mode === '4G' ? '/devices/sjzdv3/4g' : '/devices/sjzdv3/sle'"
                 class="inline-link-btn"
               >
-                {{ sjzd.wlanTypeInfo.mode === '4G' ? '4G 配置' : '星闪配置' }}
+                {{ sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? '网口配置' : sjzd.wlanTypeInfo.mode === '4G' ? '4G 配置' : '星闪配置' }}
               </router-link>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSerialStore } from './serialStore'
 import {
   sjzdSendSn,
@@ -42,10 +42,18 @@ import type {
   SjzdConfigFeature,
   SjzdConfigSaveReceipt,
   SjzdConfigSnapshotEvidence,
+  SjzdHardwareVariant,
+  SjzdNetworkConfig,
+  SjzdNetworkSnapshot,
+  SjzdNetworkStatus,
 } from '../types/sjzd'
 import { FOUR_G_EMPTY_CONFIG, type Rs485BaudResponse } from '../types/sjzd'
 import { buildRs485BaudCommand, parseRs485BaudResponse } from '../utils/sjzdRs485Baud'
 import { buildSjzdSleAddressCommand } from '../utils/sjzdSleAddress'
+import {
+  buildSjzdNetworkCommand, normalizeSjzdNetworkConfig, parseSjzdNetworkSnapshot,
+  parseSjzdWlanType, sameSjzdNetworkConfig, SjzdNetworkStatusCollector,
+} from '../utils/sjzdNetwork'
 import {
   buildModbusDebugReport,
   parseModbusDebugProtocolLine,
@@ -81,6 +89,42 @@ export const useSjzdStore = defineStore('sjzd', () => {
   const rs485BaudConfig = ref<Rs485BaudResponse | null>(null)
   const rs485BaudSupported = ref<boolean | null>(null)
   const modbusConfigSnapshot = ref<SjzdConfigSnapshotEvidence | null>(null)
+  const hardwareVariant = ref<SjzdHardwareVariant>('unknown')
+  const hardwareSource = ref<'manual' | 'protocol' | null>(null)
+  const networkSupported = ref<boolean | null>(null)
+  const networkSnapshot = ref<SjzdNetworkSnapshot | null>(null)
+  const networkSnapshotFresh = ref(false)
+  const networkStatus = ref<SjzdNetworkStatus | null>(null)
+  const networkError = ref('')
+  const networkLastSave = ref<SjzdConfigSaveReceipt | null>(null)
+  const networkSaveVerified = ref(false)
+  const networkRestartVerifiedAt = ref<string | null>(null)
+  const networkTrace = ref<Array<{ time: string; direction: 'TX' | 'RX'; text: string }>>([])
+  const networkAvailable = computed(() => hardwareVariant.value !== 'f411' && networkSupported.value !== false)
+  let serialEpoch = 0
+  let networkEpoch = 0
+  let transactionTail: Promise<unknown> = Promise.resolve()
+  let cancelSerialTransaction: (() => void) | undefined
+
+  function clearNetworkState() {
+    networkEpoch++
+    networkSupported.value = null
+    networkSnapshot.value = null
+    networkSnapshotFresh.value = false
+    networkStatus.value = null
+    networkError.value = ''
+    networkLastSave.value = null
+    networkSaveVerified.value = false
+    networkRestartVerifiedAt.value = null
+    networkTrace.value = []
+  }
+
+  function selectHardwareVariant(variant: SjzdHardwareVariant) {
+    if (!['unknown', 'f411', 'f412'].includes(variant) || isBusy.value) return
+    if (hardwareVariant.value !== variant) clearNetworkState()
+    hardwareVariant.value = variant
+    hardwareSource.value = variant === 'unknown' ? null : 'manual'
+  }
   // 多行 RS485DEV:LIST 事务期间禁止通用流解析器写入半截点位表。
   let isCollectingModbusReadback = false
   let isCollectingSleReadback = false
@@ -149,6 +193,11 @@ export const useSjzdStore = defineStore('sjzd', () => {
 
   // 彻底重置设备运行时状态（不留任何旧设备缓存与脏数据）
   function resetDeviceState() {
+    serialEpoch++
+    cancelSerialTransaction?.()
+    clearNetworkState()
+    hardwareVariant.value = 'unknown'
+    hardwareSource.value = null
     deviceInfo.value = null
     sleComparisons.value = []
     sleCurrentStatus.value = {}
@@ -212,7 +261,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
    * 在写入之前注册行监听器，直到固件明确给出本次事务的结束特征才解除。
    * 串口 write 完成只代表字节已提交，不能作为设备保存成功的证据。
    */
-  function runSerialTransaction<T>(
+  function executeSerialTransaction<T>(
     operation: string,
     send: () => Promise<unknown>,
     inspectLine: (line: string) => SerialTransactionDecision<T>,
@@ -227,6 +276,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
         settled = true
         window.clearTimeout(timer)
         serialStore.unregisterLineListener(listenerId)
+        cancelSerialTransaction = undefined
         callback()
       }
 
@@ -247,11 +297,29 @@ export const useSjzdStore = defineStore('sjzd', () => {
       const timer = window.setTimeout(() => {
         finish(() => reject(new Error(`${operation} 等待设备响应超时（${timeoutMs}ms）`)))
       }, timeoutMs)
+      cancelSerialTransaction = () => finish(() => reject(new Error(`${operation} 已取消：串口连接已变化，请重新读取`)))
 
       void send().catch((error) => {
         finish(() => reject(error instanceof Error ? error : new Error(String(error))))
       })
     })
+  }
+
+  /** 共用端口的结构化事务完整结束后才允许下一条注册监听和发送，避免跨页拼帧。 */
+  function runSerialTransaction<T>(
+    operation: string, send: () => Promise<unknown>,
+    inspectLine: (line: string) => SerialTransactionDecision<T>, timeoutMs = 2500
+  ): Promise<T> {
+    const epoch = serialEpoch
+    const port = serialStore.connectedPort
+    const execute = async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 35))
+      if (epoch !== serialEpoch || port !== serialStore.connectedPort || !port) throw new Error(`${operation} 已取消：串口会话已变化`)
+      return await executeSerialTransaction(operation, send, inspectLine, timeoutMs)
+    }
+    const result = transactionTail.then(execute, execute)
+    transactionTail = result.then(() => undefined, () => undefined)
+    return result
   }
 
   function waitForSerialLine(
@@ -397,7 +465,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
     return expected.length === actual.length && expected.every((point, index) => isSameModbusPoint(point, actual[index]))
   }
 
-  async function readModbusPointsOnce(): Promise<ModbusPointConfig[]> {
+  async function readModbusPointsOnce(publish = true): Promise<ModbusPointConfig[]> {
     const port = serialStore.connectedPort
     if (!port) throw new Error('请先连接串口')
     await ensureMcuConsoleAvailable('RS485DEV:LIST')
@@ -416,7 +484,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
           if (fed.error) return { error: fed.error }
           if (fed.snapshot) {
             const parsed = parseSjzdRs485Snapshot(fed.snapshot)
-            modbusConfigSnapshot.value = parsed.evidence
+            if (publish) modbusConfigSnapshot.value = parsed.evidence
             return { value: parsed.points }
           }
           if (line.includes(configProtocolMarker('RS485')) && !parseSjzdConfigProtocolLine(line)) {
@@ -428,7 +496,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
         3500
       )
 
-      modbusPoints.value = readback
+      if (publish) modbusPoints.value = readback
       return readback
     } finally {
       isCollectingModbusReadback = false
@@ -644,6 +712,13 @@ export const useSjzdStore = defineStore('sjzd', () => {
   // Setup stream listener for real-time sample parsing
   serialStore.registerLineListener('sjzd_parser', (line: string) => {
     try {
+      if (/^(?:NET(?::|_CONFIG:)|WLAN_TYPE:|SLE_BRIDGE:|DevInfo:)/.test(line.trim())) appendNetworkTrace('RX', line.trim())
+      if (line.includes('Application Running.')) {
+        networkSnapshotFresh.value = false
+        networkStatus.value = null
+        networkRestartVerifiedAt.value = null
+        wlanTypeInfo.value = { mode: 'SLE', modeCode: 2, uart2Baud: 230400 }
+      }
       // 1. Check for AI Samples: AI1: x.xxx mA, AI2: x.xxx mA
       if (line.includes('AI1:') && line.includes('AI2:')) {
         const aiM = line.match(/AI1:\s*([0-9.]+)\s*mA,\s*AI2:\s*([0-9.]+)\s*mA/i)
@@ -706,11 +781,17 @@ export const useSjzdStore = defineStore('sjzd', () => {
         const freqM = line.match(/(?:RptFreq|ReportFreq|RTFRE)[:=]\s*(\d+)/i)
 
         if (snM || typeM || addrM || hwM || fwM || bootM || uptimeM || freqM) {
+          if (snM && deviceInfo.value?.sn && snM[1] !== deviceInfo.value.sn) {
+            clearNetworkState()
+            hardwareVariant.value = 'unknown'
+            hardwareSource.value = null
+            showMessage('设备 SN 已变化，已清除旧网络回显与芯片选择，请重新确认设备。', false)
+          }
           deviceInfo.value = {
             sn: snM ? snM[1] : deviceInfo.value?.sn,
             deviceType: typeM ? typeM[1] : deviceInfo.value?.deviceType,
             deviceAddr: addrM ? addrM[1] : deviceInfo.value?.deviceAddr,
-            hwVersion: hwM ? hwM[1] : deviceInfo.value?.hwVersion || (typeM ? `SJZDV3-${typeM[1]}` : undefined),
+            hwVersion: hwM ? hwM[1] : /DevInfo:/i.test(line) ? undefined : deviceInfo.value?.hwVersion,
             // 完整 DEVINFO 缺少版本时清空旧值，避免将新固件缓存带给旧固件。
             fwVersion: fwM ? fwM[1] : /DevInfo:/i.test(line) ? undefined : deviceInfo.value?.fwVersion,
             bootCount: bootM ? parseInt(bootM[1], 10) : deviceInfo.value?.bootCount,
@@ -982,36 +1063,27 @@ export const useSjzdStore = defineStore('sjzd', () => {
 
       // 8. 4G Cat.1 / Wireless Mode (WLAN_TYPE) responses
       if (line.includes('WLAN_TYPE:')) {
-        const wtMatch = line.match(/WLAN_TYPE:\s*mode=(\w+),\s*mode_code=(\d+),\s*uart2_baud=(\d+)/i)
-        if (wtMatch) {
-          const modeStr: WirelessMode = wtMatch[1].toUpperCase() === '4G' ? '4G' : 'SLE'
-          wlanTypeInfo.value = {
-            mode: modeStr,
-            modeCode: parseInt(wtMatch[2], 10),
-            uart2Baud: parseInt(wtMatch[3], 10),
-            lastSyncTime: new Date().toLocaleTimeString(),
-          }
-          appendFourGLog(`[模式查询] 当前无线模式: ${modeStr} (UART2波特率: ${wtMatch[3]}bps)`, 'info')
-          showMessage(`已获取无线模式: ${modeStr} (${wtMatch[3]}bps)`)
+        const parsed = parseSjzdWlanType(line)
+        if (parsed) {
+          wlanTypeInfo.value = parsed
+          appendFourGLog(`[模式查询] 无线选择 ${parsed.mode}，实际上报 ${parsed.reportTransport || '旧固件未返回'}，UART2 ${parsed.uart2Baud}bps`, 'info')
         }
       }
 
       if (line.includes('Wireless type saved as SLE')) {
-        wlanTypeInfo.value.mode = 'SLE'
-        wlanTypeInfo.value.modeCode = 2
-        wlanTypeInfo.value.uart2Baud = 230400
-        wlanTypeInfo.value.lastSyncTime = new Date().toLocaleTimeString()
+        wlanTypeInfo.value.savedModeCode = 2
+        wlanTypeInfo.value.savedReadOk = true
+        wlanTypeInfo.value.lastSyncTime = undefined
         appendFourGLog('无线工作模式已切换为 SLE (星闪) 模式，设备正在复位重启...', 'info')
-        showMessage('无线模式已切换为 SLE，设备正在重启')
+        showMessage('SLE 选择已保存，等待重启后回读实际承载')
       }
 
       if (line.includes('Wireless type saved as 4G')) {
-        wlanTypeInfo.value.mode = '4G'
-        wlanTypeInfo.value.modeCode = 3
-        wlanTypeInfo.value.uart2Baud = 115200
-        wlanTypeInfo.value.lastSyncTime = new Date().toLocaleTimeString()
+        wlanTypeInfo.value.savedModeCode = 3
+        wlanTypeInfo.value.savedReadOk = true
+        wlanTypeInfo.value.lastSyncTime = undefined
         appendFourGLog('无线工作模式已切换为 4G Cat.1 模式，设备正在复位重启...', 'info')
-        showMessage('无线模式已切换为 4G Cat.1，设备正在重启')
+        showMessage('4G 选择已保存，等待重启后回读实际承载')
       }
 
       if (line.includes('4G mode rejected:')) {
@@ -1236,6 +1308,247 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
   })
 
+  function appendNetworkTrace(direction: 'TX' | 'RX', text: string) {
+    networkTrace.value.push({ time: new Date().toLocaleTimeString(), direction, text })
+    if (networkTrace.value.length > 100) networkTrace.value.splice(0, networkTrace.value.length - 100)
+  }
+
+  function networkSession() {
+    const port = serialStore.connectedPort
+    if (!port) throw new Error('请先连接 UART1 串口')
+    if (hardwareVariant.value === 'f411') throw new Error('STM32F411 硬件不提供网口功能')
+    return { port, epoch: networkEpoch }
+  }
+
+  function assertNetworkSession(session: ReturnType<typeof networkSession>) {
+    if (session.port !== serialStore.connectedPort || session.epoch !== networkEpoch || hardwareVariant.value === 'f411') {
+      throw new Error('设备或芯片选择已变化，请重新读取')
+    }
+  }
+
+  async function networkCommand(port: string, command: string) {
+    appendNetworkTrace('TX', command)
+    return await sjzdSendRawCommand(port, command, false)
+  }
+
+  async function readNetworkConfigOnce(): Promise<SjzdNetworkSnapshot> {
+    const session = networkSession()
+    networkSnapshotFresh.value = false
+    await ensureMcuConsoleAvailable('NET:LIST')
+    assertNetworkSession(session)
+    const collector = new SjzdConfigSnapshotCollector('NET')
+    const snapshot = await runSerialTransaction<SjzdNetworkSnapshot>('读取网口完整配置',
+      () => networkCommand(session.port, 'NET:LIST'),
+      (line) => {
+        assertNetworkSession(session)
+        if (line.includes('Command not support')) {
+          networkSupported.value = false
+          return { error: '当前固件不支持 NET 配置协议；F412 请升级网口固件，F411 无网口' }
+        }
+        const fed = collector.feed(line)
+        if (fed.error) return { error: fed.error }
+        if (fed.snapshot) return { value: parseSjzdNetworkSnapshot(fed.snapshot) }
+        if (line.includes('NET_CONFIG:') && !parseSjzdConfigProtocolLine(line)) return { error: 'NET_CONFIG 回包格式无效' }
+        return undefined
+      }, 3500)
+    assertNetworkSession(session)
+    const previous = networkSnapshot.value
+    if (!previous || previous.evidence.revision !== snapshot.evidence.revision ||
+        previous.saved.valid !== snapshot.saved.valid || previous.running.valid !== snapshot.running.valid ||
+        !sameSjzdNetworkConfig(previous.saved, snapshot.saved) || !sameSjzdNetworkConfig(previous.running, snapshot.running)) {
+      networkRestartVerifiedAt.value = null
+    }
+    networkSnapshot.value = snapshot
+    networkSnapshotFresh.value = true
+    if (networkLastSave.value?.revision !== snapshot.evidence.revision) networkSaveVerified.value = false
+    if (snapshot.pendingRestart !== 'NO') networkRestartVerifiedAt.value = null
+    networkSupported.value = true
+    if (hardwareVariant.value === 'unknown') {
+      hardwareVariant.value = 'f412'
+      hardwareSource.value = 'protocol'
+    }
+    return snapshot
+  }
+
+  async function readNetworkStatusOnce(): Promise<SjzdNetworkStatus> {
+    const session = networkSession()
+    await ensureMcuConsoleAvailable('NET:STATUS')
+    const collector = new SjzdNetworkStatusCollector()
+    networkStatus.value = collector.snapshot()
+    try {
+      return await runSerialTransaction<SjzdNetworkStatus>('读取网口运行状态',
+        () => networkCommand(session.port, 'NET:STATUS'),
+        (line) => {
+          assertNetworkSession(session)
+          if (line.includes('Command not support')) return { error: '当前固件不支持 NET:STATUS' }
+          const complete = collector.feed(line)
+          networkStatus.value = collector.snapshot()
+          return complete ? { value: collector.snapshot() } : undefined
+        }, 2500)
+    } finally {
+      if (session.epoch === networkEpoch && session.port === serialStore.connectedPort) networkStatus.value = collector.snapshot()
+    }
+  }
+
+  async function readNetworkIdentityOnce() {
+    const session = networkSession()
+    await waitForSerialLine('读取设备身份', () => networkCommand(session.port, 'DEVINFO'),
+      (line) => /\bDevInfo:\s*SN=\s*[0-9A-Za-z]+/i.test(line),
+      (line) => line.includes('Command not support') ? line : undefined)
+    assertNetworkSession(session)
+    if (!deviceInfo.value?.sn) throw new Error('未读取到设备 SN，不能关联网络配置')
+    return deviceInfo.value.sn
+  }
+
+  async function readNetworkWirelessOnce() {
+    const session = networkSession()
+    await runSerialTransaction('读取实际上报承载', () => networkCommand(session.port, 'WLAN_TYPE:LIST'),
+      (line) => {
+        assertNetworkSession(session)
+        if (line.includes('Command not support')) return { error: line }
+        const parsed = parseSjzdWlanType(line)
+        if (parsed) { wlanTypeInfo.value = parsed; return { value: parsed } }
+        return undefined
+      })
+  }
+
+  async function networkOperation<T>(label: string, action: () => Promise<T>): Promise<T | undefined> {
+    if (isBusy.value) return
+    const epoch = networkEpoch
+    isBusy.value = true
+    networkError.value = ''
+    try {
+      networkSession()
+      return await action()
+    } catch (error) {
+      if (epoch === networkEpoch) {
+        if (!networkSnapshotFresh.value) {
+          networkSaveVerified.value = false
+          networkRestartVerifiedAt.value = null
+        }
+        networkError.value = `${label}：${error instanceof Error ? error.message : String(error)}`
+        showMessage(networkError.value, false)
+      }
+      return undefined
+    } finally {
+      isBusy.value = false
+    }
+  }
+
+  async function queryNetworkConfig() {
+    return await networkOperation('读取网口配置失败', async () => {
+      const snapshot = await readNetworkConfigOnce()
+      await readNetworkIdentityOnce()
+      await readNetworkWirelessOnce()
+      await readNetworkStatusOnce()
+      showMessage(`网络配置已完整读回（${snapshot.evidence.revisionHex}）；${snapshot.pendingRestart === 'YES' ? '保存值待重启生效' : '保存值与本次运行值已核对'}。`)
+      return snapshot
+    })
+  }
+
+  async function refreshNetworkStatus() {
+    return await networkOperation('刷新网络状态失败', async () => {
+      if (networkSupported.value !== true) throw new Error('请先读取完整网络配置')
+      await readNetworkWirelessOnce()
+      return await readNetworkStatusOnce()
+    })
+  }
+
+  function requireNetworkReadback() {
+    if (networkSupported.value !== true || !networkSnapshotFresh.value || !networkSnapshot.value) throw new Error('请先读取当前设备的完整网络配置，再执行操作')
+    return networkSnapshot.value
+  }
+
+  async function saveNetworkConfig(input: SjzdNetworkConfig) {
+    return await networkOperation('保存网络配置未通过复核', async () => {
+      requireNetworkReadback()
+      networkSaveVerified.value = false
+      networkLastSave.value = null
+      networkRestartVerifiedAt.value = null
+      const session = networkSession()
+      const expected = normalizeSjzdNetworkConfig(input)
+      const command = buildSjzdNetworkCommand(expected)
+      await readNetworkIdentityOnce()
+      assertNetworkSession(session)
+      const points = await readModbusPointsOnce(false)
+      assertNetworkSession(session)
+      if ((expected.flags & 2) && points.some((point) => point.slaveAddr === expected.aiUnit)) throw new Error(`AI_UNIT_CONFLICT：485 点表已使用从站 ${expected.aiUnit}`)
+      networkSnapshotFresh.value = false
+      try {
+        const receipt = await waitForConfigSave('NET', '保存网络配置', () => networkCommand(session.port, command))
+        assertNetworkSession(session)
+        networkLastSave.value = receipt
+        const actual = await readNetworkConfigOnce()
+        assertSaveRevision('NET', receipt, actual.evidence)
+        if (!actual.saved.valid || !sameSjzdNetworkConfig(expected, actual.saved)) throw new Error('EEPROM 实际保存字段与本次输入不一致，请查看三列回显')
+        networkSaveVerified.value = true
+        showMessage(actual.pendingRestart === 'YES' ? '已保存并完整读回一致；当前运行值保持，待重启生效。' : '已保存并完整读回一致，当前运行值也一致。')
+        return actual
+      } catch (error) {
+        // 固件写入/校验失败后可能追加自动 LIST；等其输出结束再主动读取实际保存状态。
+        await new Promise((resolve) => window.setTimeout(resolve, 200))
+        assertNetworkSession(session)
+        try { await readNetworkConfigOnce() } catch { /* 保留上次快照并标记未确认，原始原因优先。 */ }
+        throw error
+      }
+    })
+  }
+
+  async function resetNetworkConfig() {
+    return await networkOperation('网络配置重置未通过复核', async () => {
+      requireNetworkReadback()
+      networkSaveVerified.value = false
+      networkLastSave.value = null
+      networkRestartVerifiedAt.value = null
+      const session = networkSession()
+      await readNetworkIdentityOnce()
+      assertNetworkSession(session)
+      networkSnapshotFresh.value = false
+      try {
+        const receipt = await waitForConfigSave('NET', '仅清除网络记录', () => networkCommand(session.port, 'NET:RESET_CONFIG'))
+        networkLastSave.value = receipt
+        const actual = await readNetworkConfigOnce()
+        assertSaveRevision('网络重置', receipt, actual.evidence)
+        if (actual.saved.valid || actual.saved.code !== 'EMPTY') throw new Error('重置后记录不是 EMPTY，请查看实际回读')
+        networkSaveVerified.value = true
+        showMessage('网络记录已单独清除并读回 EMPTY；重启后使用默认 .55:502，其他配置保留。')
+        return actual
+      } catch (error) {
+        await new Promise((resolve) => window.setTimeout(resolve, 200))
+        assertNetworkSession(session)
+        try { await readNetworkConfigOnce() } catch { /* 记录未确认时保留历史回显。 */ }
+        throw error
+      }
+    })
+  }
+
+  async function restartNetworkAndVerify() {
+    return await networkOperation('重启后网络配置未完成复核', async () => {
+      const before = requireNetworkReadback()
+      const session = networkSession()
+      const sn = await readNetworkIdentityOnce()
+      const expected = { ...before.saved }
+      networkRestartVerifiedAt.value = null
+      networkSnapshotFresh.value = false
+      await waitForSerialLine('等待设备重启日志', () => networkCommand(session.port, '@RST'),
+        (line) => line.includes('Application Running.'), (line) => line.includes('Command not support') ? line : undefined, 10000)
+      await new Promise((resolve) => window.setTimeout(resolve, 1200))
+      assertNetworkSession(session)
+      wlanBridgeStatus.value = null
+      const actualSn = await readNetworkIdentityOnce()
+      if (actualSn !== sn) throw new Error(`设备身份变化（${sn} → ${actualSn}），不能认定原设备重启复核成功`)
+      const actual = await readNetworkConfigOnce()
+      await readNetworkWirelessOnce()
+      await readNetworkStatusOnce()
+      if (actual.pendingRestart !== 'NO' || !sameSjzdNetworkConfig(expected, actual.saved) || !sameSjzdNetworkConfig(expected, actual.running) || expected.valid !== actual.running.valid) {
+        throw new Error('重启后保存值、运行值或待重启状态不一致，请检查回显')
+      }
+      networkRestartVerifiedAt.value = new Date().toISOString()
+      showMessage('已观察到设备重启，SN 与配置读回一致；链路和服务状态见实时回显。')
+      return actual
+    })
+  }
+
   // Device Info Actions
   async function queryDeviceInfo() {
     if (!serialStore.connectedPort) {
@@ -1432,6 +1745,10 @@ export const useSjzdStore = defineStore('sjzd', () => {
 
   async function toggleWlanBridge(enable: boolean) {
     if (!serialStore.connectedPort) return
+    if (enable && wlanTypeInfo.value.reportTransport === 'NETTY') {
+      showMessage('当前实际上报承载为 Netty，UART2 不开放透传（NETTY_ACTIVE）。', false)
+      return
+    }
     isBusy.value = true
     // ACK 丢失时不能继续沿用旧状态，否则 MCU 命令可能被误转发给无线模组。
     wlanBridgeStatus.value = null
@@ -1875,30 +2192,67 @@ export const useSjzdStore = defineStore('sjzd', () => {
   }
 
   async function setWirelessMode(mode: WirelessMode) {
+    if (isBusy.value) return
     if (!serialStore.connectedPort) {
       showMessage('请先连接串口', false)
       return
     }
-    if (mode === '4G') {
-      if (!fourGConfig.value.host || !fourGConfig.value.port) {
-        showMessage('切换 4G 模式前，必须先配置并保存 MQTT Broker 主机与端口', false)
-        return
-      }
-    }
     isBusy.value = true
+    const operationPort = serialStore.connectedPort
+    networkError.value = ''
     try {
       await ensureMcuConsoleAvailable(`切换无线模式到 ${mode}`)
+      if (mode === '4G') {
+        const config = await readFourGConfigOnce()
+        if (!config.status.configOperational) throw new Error('4G 保存配置不完整，请先在 4G 页配置并读回确认')
+      }
       const port = serialStore.connectedPort as string
-      await waitForSerialLine(
+      const switchAck = await waitForSerialLine(
         `切换无线模式到 ${mode}`,
-        () => sjzdSendWirelessType(port, mode),
-        (line) => line.includes(`Wireless type saved as ${mode}`),
-        (line) => (line.includes('rejected') || line.includes('persistence failed') ? line : undefined)
+        () => hardwareVariant.value === 'f412' ? networkCommand(port, `WLAN_TYPE:${mode}`) : sjzdSendWirelessType(port, mode),
+        (line) => line.includes(`Wireless type saved as ${mode}`) || line.includes(`WLAN_TYPE:SWITCH,status=OK,saved_wireless=${mode === 'SLE' ? 2 : 3},restart=YES`),
+        (line) => line.includes('WLAN_TYPE:SWITCH,status=ERROR') || /rejected|persistence failed|Wireless type save failed/i.test(line) ? line : undefined
       )
       wlanBridgeStatus.value = null
       wlanBridgeEnabled.value = false
-      showMessage(`无线模式已获固件持久化确认并正在重启；重连后须回读 WLAN_TYPE:LIST 验证。`)
+      networkSnapshotFresh.value = false
+      networkRestartVerifiedAt.value = null
+      const structuredSwitch = switchAck.includes('WLAN_TYPE:SWITCH,')
+      // 旧 F411 固件只有保存日志，沿用等待后读回，不依赖新版启动日志契约。
+      if (structuredSwitch) {
+        await waitForSerialLine('等待承载切换重启', async () => undefined,
+          (line) => line.includes('Application Running.'), () => undefined, 10000)
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1200))
+      if (serialStore.connectedPort !== port) throw new Error('串口已变化，请重连后重新读取')
+      await ensureMcuConsoleAvailable('复核上报承载')
+      await runSerialTransaction('切换后无线模式回读', () => sjzdQueryWlanType(port), (line) => {
+        const parsed = parseSjzdWlanType(line)
+        if (parsed) { wlanTypeInfo.value = parsed; return { value: parsed } }
+        return undefined
+      })
+      if (wlanTypeInfo.value.mode !== mode || (wlanTypeInfo.value.reportTransport && wlanTypeInfo.value.reportTransport !== mode)) throw new Error('切换后的实际承载与目标不一致')
+      if (hardwareVariant.value === 'f412' && networkSupported.value === true) {
+        await readNetworkConfigOnce()
+        await readNetworkStatusOnce()
+        if (networkSnapshot.value!.running.flags & 1) throw new Error('实际 Netty 开关仍开启，切换未完成')
+      }
+      showMessage(structuredSwitch
+        ? `已观察到设备重启并读回 ${mode} 承载；Modbus TCP 和网络参数见运行回显。`
+        : `无线选择已保存并实际读回 ${mode}；旧固件未提供重启证明或扩展承载时，不推断其网络能力。`)
     } catch (e: any) {
+      // 跨记录保存可能部分成功；只读回实际状态，不重发切换或保存指令。
+      if (serialStore.connectedPort === operationPort) {
+        try {
+          await runSerialTransaction('切换失败后无线选择读回', () => sjzdQueryWlanType(operationPort), (line) => {
+            const parsed = parseSjzdWlanType(line)
+            if (parsed) { wlanTypeInfo.value = parsed; return { value: parsed } }
+            return undefined
+          })
+          if (hardwareVariant.value === 'f412' && networkSupported.value === true) await readNetworkConfigOnce()
+        } catch { /* 保留原始切换错误，未完整读回的状态保持未确认。 */ }
+      }
+      if (hardwareVariant.value === 'f412') networkError.value = `切换承载未通过复核：${String(e)}`
       showMessage(`切换模式失败: ${e}`, false)
     } finally {
       isBusy.value = false
@@ -2107,6 +2461,10 @@ export const useSjzdStore = defineStore('sjzd', () => {
 
   async function reconnectFourG() {
     if (!serialStore.connectedPort) return
+    if (wlanTypeInfo.value.reportTransport === 'NETTY') {
+      showMessage('当前运行 Netty，4G 参数仅为预配置，不能触发模组重连。', false)
+      return
+    }
     isBusy.value = true
     try {
       await ensureMcuConsoleAvailable('4G:RECONNECT')
@@ -2237,6 +2595,24 @@ export const useSjzdStore = defineStore('sjzd', () => {
   }
 
   return {
+    hardwareVariant,
+    hardwareSource,
+    selectHardwareVariant,
+    networkAvailable,
+    networkSupported,
+    networkSnapshot,
+    networkSnapshotFresh,
+    networkStatus,
+    networkError,
+    networkLastSave,
+    networkSaveVerified,
+    networkRestartVerifiedAt,
+    networkTrace,
+    queryNetworkConfig,
+    refreshNetworkStatus,
+    saveNetworkConfig,
+    resetNetworkConfig,
+    restartNetworkAndVerify,
     deviceInfo,
     sleComparisons,
     sleCurrentStatus,

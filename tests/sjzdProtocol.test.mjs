@@ -608,7 +608,13 @@ test('SJZ DEVINFO 不支持或回读超时均报告失败并释放事务监听�
       },
     }
 
-    await store.queryDeviceInfo()
+    const unsupportedQuery = store.queryDeviceInfo()
+    // 分别推进桥接查询和 DEVINFO 前新增的 35ms 串口空闲保护。
+    await new Promise((resolve) => setImmediate(resolve))
+    context.mock.timers.tick(35)
+    await new Promise((resolve) => setImmediate(resolve))
+    context.mock.timers.tick(35)
+    await unsupportedQuery
     assert.equal(store.lastOpMessage.success, false)
     assert.match(store.lastOpMessage.text, /Command not support/)
     assert.equal(store.isBusy, false)
@@ -617,6 +623,8 @@ test('SJZ DEVINFO 不支持或回读超时均报告失败并释放事务监听�
     mode = 'timeout'
     let resolved = false
     const query = store.queryDeviceInfo().then(() => { resolved = true })
+    await new Promise((resolve) => setImmediate(resolve))
+    context.mock.timers.tick(35)
     await new Promise((resolve) => setImmediate(resolve))
     context.mock.timers.tick(2499)
     await Promise.resolve()

@@ -21,7 +21,7 @@ export interface ModbusPointConfig {
 }
 
 /** SJZDV3 配置结构化协议中的功能域。 */
-export type SjzdConfigFeature = 'SLE' | '4G' | 'RS485'
+export type SjzdConfigFeature = 'SLE' | '4G' | 'RS485' | 'NET'
 
 /**
  * 已通过同一事务 ID、payload 数量与 CRC32 校验的配置快照证据。
@@ -54,7 +54,7 @@ export interface SjzdBridgeStatus {
   transactionId: number
   requested: boolean
   active: boolean
-  uartOwner: 'MCU' | 'SLE' | '4G'
+  uartOwner: 'MCU' | 'SLE' | '4G' | 'NONE'
   wireless: 'SLE' | '4G'
   status: 'OK' | 'ERROR'
   code?: string
@@ -212,6 +212,45 @@ export interface WlanTypeInfo {
   modeCode: number
   uart2Baud: number
   lastSyncTime?: string
+  reportTransport?: 'SLE' | '4G' | 'NETTY'
+  uart2Active?: boolean
+  savedModeCode?: number
+  savedReadOk?: boolean
+}
+
+export type SjzdHardwareVariant = 'unknown' | 'f411' | 'f412'
+
+export interface SjzdNetworkConfig {
+  ip: string
+  mask: string
+  gateway: string
+  nettyIp: string
+  nettyPort: number
+  flags: number
+  aiUnit: number
+  modbusPort: number
+}
+
+export interface SjzdNetworkRecord extends SjzdNetworkConfig {
+  valid: boolean
+  code: string
+  version: number
+}
+
+export interface SjzdNetworkSnapshot {
+  saved: SjzdNetworkRecord
+  running: SjzdNetworkRecord
+  pendingRestart: 'YES' | 'NO' | 'UNKNOWN'
+  evidence: SjzdConfigSnapshotEvidence
+}
+
+export type SjzdNetworkStatusKind = 'STATUS' | 'NETTY' | 'MODBUS' | 'CACHE' | 'RESOURCES'
+export interface SjzdNetworkStatus {
+  parts: Partial<Record<SjzdNetworkStatusKind, Record<string, string>>>
+  complete: boolean
+  missing: SjzdNetworkStatusKind[]
+  receivedAt: string
+  rawLines: string[]
 }
 
 export interface FourGConfigDto {

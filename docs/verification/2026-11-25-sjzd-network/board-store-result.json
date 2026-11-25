@@ -1,0 +1,950 @@
+{
+  "passed": true,
+  "source": "Actual Pinia store and NET parser; only Tauri transport replaced by physical UART1 bridge",
+  "stages": [
+    {
+      "name": "initial-defaults",
+      "snapshot": {
+        "saved": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 247,
+          "modbusPort": 502
+        },
+        "running": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 247,
+          "modbusPort": 502
+        },
+        "pendingRestart": "NO",
+        "evidence": {
+          "transactionId": 4,
+          "revision": 368986081,
+          "revisionHex": "0x15FE47E1",
+          "payloadCount": 3,
+          "crc32": "3AA6F47C",
+          "deviceStatus": "OK",
+          "completedAt": "2026-11-25T11:20:52.903Z"
+        }
+      },
+      "status": {
+        "parts": {
+          "STATUS": {
+            "config_valid": "1",
+            "running_flags": "2",
+            "ip": "192.168.30.55",
+            "driver": "READY",
+            "error": "OK",
+            "vendor": "1C00",
+            "product": "9151",
+            "revision": "2B",
+            "mac": "E4:66:E5:13:17:4B",
+            "link": "UP",
+            "speed_mbps": "100",
+            "full_duplex": "1",
+            "rx": "71",
+            "tx": "1",
+            "rx_errors": "0",
+            "tx_errors": "0",
+            "spi_errors": "0",
+            "recoveries": "0",
+            "rx_drops": "0",
+            "netty": "IMPLEMENTED",
+            "modbus": "IMPLEMENTED",
+            "report_transport": "SLE",
+            "free_heap": "25352",
+            "min_free_heap": "24856",
+            "network_stack_free": "1928"
+          },
+          "NETTY": {
+            "enabled": "0",
+            "state": "WAIT_LINK",
+            "last_error": "NONE",
+            "connections": "0",
+            "rx_frames": "0",
+            "tx_frames": "0",
+            "errors": "0"
+          },
+          "MODBUS": {
+            "enabled": "1",
+            "listening": "1",
+            "error": "NONE",
+            "clients": "0",
+            "requests": "0",
+            "exceptions": "0",
+            "rejected": "0",
+            "disconnects": "0",
+            "stack_free": "2792"
+          },
+          "CACHE": {
+            "ai_valid": "1",
+            "ai_age_ms": "74",
+            "valid_points": "0",
+            "oldest_age_ms": "0",
+            "config_generation": "0",
+            "wlan_stack_free": "2864"
+          },
+          "RESOURCES": {
+            "lwip_heap_used": "0",
+            "lwip_heap_max": "68",
+            "lwip_heap_errors": "0",
+            "netconn_used": "1",
+            "netconn_errors": "0",
+            "tcp_pcb_used": "0",
+            "tcp_pcb_errors": "0",
+            "core_stack_free": "2888",
+            "netbuf_used": "0",
+            "netbuf_max": "0",
+            "netbuf_errors": "0"
+          }
+        },
+        "complete": true,
+        "missing": [],
+        "receivedAt": "2026-11-25T11:20:53.174Z",
+        "rawLines": [
+          "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=71,tx=1,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928",
+          "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0",
+          "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792",
+          "NET:CACHE,ai_valid=1,ai_age_ms=74,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864",
+          "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2888,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+        ]
+      },
+      "message": {
+        "success": true,
+        "text": "网络配置已完整读回（0x15FE47E1）；保存值与本次运行值已核对。",
+        "time": 1795605653174
+      }
+    },
+    {
+      "name": "saved-pending-reboot",
+      "snapshot": {
+        "saved": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 246,
+          "modbusPort": 1502
+        },
+        "running": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 247,
+          "modbusPort": 502
+        },
+        "pendingRestart": "YES",
+        "evidence": {
+          "transactionId": 6,
+          "revision": 3063767028,
+          "revisionHex": "0xB69D5FF4",
+          "payloadCount": 3,
+          "crc32": "83151D1D",
+          "deviceStatus": "OK",
+          "completedAt": "2026-11-25T11:20:53.459Z"
+        }
+      },
+      "status": {
+        "parts": {
+          "STATUS": {
+            "config_valid": "1",
+            "running_flags": "2",
+            "ip": "192.168.30.55",
+            "driver": "READY",
+            "error": "OK",
+            "vendor": "1C00",
+            "product": "9151",
+            "revision": "2B",
+            "mac": "E4:66:E5:13:17:4B",
+            "link": "UP",
+            "speed_mbps": "100",
+            "full_duplex": "1",
+            "rx": "71",
+            "tx": "1",
+            "rx_errors": "0",
+            "tx_errors": "0",
+            "spi_errors": "0",
+            "recoveries": "0",
+            "rx_drops": "0",
+            "netty": "IMPLEMENTED",
+            "modbus": "IMPLEMENTED",
+            "report_transport": "SLE",
+            "free_heap": "25352",
+            "min_free_heap": "24856",
+            "network_stack_free": "1928"
+          },
+          "NETTY": {
+            "enabled": "0",
+            "state": "WAIT_LINK",
+            "last_error": "NONE",
+            "connections": "0",
+            "rx_frames": "0",
+            "tx_frames": "0",
+            "errors": "0"
+          },
+          "MODBUS": {
+            "enabled": "1",
+            "listening": "1",
+            "error": "NONE",
+            "clients": "0",
+            "requests": "0",
+            "exceptions": "0",
+            "rejected": "0",
+            "disconnects": "0",
+            "stack_free": "2792"
+          },
+          "CACHE": {
+            "ai_valid": "1",
+            "ai_age_ms": "74",
+            "valid_points": "0",
+            "oldest_age_ms": "0",
+            "config_generation": "0",
+            "wlan_stack_free": "2864"
+          },
+          "RESOURCES": {
+            "lwip_heap_used": "0",
+            "lwip_heap_max": "68",
+            "lwip_heap_errors": "0",
+            "netconn_used": "1",
+            "netconn_errors": "0",
+            "tcp_pcb_used": "0",
+            "tcp_pcb_errors": "0",
+            "core_stack_free": "2888",
+            "netbuf_used": "0",
+            "netbuf_max": "0",
+            "netbuf_errors": "0"
+          }
+        },
+        "complete": true,
+        "missing": [],
+        "receivedAt": "2026-11-25T11:20:53.174Z",
+        "rawLines": [
+          "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=71,tx=1,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928",
+          "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0",
+          "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792",
+          "NET:CACHE,ai_valid=1,ai_age_ms=74,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864",
+          "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2888,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+        ]
+      },
+      "message": {
+        "success": true,
+        "text": "已保存并完整读回一致；当前运行值保持，待重启生效。",
+        "time": 1795605653460
+      }
+    },
+    {
+      "name": "reboot-applied-1502-246",
+      "snapshot": {
+        "saved": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 246,
+          "modbusPort": 1502
+        },
+        "running": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 246,
+          "modbusPort": 1502
+        },
+        "pendingRestart": "NO",
+        "evidence": {
+          "transactionId": 2,
+          "revision": 3063767028,
+          "revisionHex": "0xB69D5FF4",
+          "payloadCount": 3,
+          "crc32": "A2415A03",
+          "deviceStatus": "OK",
+          "completedAt": "2026-11-25T11:20:55.237Z"
+        }
+      },
+      "status": {
+        "parts": {
+          "STATUS": {
+            "config_valid": "1",
+            "running_flags": "2",
+            "ip": "192.168.30.55",
+            "driver": "READY",
+            "error": "OK",
+            "vendor": "1C00",
+            "product": "9151",
+            "revision": "2B",
+            "mac": "E4:66:E5:13:17:4B",
+            "link": "UP",
+            "speed_mbps": "100",
+            "full_duplex": "1",
+            "rx": "14",
+            "tx": "5",
+            "rx_errors": "0",
+            "tx_errors": "0",
+            "spi_errors": "0",
+            "recoveries": "0",
+            "rx_drops": "0",
+            "netty": "IMPLEMENTED",
+            "modbus": "IMPLEMENTED",
+            "report_transport": "SLE",
+            "free_heap": "25352",
+            "min_free_heap": "24856",
+            "network_stack_free": "1928"
+          },
+          "NETTY": {
+            "enabled": "0",
+            "state": "WAIT_LINK",
+            "last_error": "NONE",
+            "connections": "0",
+            "rx_frames": "0",
+            "tx_frames": "0",
+            "errors": "0"
+          },
+          "MODBUS": {
+            "enabled": "1",
+            "listening": "1",
+            "error": "NONE",
+            "clients": "0",
+            "requests": "0",
+            "exceptions": "0",
+            "rejected": "0",
+            "disconnects": "0",
+            "stack_free": "2792"
+          },
+          "CACHE": {
+            "ai_valid": "1",
+            "ai_age_ms": "234",
+            "valid_points": "0",
+            "oldest_age_ms": "0",
+            "config_generation": "0",
+            "wlan_stack_free": "2864"
+          },
+          "RESOURCES": {
+            "lwip_heap_used": "0",
+            "lwip_heap_max": "68",
+            "lwip_heap_errors": "0",
+            "netconn_used": "1",
+            "netconn_errors": "0",
+            "tcp_pcb_used": "0",
+            "tcp_pcb_errors": "0",
+            "core_stack_free": "2596",
+            "netbuf_used": "0",
+            "netbuf_max": "0",
+            "netbuf_errors": "0"
+          }
+        },
+        "complete": true,
+        "missing": [],
+        "receivedAt": "2026-11-25T11:20:59.093Z",
+        "rawLines": [
+          "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=14,tx=5,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928",
+          "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0",
+          "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792",
+          "NET:CACHE,ai_valid=1,ai_age_ms=234,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864",
+          "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2596,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+        ]
+      },
+      "message": {
+        "success": true,
+        "text": "已观察到设备重启，SN 与配置读回一致；链路和服务状态见实时回显。",
+        "time": 1795605655436
+      }
+    },
+    {
+      "name": "restored-defaults-502-247",
+      "snapshot": {
+        "saved": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 247,
+          "modbusPort": 502
+        },
+        "running": {
+          "valid": true,
+          "code": "OK",
+          "version": 1,
+          "ip": "192.168.30.55",
+          "mask": "255.255.255.0",
+          "gateway": "0.0.0.0",
+          "nettyIp": "0.0.0.0",
+          "nettyPort": 0,
+          "flags": 2,
+          "aiUnit": 247,
+          "modbusPort": 502
+        },
+        "pendingRestart": "NO",
+        "evidence": {
+          "transactionId": 2,
+          "revision": 368986081,
+          "revisionHex": "0x15FE47E1",
+          "payloadCount": 3,
+          "crc32": "6C835558",
+          "deviceStatus": "OK",
+          "completedAt": "2026-11-25T11:21:01.178Z"
+        }
+      },
+      "status": {
+        "parts": {
+          "STATUS": {
+            "config_valid": "1",
+            "running_flags": "2",
+            "ip": "192.168.30.55",
+            "driver": "READY",
+            "error": "OK",
+            "vendor": "1C00",
+            "product": "9151",
+            "revision": "2B",
+            "mac": "E4:66:E5:13:17:4B",
+            "link": "UP",
+            "speed_mbps": "100",
+            "full_duplex": "1",
+            "rx": "13",
+            "tx": "5",
+            "rx_errors": "0",
+            "tx_errors": "0",
+            "spi_errors": "0",
+            "recoveries": "0",
+            "rx_drops": "0",
+            "netty": "IMPLEMENTED",
+            "modbus": "IMPLEMENTED",
+            "report_transport": "SLE",
+            "free_heap": "25352",
+            "min_free_heap": "24856",
+            "network_stack_free": "1928"
+          },
+          "NETTY": {
+            "enabled": "0",
+            "state": "WAIT_LINK",
+            "last_error": "NONE",
+            "connections": "0",
+            "rx_frames": "0",
+            "tx_frames": "0",
+            "errors": "0"
+          },
+          "MODBUS": {
+            "enabled": "1",
+            "listening": "1",
+            "error": "NONE",
+            "clients": "0",
+            "requests": "0",
+            "exceptions": "0",
+            "rejected": "0",
+            "disconnects": "0",
+            "stack_free": "2792"
+          },
+          "CACHE": {
+            "ai_valid": "1",
+            "ai_age_ms": "135",
+            "valid_points": "0",
+            "oldest_age_ms": "0",
+            "config_generation": "0",
+            "wlan_stack_free": "2864"
+          },
+          "RESOURCES": {
+            "lwip_heap_used": "0",
+            "lwip_heap_max": "68",
+            "lwip_heap_errors": "0",
+            "netconn_used": "1",
+            "netconn_errors": "0",
+            "tcp_pcb_used": "0",
+            "tcp_pcb_errors": "0",
+            "core_stack_free": "2596",
+            "netbuf_used": "0",
+            "netbuf_max": "0",
+            "netbuf_errors": "0"
+          }
+        },
+        "complete": true,
+        "missing": [],
+        "receivedAt": "2026-11-25T11:21:04.851Z",
+        "rawLines": [
+          "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=13,tx=5,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928",
+          "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0",
+          "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792",
+          "NET:CACHE,ai_valid=1,ai_age_ms=135,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864",
+          "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2596,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+        ]
+      },
+      "message": {
+        "success": true,
+        "text": "已观察到设备重启，SN 与配置读回一致；链路和服务状态见实时回显。",
+        "time": 1795605661382
+      }
+    }
+  ],
+  "changedAi": {
+    "port": 1502,
+    "unit": 246,
+    "ai1": 0,
+    "ai2": 0,
+    "response": "04d20000000bf604080000000000000000"
+  },
+  "finalAi": {
+    "port": 502,
+    "unit": 247,
+    "ai1": 0,
+    "ai2": 0,
+    "response": "04d20000000bf704080000000000000000"
+  },
+  "rawTrace": [
+    {
+      "time": "7:20:52 PM",
+      "direction": "TX",
+      "text": "NET:LIST"
+    },
+    {
+      "time": "7:20:52 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:BEGIN,id=4,version=1,revision=368986081"
+    },
+    {
+      "time": "7:20:52 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=4,source=SAVED,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=247,modbus_port=502"
+    },
+    {
+      "time": "7:20:52 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=4,source=RUNNING,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=247,modbus_port=502"
+    },
+    {
+      "time": "7:20:52 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:STATE,id=4,pending_restart=NO"
+    },
+    {
+      "time": "7:20:52 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:END,id=4,count=3,crc32=3AA6F47C,status=OK"
+    },
+    {
+      "time": "7:20:52 PM",
+      "direction": "TX",
+      "text": "DEVINFO"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "TX",
+      "text": "WLAN_TYPE:LIST"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "TX",
+      "text": "NET:STATUS"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=71,tx=1,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET:CACHE,ai_valid=1,ai_age_ms=74,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2888,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "TX",
+      "text": "NET:SET,192.168.30.55,255.255.255.0,0.0.0.0,0.0.0.0,0,2,246,1502"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:SAVED,revision=3063767028,hash=B69D5FF4,status=OK,restart=YES"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "TX",
+      "text": "NET:LIST"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:BEGIN,id=6,version=1,revision=3063767028"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=6,source=SAVED,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=246,modbus_port=1502"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=6,source=RUNNING,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=247,modbus_port=502"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:STATE,id=6,pending_restart=YES"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:END,id=6,count=3,crc32=83151D1D,status=OK"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "TX",
+      "text": "DEVINFO"
+    },
+    {
+      "time": "7:20:53 PM",
+      "direction": "TX",
+      "text": "@RST"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "TX",
+      "text": "DEVINFO"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "TX",
+      "text": "NET:LIST"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:BEGIN,id=2,version=1,revision=3063767028"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=2,source=SAVED,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=246,modbus_port=1502"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=2,source=RUNNING,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=246,modbus_port=1502"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:STATE,id=2,pending_restart=NO"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:END,id=2,count=3,crc32=A2415A03,status=OK"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "TX",
+      "text": "WLAN_TYPE:LIST"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "TX",
+      "text": "NET:STATUS"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=DOWN,speed_mbps=10,full_duplex=0,rx=0,tx=0,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25552,min_free_heap=24856,network_stack_free=2716"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET:MODBUS,enabled=1,listening=0,error=WAIT_LINK,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2916"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET:CACHE,ai_valid=1,ai_age_ms=84,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2968"
+    },
+    {
+      "time": "7:20:55 PM",
+      "direction": "RX",
+      "text": "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=0,lwip_heap_errors=0,netconn_used=0,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2892,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "TX",
+      "text": "WLAN_TYPE:LIST"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "TX",
+      "text": "NET:STATUS"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "RX",
+      "text": "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=3,tx=1,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "RX",
+      "text": "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "RX",
+      "text": "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "RX",
+      "text": "NET:CACHE,ai_valid=1,ai_age_ms=79,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864"
+    },
+    {
+      "time": "7:20:57 PM",
+      "direction": "RX",
+      "text": "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2892,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+    },
+    {
+      "time": "7:20:58 PM",
+      "direction": "TX",
+      "text": "WLAN_TYPE:LIST"
+    },
+    {
+      "time": "7:20:58 PM",
+      "direction": "TX",
+      "text": "NET:STATUS"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=14,tx=5,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET:CACHE,ai_valid=1,ai_age_ms=234,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2596,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "TX",
+      "text": "NET:SET,192.168.30.55,255.255.255.0,0.0.0.0,0.0.0.0,0,2,247,502"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:SAVED,revision=368986081,hash=15FE47E1,status=OK,restart=YES"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "TX",
+      "text": "NET:LIST"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:BEGIN,id=4,version=1,revision=368986081"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=4,source=SAVED,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=247,modbus_port=502"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=4,source=RUNNING,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=246,modbus_port=1502"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:STATE,id=4,pending_restart=YES"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:END,id=4,count=3,crc32=711406AA,status=OK"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "TX",
+      "text": "DEVINFO"
+    },
+    {
+      "time": "7:20:59 PM",
+      "direction": "TX",
+      "text": "@RST"
+    },
+    {
+      "time": "7:21:00 PM",
+      "direction": "TX",
+      "text": "DEVINFO"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "TX",
+      "text": "NET:LIST"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:BEGIN,id=2,version=1,revision=368986081"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=2,source=SAVED,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=247,modbus_port=502"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:ITEM,id=2,source=RUNNING,valid=1,code=OK,version=1,flags=2,ip=192.168.30.55,mask=255.255.255.0,gateway=0.0.0.0,netty_ip=0.0.0.0,netty_port=0,ai_unit=247,modbus_port=502"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:STATE,id=2,pending_restart=NO"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET_CONFIG:END,id=2,count=3,crc32=6C835558,status=OK"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "TX",
+      "text": "WLAN_TYPE:LIST"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "TX",
+      "text": "NET:STATUS"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=DOWN,speed_mbps=10,full_duplex=0,rx=0,tx=0,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25552,min_free_heap=24856,network_stack_free=2716"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET:MODBUS,enabled=1,listening=0,error=WAIT_LINK,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2916"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET:CACHE,ai_valid=1,ai_age_ms=84,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2968"
+    },
+    {
+      "time": "7:21:01 PM",
+      "direction": "RX",
+      "text": "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=0,lwip_heap_errors=0,netconn_used=0,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2892,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "TX",
+      "text": "WLAN_TYPE:LIST"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "TX",
+      "text": "NET:STATUS"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "RX",
+      "text": "NET:STATUS,config_valid=1,running_flags=2,ip=192.168.30.55,driver=READY,error=OK,vendor=1C00,product=9151,revision=2B,mac=E4:66:E5:13:17:4B,link=UP,speed_mbps=100,full_duplex=1,rx=13,tx=5,rx_errors=0,tx_errors=0,spi_errors=0,recoveries=0,rx_drops=0,netty=IMPLEMENTED,modbus=IMPLEMENTED,report_transport=SLE,free_heap=25352,min_free_heap=24856,network_stack_free=1928"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "RX",
+      "text": "NET:NETTY,enabled=0,state=WAIT_LINK,last_error=NONE,connections=0,rx_frames=0,tx_frames=0,errors=0"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "RX",
+      "text": "NET:MODBUS,enabled=1,listening=1,error=NONE,clients=0,requests=0,exceptions=0,rejected=0,disconnects=0,stack_free=2792"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "RX",
+      "text": "NET:CACHE,ai_valid=1,ai_age_ms=135,valid_points=0,oldest_age_ms=0,config_generation=0,wlan_stack_free=2864"
+    },
+    {
+      "time": "7:21:04 PM",
+      "direction": "RX",
+      "text": "NET:RESOURCES,lwip_heap_used=0,lwip_heap_max=68,lwip_heap_errors=0,netconn_used=1,netconn_errors=0,tcp_pcb_used=0,tcp_pcb_errors=0,core_stack_free=2596,netbuf_used=0,netbuf_max=0,netbuf_errors=0"
+    }
+  ],
+  "serialReleased": true
+}

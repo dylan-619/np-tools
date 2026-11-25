@@ -56,6 +56,12 @@ const router = createRouter({
       meta: { title: 'SJZDV3 4G Cat.1 / MQTT 配置' }
     },
     {
+      path: '/devices/sjzdv3/network',
+      name: 'SjzdNetwork',
+      component: () => import('../views/devices/sjzdv3/NetworkConfigView.vue'),
+      meta: { title: 'SJZDV3 F412 网口与上报承载' }
+    },
+    {
       path: '/devices/sjzdv3/modbus',
       name: 'SjzdModbus',
       component: () => import('../views/devices/sjzdv3/ModbusView.vue'),

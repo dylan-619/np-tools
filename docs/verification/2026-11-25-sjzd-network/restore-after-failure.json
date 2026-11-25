@@ -1,0 +1,46 @@
+{
+  "snapshot": {
+    "saved": {
+      "valid": true,
+      "code": "OK",
+      "version": 1,
+      "ip": "192.168.30.55",
+      "mask": "255.255.255.0",
+      "gateway": "0.0.0.0",
+      "nettyIp": "0.0.0.0",
+      "nettyPort": 0,
+      "flags": 2,
+      "aiUnit": 247,
+      "modbusPort": 502
+    },
+    "running": {
+      "valid": true,
+      "code": "OK",
+      "version": 1,
+      "ip": "192.168.30.55",
+      "mask": "255.255.255.0",
+      "gateway": "0.0.0.0",
+      "nettyIp": "0.0.0.0",
+      "nettyPort": 0,
+      "flags": 2,
+      "aiUnit": 247,
+      "modbusPort": 502
+    },
+    "pendingRestart": "NO",
+    "evidence": {
+      "transactionId": 2,
+      "revision": 368986081,
+      "revisionHex": "0x15FE47E1",
+      "payloadCount": 3,
+      "crc32": "6C835558",
+      "deviceStatus": "OK",
+      "completedAt": "2026-11-25T11:19:45.411Z"
+    }
+  },
+  "error": "",
+  "message": {
+    "success": true,
+    "text": "已观察到设备重启，SN 与配置读回一致；链路和服务状态见实时回显。",
+    "time": 1795605585611
+  }
+}

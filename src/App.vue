@@ -58,9 +58,9 @@ function dismissToast() {
 
         <!-- View Routed Content -->
         <main class="view-content-area">
-          <router-view v-slot="{ Component }">
+          <router-view v-slot="{ Component, route }">
             <transition name="fade-slide" mode="out-in">
-              <component :is="Component" />
+              <component :is="Component" :key="route.path === '/modbus' ? route.fullPath : undefined" />
             </transition>
           </router-view>
         </main>

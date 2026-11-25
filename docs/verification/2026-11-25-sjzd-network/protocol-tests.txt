@@ -1,0 +1,234 @@
+
+> np-tools@1.1.3 test:protocol /Users/Dylan/work_project/new-yunteng/iot-project/np-iot-products/np-tools
+> node --test tests/controllerDebug.test.mjs && node --test tests/controllerIecImport.test.mjs && node --test tests/sjzdProtocol.test.mjs && node --test tests/sjzdNetwork.test.mjs && node --test tests/mqttProtocol.test.mjs && node --test tests/modbusProtocol.test.mjs && node --test tests/sshSftpPaths.test.mjs && node --test tests/gatewayPointExcel.test.mjs && node --test tests/sjzdGatewayPointExcel.test.mjs
+
+✔ KZ3 点表按物理模块与通道号排序而不是按创建顺序排序 (20.722958ms)
+✔ 导入 YAML 后自动识别 SN 不覆盖当前配置，只有显式刷新才载入设备存档 (5.070125ms)
+✔ U32 校验覆盖全范围、整数要求和工程上下限 (0.330083ms)
+✔ BOOL/FLOAT 和命令使用各自类型规则 (0.146375ms)
+✔ 整数精确比对，只有 FLOAT 允许舍入误差；读取检查整数宽度 (0.086292ms)
+✔ KZ3 点表 manifest 字节序列与固件生成器一致 (4.876709ms)
+✔ KZ3 descriptor 开放 BOOL/FLOAT/U32 parameter 并继续拒绝未实现整数 owner (4.409042ms)
+✔ KZ3 U32 parameter 通过受控 HTTP 写入并按整数范围读回 (6.823292ms)
+✔ KZ3 掉电保持 parameter 不会被误标为 RAM 参数 (1.791791ms)
+✔ KZ3 在线调试在工程身份未核验时不发送任何点位写入请求 (1.5385ms)
+✔ KZ3 工程 ID、版本和点表 manifest 匹配后才可申请受控写入 (2.710667ms)
+✔ KZ3 周期采样跟随实际 next_offset 分页读取全部北向点位 (2.833667ms)
+✔ 旧固件缺少分页端点时不退回高频逐点轮询 (2.628875ms)
+✔ KZ3 manifest 不匹配保持写入锁定且不会发送 POST (2.042375ms)
+✔ KZ3 parameter 写入会在 POST 前重新校验工程契约并完成读回 (4.258542ms)
+✔ KZ3 写入前复核发现 active fault 时取消 POST 并重新上锁 (2.563ms)
+✔ KZ3 周期 project 复核发现设备点表变化后解除写入许可 (2.877792ms)
+✔ KZ3 会话内 configuration_hash 变化即使点表相同也会解除写入许可 (2.587667ms)
+✔ KZ3 HTTP 写入失败不会自动重试 (5.646208ms)
+✔ U32 变化 1 时仍记录监视值变化 (1.364167ms)
+✔ 设备 U32 响应 0.5 触发类型不匹配 (0.940042ms)
+✔ 设备 U32 响应 -1 触发类型不匹配 (1.030667ms)
+✔ 设备 U32 响应 4294967296 触发类型不匹配 (1.028875ms)
+✔ XTQ Capability 槽位严格复现固件持久化约束 (0.389292ms)
+✔ XTQ 同步规则规范化、CRC32 和单次上传帧与固件契约一致 (0.429792ms)
+✔ XTQ 同步规则在写设备前拒绝冲突目标与超出字段契约的草稿 (0.1295ms)
+✔ SJZ 原始 Modbus 调试日志未提供结构化结束帧时不伪造单点诊断通过 (0.199292ms)
+✔ SJZ 结构化诊断解析器保留同一事务 ID 的异常码，并拒绝缺少 END 的结果 (0.520875ms)
+✔ XTQ 有效状态采样保留时间线并仅导出已定义字段的结构化差异 (2.242834ms)
+✔ XTQ 会话以精确同步字节帧上传，Capability 写入后只核对状态摘要 (1.014458ms)
+✔ XTQ 状态摘要不匹配不会伪装为内容验证通过 (0.686084ms)
+✔ XTQ 重启复核遇到任一 owner 失败时保持错误状态，不伪造恢复成功 (0.813291ms)
+✔ XTQ 重启恢复只重开本次已知串口，不扫描端口且恢复后复核全部 owner (1702.646ms)
+✔ Cat.1 INIT 对文本字段做 percent 编码且会话回显不泄露凭证 (0.675917ms)
+✔ Cat.1 差异写入保持未输入的凭证，并拒绝未初始化记录 (0.326709ms)
+✔ Cat.1 SHOW 多行字段可解码，白名单拒绝任意注入 (0.206208ms)
+✔ KZ3 Edge TCP 命令与当前 UART1 SET/SHOW 契约一致 (0.233208ms)
+✔ KZ3 Ethernet 复连只从已校验的单一 SAVED 候选生成 HTTP 地址 (0.271917ms)
+✔ KZ3 Ethernet INIT 原子提交预先拒绝固件会拒绝的候选网络 (0.130833ms)
+✔ KZ3 身份查询兼容可选的逻辑代码块版本字段 (0.112125ms)
+✔ KZ3 真实 KZ3-203 型号通过身份预检且不自动解锁 (2.752167ms)
+✔ KZ3 HTTP 直连按真实 SN 进入同一工作空间，不依赖先连串口或沿用上一台 SN (1.905083ms)
+✔ KZ3 旧 KZ3-F427 标识仍通过相同硬件与 OTA 门禁 (1.495958ms)
+▶ KZ3 后台身份查询等待期间提交资格保持稳定，各类写入等待轮询后只发送一次
+  ✔ 单次命令 (5.006042ms)
+  ✔ BOOL参数 (5.69125ms)
+  ✔ U32参数 (5.532084ms)
+  ✔ FLOAT参数 (5.275584ms)
+  ✔ 掉电保持参数 (5.903333ms)
+✔ KZ3 后台身份查询等待期间提交资格保持稳定，各类写入等待轮询后只发送一次 (27.786542ms)
+✔ KZ3 后台查询发现 HOLD 时取消等待中的命令并解除许可，不发送 POST (4.149333ms)
+▶ KZ3 身份不匹配指出具体字段并阻断写入，不按相似型号或隐式类型放行
+  ✔ 相似型号 (2.731584ms)
+  ✔ 空SN (3.785875ms)
+  ✔ 数字SN (2.040291ms)
+  ✔ 错误MCU (1.588875ms)
+  ✔ 缺失MCU (1.54325ms)
+  ✔ DI数量字符串 (1.634667ms)
+  ✔ DO数量错误 (1.812959ms)
+  ✔ AI数量错误 (1.705334ms)
+  ✔ AO数量错误 (1.594584ms)
+✔ KZ3 身份不匹配指出具体字段并阻断写入，不按相似型号或隐式类型放行 (18.850833ms)
+▶ KZ3 型号、SN、schema和OTA状态变更均阻断实际写请求
+  ✔ model (2.353792ms)
+  ✔ sn (2.160167ms)
+  ✔ schema (2.000666ms)
+  ✔ hold (2.684292ms)
+  ✔ data (9.729625ms)
+  ✔ phase (2.429041ms)
+  ✔ package (6.248625ms)
+✔ KZ3 型号、SN、schema和OTA状态变更均阻断实际写请求 (28.016833ms)
+✔ KZ3 预读期间撤销许可后不得发送POST (2.5065ms)
+✔ KZ3 command已接受但读回断线时解除许可且不重试 (3.423875ms)
+✔ KZ3 YAML往返保留未知字段、启动门禁、外部输入、PID零值和Runtime条件 (4.394ms)
+✔ KZ3 OTA查询不可用时保持只读且不发送业务POST (4.11825ms)
+✔ KZ3 manifest严格镜像SDK的s32原名与f32别名 (0.571084ms)
+✔ KZ3 预读跨越许可截止时间后不得发送POST (3.325083ms)
+✔ KZ3 写前预读后修改URL不能把POST发到新设备 (2.212166ms)
+✔ KZ3 类型别名在descriptor、地址分配与值校验中一致 (1.725625ms)
+✔ KZ3 HTTP读回失败保留owner已经接受的证据 (3.208458ms)
+▶ KZ3 未知故障状态或非布尔健康字段禁止业务写入
+  ✔ fault (1.795834ms)
+  ✔ health (1.881459ms)
+✔ KZ3 未知故障状态或非布尔健康字段禁止业务写入 (3.830291ms)
+✔ KZ3 YAML保持显式normal命令策略与未识别枚举供权威校验 (2.695417ms)
+✔ KZ3 YAML不把字符串布尔值、非有限数或循环引用静默改成发布配置 (2.794333ms)
+✔ KZ3 三种通信模式按 TCP 开关单选，保留无线记录不等于无线正在运行 (0.140459ms)
+✔ KZ3 只有模式选择要求双组回读，参数写入不会发送切换命令 (0.082583ms)
+✔ KZ3 切回无线回读两组保存值，运行模式直到重启后查询才变化 (7.720459ms)
+✔ KZ3 启用 TCP 后只确认下次选择，当前星闪保持运行 (3.408292ms)
+✔ KZ3 旧固件 ACK 未关闭 TCP 时工具拒绝宣称互斥保存成功 (3.455625ms)
+✔ KZ3 无线已保存而 TCP 关闭失败时回读两组，保留 ERR 且不重发 (5.009791ms)
+✔ KZ3 保存后查询失败不得沿用旧快照或返回保存复核成功 (4.6315ms)
+✔ KZ3 无线周期更新只发送原参数命令和无线查询 (3.346375ms)
+ℹ tests 90
+ℹ suites 0
+ℹ pass 90
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3419.421833
+✔ IEC 双泵工程导入 46 字段，顺序、类型和地址与 SDK manifest 一致 (10.964459ms)
+✔ IEC 原始 YAML 字节往返保留绑定、历史/预留地址和未知字段，不虚构 XML 初值 (10.1475ms)
+✔ IEC 调试描述保留持久参数范围、单位、物理源和可写类别，写入仍需在线门禁 (13.361083ms)
+✔ IEC 显式 binding_id 和 Base 字段不要求伪造 IEC 变量 (4.099375ms)
+✔ IEC 畸形布局、丢失绑定、重复身份及未知状态明确拒绝 (25.69325ms)
+✔ 导入文件入口保留当前 IEC 工程，不回退到默认旧点表 (5.131208ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3396.405666
+✔ SJZ 星闪配置保存有效设备地址，旧固件不写地址，APID 仅回读 (2003.37225ms)
+✔ SJZ 地址只允许 1..65534，回读兼容默认地址和已保存地址 (0.706208ms)
+✔ SJZ 配置列表仅在同一事务 count 与 CRC32 均通过后采纳 RS485 点表 (0.813458ms)
+✔ SJZ SLE 完整 EEPROM 快照可明确表达芯片未就绪，而不是伪造成可比对状态 (0.253666ms)
+✔ SJZ 4G 完整错误终态保留脱敏密码、带引号文本与配置错误掩码 (1.049791ms)
+✔ SJZ 保存回执与桥接状态必须通过格式和值一致性校验 (0.203375ms)
+✔ SJZ Modbus DEBUG 只将同一 ID 的完整 BEGIN/TX/RX/DATA/RESULT/END 判为成功 (0.720125ms)
+✔ SJZ Modbus DEBUG 保留同一 ID 的异常与 BUSY 终态，不接受其他事务的 END (0.199ms)
+✔ SJZ 全局波特率严格构造命令，默认恢复不清点表 (0.416709ms)
+✔ SJZ 波特率区分未设置、已保存待重启、重启运行值及 EEPROM 读取失败 (0.47275ms)
+✔ SJZ 波特率拒绝不完整回执、非法数值、重复字段及伪造的已生效状态 (0.156292ms)
+✔ SJZ 波特率 store 实际执行设置后 LIST 复核，重启仅发送 @RST，旧固件禁止保存 (370.25675ms)
+✔ SJZ DEVINFO 与 VERSION 回读显示实际固件版本，旧响应清空版本缓存 (78.136125ms)
+✔ SJZ DEVINFO 等待实际回读完成后才发送后续 WLAN_TYPE 查询 (115.345417ms)
+✔ SJZ DEVINFO 不支持或回读超时均报告失败并释放事务监听器 (1.943666ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2851.773959
+✔ NET defaults, four flag combinations and exact full-record command (1.631834ms)
+✔ NET field validation rejects IP/mask/target/port and injection boundaries (0.659875ms)
+✔ NET complete CRC snapshot preserves saved and running values, fallback is not disabled (1.970791ms)
+✔ NET rejects damaged, truncated, repeated source and contradictory pending snapshots (1.222333ms)
+✔ Netty NONE bridge owner and extended wireless readback remain distinct from SLE choice (13.1575ms)
+✔ status requires five rows, preserves numeric zero and leaves missing fields unknown (0.552708ms)
+✔ F411 blocks every network action without sending NET, F412 selection resets capability (82.711167ms)
+✔ complete NET protocol detects F412 support and returns current config/transport/zero counters (192.448167ms)
+✔ F412 old firmware is unsupported, cannot silently write defaults (75.336583ms)
+✔ saving verifies EEPROM fields/revision, preserves RUNNING and unrelated point draft (338.436875ms)
+✔ save failure writeError never reports verified success and keeps actual/history explicit (537.503625ms)
+✔ save failure badHash never reports verified success and keeps actual/history explicit (538.764208ms)
+✔ save failure wrongFields never reports verified success and keeps actual/history explicit (575.511333ms)
+✔ save failure corruptAfterSave never reports verified success and keeps actual/history explicit (574.639875ms)
+✔ AI conflicts stop before SET and partial diagnostic rows do not become zero/complete (517.837667ms)
+✔ reset only clears NET and keeps current running config until an observed verified reboot (1792.610417ms)
+✔ serial switch cancels pending replies and clears hardware and all network readback (240.232959ms)
+✔ reboot verification refuses a different device SN (1535.725541ms)
+✔ switching Netty to SLE accepts SWITCH ACK and verifies both groups without changing Modbus (1708.163292ms)
+✔ failed carrier switch reads actual saved/running groups, never retries or reports success (306.841583ms)
+✔ rendered F411 view exposes no network fields and performs no NET query (436.080042ms)
+✔ rendered F412 fields initialize from actual SAVED while RUNNING remains separate (198.802ms)
+✔ unconfigured record renders explicit fallback and allows an intentional default save (379.352208ms)
+✔ stale readback renders historical values and cannot enable saving (199.408709ms)
+✔ changing to F411 after F412 readback clears cached network data and blocks commands (194.696084ms)
+✔ save rechecks identity before SET and cannot write another device (237.755917ms)
+✔ external configuration changes and failed fresh reads invalidate prior reboot verification (391.808875ms)
+✔ legacy F411 wireless switching does not require new SWITCH or startup logs and sends no NET (1362.540667ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13001.321875
+✔ MQTT 发布 Topic 拒绝通配符，订阅 Topic 仅接受独立通配符层级 (4.90675ms)
+✔ MQTT 公共调试不允许用设备 SN 作为 Client ID，且 payload 按 UTF-8 字节计数 (0.245666ms)
+✔ KZ3 下行信封校验元数据；兼容模式允许完整省略 _meta (0.205667ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 374.826792
+✔ PLC 参考地址会准确换算为 PDU 偏移并形成标准 RTU 请求 (3.568583ms)
+✔ 分片 RTU 数据流可提取完整帧，并按字节序解码实时值 (1.691709ms)
+✔ RTU 转换器回显请求时跳过回显并继续提取真实响应 (0.295125ms)
+✔ 异常帧、CRC 错误和不合法点位均不被当成有效实时值 (0.355041ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 458.427625
+✔ SSH 下载建议名去除远端目录和平台保留字符 (0.523042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 372.846917
+✔ 网关 Excel 使用固定 14 列契约，并严格映射四个 Modbus 地址区 (1.478792ms)
+✔ 网关 Excel 在导出前拒绝类型、权限和地址占用冲突 (0.301166ms)
+✔ 网关 Excel 文件名固定使用 xlsx 后缀并清理非法字符 (0.320625ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 409.738667
+✔ 终端点位导出保留 PLC 地址并生成与固件 JSON 一致的组合键 (1.110458ms)
+✔ 终端点位导出严格映射数据类型并保留可选工程名称 (0.214584ms)
+✔ 终端点位导出拒绝 RAW_HEX、类型功能码冲突和重复上报键 (0.322458ms)
+✔ 终端网关 Excel 文件名使用 SN 并固定 xlsx 后缀 (0.369834ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 355.691458

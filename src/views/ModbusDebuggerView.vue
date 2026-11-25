@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
   AlertTriangle,
@@ -44,6 +44,9 @@ import {
 } from '../utils/modbusProtocol'
 
 const router = useRouter()
+const route = useRoute()
+// 临时调试归属在实例创建时确定，离页动画期间不能因 route 已变化而写入常规配置。
+const isSjzdAiContext = route.query.sjzd === 'ai'
 const serial = useSerialStore()
 
 const STORAGE_KEY = 'np_tools_modbus_debug_config_v1'
@@ -202,6 +205,21 @@ let rtuListenerAttached = false
 let rtuReceiveBuffer = new Uint8Array()
 let pendingRtuRead: PendingRtuRead | null = null
 
+if (isSjzdAiContext) {
+  const host = String(route.query.host || '')
+  const port = Number(route.query.port)
+  const unit = Number(route.query.unit)
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) && host.split('.').every((octet) => Number(octet) <= 255)
+      && Number.isInteger(port) && port > 0 && port <= 65535 && Number.isInteger(unit) && unit > 0 && unit <= 247) {
+    transport.value = 'tcp'
+    tcp.host = host
+    tcp.port = port
+    points.value = [0, 2].map((address, index) => ({ ...defaultPoint(index + 1), name: `AI${index + 1}（mA）`,
+      unitId: unit, functionCode: 4, addressMode: 'offset', address, quantity: 2, valueType: 'float32', byteOrder: 'ABCD' }))
+    statusMessage.value = '已按设备当前运行地址预填两路 AI，尚未启动读取；本次临时监视不覆盖常规调试配置。'
+  }
+}
+
 const enabledPointCount = computed(() => points.value.filter((point) => point.enabled).length)
 const successfulPointCount = computed(
   () => points.value.filter((point) => point.enabled && runtime[point.id]?.status === 'ok').length
@@ -210,6 +228,8 @@ const activeTransportLabel = computed(() => (transport.value === 'rtu' ? 'Modbus
 const configurationLocked = computed(() => isPolling.value || isCycling.value)
 
 function persistConfig() {
+  // 从设备运行值进入的 AI 临时监视不覆盖用户原有通用调试配置。
+  if (isSjzdAiContext) return
   if (typeof localStorage === 'undefined') return
   localStorage.setItem(
     STORAGE_KEY,

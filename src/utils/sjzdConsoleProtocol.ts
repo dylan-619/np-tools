@@ -12,6 +12,7 @@ const CONFIG_PREFIXES: Record<SjzdConfigFeature, string> = {
   SLE: 'SLE_CONFIG:',
   '4G': '4G_CONFIG:',
   RS485: 'RS485_CONFIG:',
+  NET: 'NET_CONFIG:',
 }
 
 export interface SjzdConfigProtocolLine {
@@ -469,7 +470,8 @@ export function parseSjzdBridgeAck(line: string): SjzdBridgeStatus | undefined {
       code: parsed.fields.code,
       confirmedAt: new Date().toISOString(),
     }
-    if (!['MCU', 'SLE', '4G'].includes(result.uartOwner) || !['SLE', '4G'].includes(result.wireless)) return undefined
+    if (!['MCU', 'SLE', '4G', 'NONE'].includes(result.uartOwner) || !['SLE', '4G'].includes(result.wireless)) return undefined
+    if (result.uartOwner === 'NONE' && result.active) return undefined
     if (result.status === 'OK' && result.active !== result.requested) return undefined
     return result
   } catch {

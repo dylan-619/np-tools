@@ -17,12 +17,15 @@ import {
   LayoutDashboard,
   ChevronDown,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  EthernetPort
 } from 'lucide-vue-next'
 import GlobalSerialBar from './GlobalSerialBar.vue'
+import { useSjzdStore } from '../../stores/sjzdStore'
 
 const route = useRoute()
 const router = useRouter()
+const sjzd = useSjzdStore()
 const collapsed = ref(false)
 type ProductGroup = 'controller' | 'xtq' | 'sjzdv3' | 'common' | 'delivery'
 
@@ -242,6 +245,16 @@ function groupIsCollapsed(group: ProductGroup) {
           >
             <Wifi :size="16" class="nav-icon" />
             <span v-if="!isCompact" class="nav-text">4G Cat.1 / MQTT 配置</span>
+          </button>
+
+          <button
+            class="nav-item" :class="{ active: route.path === '/devices/sjzdv3/network' }"
+            :disabled="sjzd.hardwareVariant === 'f411'" aria-label="F412 网口与上报承载"
+            :title="sjzd.hardwareVariant === 'f411' ? 'STM32F411 不具备网口功能，请在设备信息确认芯片' : 'F412 网口与上报承载：配置、保存和运行值回显'"
+            @click="navigateTo('/devices/sjzdv3/network')"
+          >
+            <EthernetPort :size="16" class="nav-icon" />
+            <span v-if="!isCompact" class="nav-text">网口与上报承载 (F412)</span>
           </button>
 
           <span class="nav-section-label">点位与运行监测</span>
@@ -576,7 +589,7 @@ function groupIsCollapsed(group: ProductGroup) {
   width: 100%;
 }
 
-.nav-item:hover {
+.nav-item:hover:not(:disabled) {
   background: #eef3f7;
   color: #102330;
 }
@@ -587,6 +600,11 @@ function groupIsCollapsed(group: ProductGroup) {
   color: #0f5f9e;
   font-weight: 600;
   box-shadow: inset 2px 0 0 var(--accent, #1769aa);
+}
+
+.nav-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .nav-icon {
