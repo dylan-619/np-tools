@@ -41,7 +41,7 @@ const fields = SJZD_NETWORK_FIELDS.filter((field) => field.key !== 'flags').map(
   numeric: ['nettyPort', 'modbusPort', 'aiUnit'].includes(field.key),
   hint: ({ ip: '设备自己的地址；电脑请使用同网段其他 IP。', mask: '连续掩码，支持 /1～/30。', gateway: '同网段直连可填 0.0.0.0。',
     nettyIp: '接收设备上报的服务器地址；不是设备 IP。', nettyPort: '关闭时可保留预配置；未配置目标 IP 与端口成对为 0。',
-    aiUnit: '1～247，不能与既有 RS485 从站冲突。', modbusPort: '设备本机监听端口，默认 502。' } as Record<string, string>)[field.key],
+    aiUnit: '本机 TCP 虚拟单元，默认 250；兼容 1～255，不能与 RS485 从站冲突。', modbusPort: '设备本机监听端口，默认 502。' } as Record<string, string>)[field.key],
 }))
 
 function copySaved(feedback = true) {
@@ -121,7 +121,7 @@ const confirmationTitle = computed(() => confirmation.value === 'restart' ? '重
 const confirmationMessage = computed(() => confirmation.value === 'restart'
   ? `将重启设备并核对 SN、EEPROM 保存值及启动运行值。目标 ${sjzd.networkSnapshot?.saved.ip}:${sjzd.networkSnapshot?.saved.modbusPort}，${flagLabel(sjzd.networkSnapshot?.saved.flags || 0)}。`
   : confirmation.value === 'reset'
-    ? '仅清除网络记录，保留 SN、无线配置和 485 点表。重启后默认 192.168.30.55:502、AI247、Netty 关闭；若 AI247 与 485 从站冲突，服务将拒绝启动。'
+    ? '仅清除网络记录，保留 SN、无线配置和 485 点表。重启后默认 192.168.30.55:502、AI Unit 250、Netty 关闭。'
     : confirmation.value === 'LOCAL'
       ? '关闭星闪、4G 和 Netty 主动上报，开启 Modbus TCP；保留本机 IP、端口及采集点表，保存后自动重启。即使无线模块仍插着，重启后也不再探测或初始化；需要时可重新选择星闪或 4G。'
       : confirmation.value === 'NETTY'
@@ -207,7 +207,7 @@ async function copyTrace() {
               <span>{{ field.label }}</span>
               <input
                 :id="`net-${field.key}`" :value="draft[field.key]" :type="field.numeric ? 'number' : 'text'" :inputmode="field.numeric ? 'numeric' : 'decimal'"
-                :min="field.key === 'nettyPort' ? 0 : 1" :max="field.key === 'aiUnit' ? 247 : 65535" autocomplete="off" :spellcheck="false"
+                :min="field.key === 'nettyPort' ? 0 : 1" :max="field.key === 'aiUnit' ? 255 : 65535" autocomplete="off" :spellcheck="false"
                 :aria-invalid="Boolean(errors[field.key])" :aria-describedby="`net-help-${field.key}`" @input="changeField(field.key, $event)"
               >
               <small :id="`net-help-${field.key}`" :class="{ 'field-error': errors[field.key] }">{{ errors[field.key] || field.hint }}</small>

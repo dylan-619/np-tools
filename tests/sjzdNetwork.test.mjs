@@ -43,7 +43,7 @@ const statusLines = (config = defaults, mode = 'SLE') => [
 ]
 
 test('NET defaults, four flag combinations and exact full-record command', () => {
-  assert.equal(network.buildSjzdNetworkCommand(defaults), 'NET:SET,192.168.30.55,255.255.255.0,0.0.0.0,0.0.0.0,0,2,247,502')
+  assert.equal(network.buildSjzdNetworkCommand(defaults), 'NET:SET,192.168.30.55,255.255.255.0,0.0.0.0,0.0.0.0,0,2,250,502')
   for (const flags of [0, 1, 2, 3]) {
     const config = { ...defaults, flags, nettyIp: '192.168.30.254', nettyPort: 8888 }
     assert.deepEqual(network.validateSjzdNetworkConfig(config), {})
@@ -52,11 +52,18 @@ test('NET defaults, four flag combinations and exact full-record command', () =>
   assert.equal(network.normalizeSjzdNetworkConfig({ ...defaults, ip: '192.168.030.055' }).ip, defaults.ip)
 })
 
+test('local AI defaults to 250 and accepts TCP byte-sized IDs without widening RS485 points', () => {
+  assert.equal(defaults.aiUnit, 250)
+  const result = network.parseSjzdNetworkSnapshot(collect(configLines()))
+  assert.equal(result.saved.aiUnit, 250); assert.equal(result.running.aiUnit, 250)
+  assert.doesNotThrow(() => network.buildSjzdNetworkCommand({ ...defaults, aiUnit: 255 }))
+})
+
 test('NET field validation rejects IP/mask/target/port and injection boundaries', () => {
   for (const change of [
     { ip: '192.168.30.255' }, { ip: '127.0.0.1' }, { ip: '224.0.0.1' }, { ip: '192.168.30.256' },
     { ip: '192.168.30.55\r\n@RST' }, { mask: '255.0.255.0' }, { mask: '255.255.255.254' },
-    { gateway: defaults.ip }, { gateway: '192.168.31.1' }, { flags: 4 }, { aiUnit: 0 }, { aiUnit: 248 },
+    { gateway: defaults.ip }, { gateway: '192.168.31.1' }, { flags: 4 }, { aiUnit: 0 }, { aiUnit: 256 },
     { modbusPort: 0 }, { modbusPort: 65536 }, { nettyPort: -1 }, { flags: 1 },
     { flags: 3, nettyIp: '10.0.0.20', nettyPort: 8888 }, { nettyIp: '192.168.30.255', nettyPort: 8888 },
     { nettyIp: '192.168.30.254', nettyPort: 0 }, { nettyPort: 8888 },
@@ -268,10 +275,11 @@ for (const [fault, message] of [['writeError', 'WRITE_ERROR'], ['badHash', '回�
 }
 
 test('AI conflicts stop before SET and partial diagnostic rows do not become zero/complete', async () => {
-  const f = await fixture({ points: [247] })
+  const legacy = { ...defaults, aiUnit: 247 }
+  const f = await fixture({ points: [247], saved: legacy, running: legacy })
   try {
     await f.store.queryNetworkConfig(); f.store.networkSaveVerified = true
-    await f.store.saveNetworkConfig({ ...defaults, modbusPort: 1502 })
+    await f.store.saveNetworkConfig({ ...legacy, modbusPort: 1502 })
     assert.equal(f.store.networkSaveVerified, false)
     assert.match(f.store.networkError, /AI_UNIT_CONFLICT/)
     assert.equal(f.commands.some((text) => text.startsWith('NET:SET')), false)
@@ -591,11 +599,11 @@ for (const temporary of [true, false]) {
     globalThis.localStorage = { getItem: name => storage.get(name) ?? null, setItem: (name, value) => storage.set(name, value) }
     let mounted
     try {
-      mounted = await mountModbusSetup(f, temporary ? '/modbus?sjzd=ai&host=192.168.30.55&port=1502&unit=246' : '/modbus')
+      mounted = await mountModbusSetup(f, temporary ? '/modbus?sjzd=ai&host=192.168.30.55&port=1502&unit=250' : '/modbus')
       assert.equal(mounted.bindings.tcp.port, temporary ? 1502 : 2502)
       assert.equal(mounted.bindings.isPolling.value, false)
       if (temporary) {
-        assert.deepEqual(mounted.bindings.points.value.map(point => point.unitId), [246, 246])
+        assert.deepEqual(mounted.bindings.points.value.map(point => point.unitId), [250, 250])
         // 路由已变化但旧组件尚在离页动画中时，配置 watch 仍不得写常规档案。
         await mounted.router.push('/devices/sjzdv3/network')
       }

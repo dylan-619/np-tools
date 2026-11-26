@@ -34,6 +34,16 @@ function appendCrc(payload) {
   return Uint8Array.from([...payload, crc & 0xff, (crc >>> 8) & 0xff])
 }
 
+test('TCP accepts virtual Unit 250 while RTU keeps the 247 address limit', () => {
+  const ai = point({ unitId: 250, functionCode: 4, address: 0, addressMode: 'offset' })
+  assert.doesNotThrow(() => protocol.validateModbusMonitorPoint(ai, 'tcp'))
+  assert.deepEqual([...protocol.buildModbusReadPdu(ai, 'tcp')], [250, 4, 0, 0, 0, 2])
+  assert.throws(() => protocol.buildModbusRtuRequest(ai), /247/)
+  for (const unitId of [0, 256]) {
+    assert.throws(() => protocol.validateModbusMonitorPoint(point({ unitId }), 'tcp'), /255/)
+  }
+})
+
 test('PLC 参考地址会准确换算为 PDU 偏移并形成标准 RTU 请求', () => {
   assert.equal(protocol.resolveModbusAddress(point()), 0)
   assert.equal(

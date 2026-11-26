@@ -210,7 +210,7 @@ if (isSjzdAiContext) {
   const port = Number(route.query.port)
   const unit = Number(route.query.unit)
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) && host.split('.').every((octet) => Number(octet) <= 255)
-      && Number.isInteger(port) && port > 0 && port <= 65535 && Number.isInteger(unit) && unit > 0 && unit <= 247) {
+      && Number.isInteger(port) && port > 0 && port <= 65535 && Number.isInteger(unit) && unit > 0 && unit <= 255) {
     transport.value = 'tcp'
     tcp.host = host
     tcp.port = port
@@ -467,7 +467,7 @@ async function readPoint(point: ModbusMonitorPoint) {
   })
 
   try {
-    validateModbusMonitorPoint(point)
+    validateModbusMonitorPoint(point, transport.value)
     if (activeTransport === 'rtu') {
       requestHex = formatModbusHex(buildModbusRtuRequest(point))
       const outcome = await readRtuPoint(point)
@@ -527,7 +527,7 @@ async function readPoint(point: ModbusMonitorPoint) {
     }
 
     const address = resolveModbusAddress(point)
-    requestHex = `PDU ${formatModbusHex(buildModbusReadPdu(point))}`
+    requestHex = `PDU ${formatModbusHex(buildModbusReadPdu(point, 'tcp'))}`
     const response = await modbusTcpRead({
       host: tcp.host.trim(),
       port: Number(tcp.port),
@@ -612,7 +612,7 @@ function validateSession(): void {
     throw new Error('轮询周期必须在 300 到 60000 ms 之间')
   }
   for (const point of points.value.filter((item) => item.enabled)) {
-    validateModbusMonitorPoint(point)
+    validateModbusMonitorPoint(point, transport.value)
   }
 }
 
@@ -672,7 +672,7 @@ async function readOne(point: ModbusMonitorPoint) {
   }
   try {
     validateCommunicationSettings()
-    validateModbusMonitorPoint(point)
+    validateModbusMonitorPoint(point, transport.value)
     isCycling.value = true
     statusMessage.value = `正在读取「${point.name}」…`
     await readPoint(point)
@@ -956,7 +956,7 @@ onBeforeUnmount(() => {
                 <input v-model="point.enabled" :disabled="configurationLocked" type="checkbox" :aria-label="`启用 ${point.name}`">
               </td>
               <td><input v-model.trim="point.name" :disabled="configurationLocked" class="cell-input point-name" maxlength="32"></td>
-              <td><input v-model.number="point.unitId" :disabled="configurationLocked" class="cell-input center-input" type="number" min="1" max="247" inputmode="numeric" @input="invalidatePointRuntime(point)"></td>
+              <td><input v-model.number="point.unitId" :disabled="configurationLocked" class="cell-input center-input" type="number" min="1" :max="transport === 'tcp' ? 255 : 247" inputmode="numeric" @input="invalidatePointRuntime(point)"></td>
               <td>
                 <select v-model.number="point.functionCode" :disabled="configurationLocked" class="cell-select" @change="onFunctionChanged(point)">
                   <option v-for="option in MODBUS_READ_FUNCTION_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>

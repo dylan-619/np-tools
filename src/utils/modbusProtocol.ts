@@ -2,6 +2,7 @@ import type {
   ModbusByteOrder,
   ModbusMonitorPoint,
   ModbusReadFunction,
+  ModbusTransport,
   ModbusValueType,
 } from '../types/modbusDebug'
 
@@ -80,10 +81,11 @@ export function requiredScalarQuantity(valueType: ModbusValueType): 1 | 2 | null
 }
 
 /** 在发报文前收紧点位范围和数据类型，避免“看似成功但地址语义错误”。 */
-export function validateModbusMonitorPoint(point: ModbusMonitorPoint): void {
+export function validateModbusMonitorPoint(point: ModbusMonitorPoint, transport: ModbusTransport = 'rtu'): void {
   assertInteger(point.unitId, '从站 ID')
-  if (point.unitId < 1 || point.unitId > 247) {
-    throw new Error('从站 ID 必须在 1 到 247 之间')
+  const maxUnitId = transport === 'tcp' ? 255 : 247
+  if (point.unitId < 1 || point.unitId > maxUnitId) {
+    throw new Error(`${transport === 'tcp' ? 'TCP Unit ID' : '从站 ID'} 必须在 1 到 ${maxUnitId} 之间`)
   }
   if (![1, 2, 3, 4].includes(point.functionCode)) {
     throw new Error('只支持 Modbus 只读功能码 01、02、03、04')
@@ -125,8 +127,8 @@ function valueTypeLabel(valueType: ModbusValueType): string {
 }
 
 /** 构建 RTU/TCP 共用的 Unit Id + PDU 读请求（不含 TCP MBAP 或 RTU CRC）。 */
-export function buildModbusReadPdu(point: ModbusMonitorPoint): Uint8Array {
-  validateModbusMonitorPoint(point)
+export function buildModbusReadPdu(point: ModbusMonitorPoint, transport: ModbusTransport = 'rtu'): Uint8Array {
+  validateModbusMonitorPoint(point, transport)
   const address = resolveModbusAddress(point)
   return Uint8Array.from([
     point.unitId,

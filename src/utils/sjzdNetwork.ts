@@ -6,7 +6,7 @@ import type { SjzdConfigSnapshot } from './sjzdConsoleProtocol'
 
 export const SJZD_NETWORK_DEFAULTS: Readonly<SjzdNetworkConfig> = {
   ip: '192.168.30.55', mask: '255.255.255.0', gateway: '0.0.0.0',
-  nettyIp: '0.0.0.0', nettyPort: 0, flags: 2, aiUnit: 247, modbusPort: 502,
+  nettyIp: '0.0.0.0', nettyPort: 0, flags: 2, aiUnit: 250, modbusPort: 502,
 }
 
 export const SJZD_NETWORK_FIELDS: Array<{ key: keyof SjzdNetworkConfig; label: string }> = [
@@ -38,7 +38,7 @@ export function validateSjzdNetworkConfig(config: SjzdNetworkConfig): Partial<Re
   const integer = (key: 'flags' | 'aiUnit' | 'modbusPort' | 'nettyPort', min: number, max: number) => {
     if (!Number.isInteger(config[key]) || config[key] < min || config[key] > max) errors[key] = `请输入 ${min}～${max} 的整数`
   }
-  integer('flags', 0, 3); integer('aiUnit', 1, 247); integer('modbusPort', 1, 65535); integer('nettyPort', 0, 65535)
+  integer('flags', 0, 3); integer('aiUnit', 1, 255); integer('modbusPort', 1, 65535); integer('nettyPort', 0, 65535)
   const local = ipv4(config.ip), mask = ipv4(config.mask), gateway = ipv4(config.gateway), remote = ipv4(config.nettyIp)
   for (const [key, value] of [['ip', local], ['mask', mask], ['gateway', gateway], ['nettyIp', remote]] as const) {
     if (value === undefined) errors[key] = '请输入完整的四段十进制 IPv4'
@@ -100,7 +100,7 @@ function readRecord(fields: Record<string, string>): SjzdNetworkRecord {
     valid: numberField(fields, 'valid', 0, 1) === 1, code: fields.code || '', version: numberField(fields, 'version', 0, 255),
     ip: fields.ip || '', mask: fields.mask || '', gateway: fields.gateway || '', nettyIp: fields.netty_ip || '',
     nettyPort: numberField(fields, 'netty_port', 0, 65535), flags: numberField(fields, 'flags', 0, 3),
-    aiUnit: numberField(fields, 'ai_unit', 1, 247), modbusPort: numberField(fields, 'modbus_port', 1, 65535),
+    aiUnit: numberField(fields, 'ai_unit', 1, 255), modbusPort: numberField(fields, 'modbus_port', 1, 65535),
   }
   if (!config.code || (config.valid && (config.code !== 'OK' || config.version !== 1)) || (!config.valid && config.code === 'OK')) throw new Error('NET_CONFIG 记录有效性与 code/version 不一致')
   if (Object.keys(validateSjzdNetworkConfig(config)).length) throw new Error('NET_CONFIG 回读字段非法')

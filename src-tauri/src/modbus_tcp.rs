@@ -126,8 +126,9 @@ fn validate_request(request: &ModbusTcpReadRequest) -> Result<SocketAddr, String
     if request.port == 0 {
         return Err("Modbus TCP 端口必须在 1 到 65535 之间".to_string());
     }
-    if !(1..=247).contains(&request.unit_id) {
-        return Err("从站 ID 必须在 1 到 247 之间".to_string());
+    // TCP 虚拟单元允许完整非零 1B Unit ID；串口 RTU 地址校验独立保留 1..247。
+    if request.unit_id == 0 {
+        return Err("TCP Unit ID 必须在 1 到 255 之间".to_string());
     }
     if !(1..=4).contains(&request.function_code) {
         return Err("只支持 Modbus 只读功能码 01、02、03、04".to_string());
@@ -275,6 +276,11 @@ mod tests {
     #[test]
     fn 请求仅允许明确且有限的读操作() {
         assert!(validate_request(&request()).is_ok());
+        let mut local_ai = request();
+        local_ai.unit_id = 250;
+        assert!(validate_request(&local_ai).is_ok());
+        local_ai.unit_id = 0;
+        assert!(validate_request(&local_ai).is_err());
         let mut invalid_host = request();
         invalid_host.host = "device.local".to_string();
         assert!(validate_request(&invalid_host).is_err());
@@ -319,10 +325,10 @@ mod tests {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut request = [0_u8; 12];
             socket.read_exact(&mut request).await.unwrap();
-            assert_eq!(&request[2..], &[0, 0, 0, 6, 1, 3, 0, 0, 0, 2]);
+            assert_eq!(&request[2..], &[0, 0, 0, 6, 250, 4, 0, 0, 0, 4]);
 
             let response = [
-                request[0], request[1], 0, 0, 0, 7, 1, 3, 4, 0x42, 0xf6, 0xe9, 0x79,
+                request[0], request[1], 0, 0, 0, 11, 250, 4, 8, 0x40, 0x80, 0, 0, 0x41, 0x40, 0, 0,
             ];
             socket.write_all(&response).await.unwrap();
         });
@@ -331,8 +337,12 @@ mod tests {
         let mut request = request();
         request.host = "127.0.0.1".to_string();
         request.port = port;
+        request.unit_id = 250;
+        request.function_code = 4;
+        request.quantity = 4;
         let response = client.read(request).await.unwrap();
-        assert_eq!(response.data, vec![0x42, 0xf6, 0xe9, 0x79]);
+        assert_eq!(response.unit_id, 250);
+        assert_eq!(response.data, vec![0x40, 0x80, 0, 0, 0x41, 0x40, 0, 0]);
         assert_eq!(response.exception_code, None);
         server.await.unwrap();
     }
