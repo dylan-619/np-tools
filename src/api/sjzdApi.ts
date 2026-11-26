@@ -5,6 +5,7 @@ import type {
   DeviceInfoResult,
   SleFieldComparison,
   AiSampleDto,
+  WirelessMode,
 } from '../types/sjzd'
 
 export async function sjzdSendSn(path: string, sn: string): Promise<string> {
@@ -60,7 +61,7 @@ export async function sjzdQueryWlanType(path: string): Promise<string> {
   return await sjzdSendRawCommand(path, 'WLAN_TYPE:LIST', false)
 }
 
-export async function sjzdSendWirelessType(path: string, mode: 'SLE' | '4G'): Promise<string> {
+export async function sjzdSendWirelessType(path: string, mode: WirelessMode): Promise<string> {
   return await sjzdSendRawCommand(path, `WLAN_TYPE:${mode}`, false)
 }
 

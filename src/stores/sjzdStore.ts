@@ -52,7 +52,7 @@ import { buildRs485BaudCommand, parseRs485BaudResponse } from '../utils/sjzdRs48
 import { buildSjzdSleAddressCommand } from '../utils/sjzdSleAddress'
 import {
   buildSjzdNetworkCommand, normalizeSjzdNetworkConfig, parseSjzdNetworkSnapshot,
-  parseSjzdWlanType, sameSjzdNetworkConfig, SjzdNetworkStatusCollector,
+  parseSjzdWlanType, sameSjzdNetworkConfig, SJZD_NETWORK_DEFAULTS, SjzdNetworkStatusCollector,
 } from '../utils/sjzdNetwork'
 import {
   buildModbusDebugReport,
@@ -1066,7 +1066,7 @@ export const useSjzdStore = defineStore('sjzd', () => {
         const parsed = parseSjzdWlanType(line)
         if (parsed) {
           wlanTypeInfo.value = parsed
-          appendFourGLog(`[模式查询] 无线选择 ${parsed.mode}，实际上报 ${parsed.reportTransport || '旧固件未返回'}，UART2 ${parsed.uart2Baud}bps`, 'info')
+          appendFourGLog(`[模式查询] 装机选择 ${parsed.mode}，实际上报 ${parsed.reportTransport || '旧固件未返回'}，UART2 ${parsed.uart2Active === false ? '停用' : `${parsed.uart2Baud}bps`}`, 'info')
         }
       }
 
@@ -1092,8 +1092,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
       }
 
       if (line.includes('4G reconnect rejected:')) {
-        appendFourGLog('4G 重连被拒绝：当前设备处于 SLE 星闪模式', 'warn')
-        showMessage('4G 重连被拒绝：当前设备工作于 SLE 模式', false)
+        appendFourGLog(`4G 重连被拒绝：${line}`, 'warn')
+        showMessage('4G 重连被拒绝：当前未运行 4G 承载', false)
       }
 
       if (line.includes('4G/MQTT configuration cleared')) {
@@ -1745,8 +1745,12 @@ export const useSjzdStore = defineStore('sjzd', () => {
 
   async function toggleWlanBridge(enable: boolean) {
     if (!serialStore.connectedPort) return
-    if (enable && wlanTypeInfo.value.reportTransport === 'NETTY') {
-      showMessage('当前实际上报承载为 Netty，UART2 不开放透传（NETTY_ACTIVE）。', false)
+    if (enable && wlanTypeInfo.value.modeSource === 'AUTO_PROBING') {
+      showMessage('设备正在自动探测无线模块，请等待识别完成后再开启透传。', false)
+      return
+    }
+    if (enable && (wlanTypeInfo.value.reportTransport === 'NETTY' || wlanTypeInfo.value.mode === 'NETTY' || wlanTypeInfo.value.mode === 'NONE')) {
+      showMessage('当前使用有线模式，UART2 已停用，不能开启无线透传。', false)
       return
     }
     isBusy.value = true
@@ -2180,10 +2184,13 @@ export const useSjzdStore = defineStore('sjzd', () => {
       await waitForSerialLine(
         '查询无线模式',
         () => sjzdQueryWlanType(port),
-        (line) => /WLAN_TYPE:\s*mode=(?:SLE|4G),/i.test(line),
+        (line) => /WLAN_TYPE:\s*mode=(?:SLE|4G|NETTY|NONE),/i.test(line),
         (line) => (line.includes('Command not support') ? line : undefined)
       )
-      showMessage(`无线模式已完成回读：${wlanTypeInfo.value.mode}。`)
+      showMessage(wlanTypeInfo.value.modeSource === 'AUTO_PROBING'
+        ? '设备正在自动探测星闪/4G；网口服务继续运行，稍后刷新可读取最终模式。'
+        : wlanTypeInfo.value.mode === 'NONE' ? '未启用主动上报；本机网口和默认 Modbus TCP 可独立使用。'
+          : `通信模式已完成回读：${wlanTypeInfo.value.mode}。`)
     } catch (e: any) {
       showMessage(`查询无线模式失败: ${e}`, false)
     } finally {
@@ -2191,26 +2198,43 @@ export const useSjzdStore = defineStore('sjzd', () => {
     }
   }
 
-  async function setWirelessMode(mode: WirelessMode) {
+  async function setWirelessMode(mode: WirelessMode | 'LOCAL') {
     if (isBusy.value) return
     if (!serialStore.connectedPort) {
       showMessage('请先连接串口', false)
+      return
+    }
+    if ((mode === 'NETTY' || mode === 'LOCAL') && hardwareVariant.value !== 'f412') {
+      showMessage('此操作仅适用于已确认的 F412 网口设备，请先读取网络配置。', false)
+      return
+    }
+    if (mode === 'LOCAL' && !wlanTypeInfo.value.modeSource) {
+      showMessage('当前固件未提供关闭主动上报能力，请先升级配套固件。', false)
       return
     }
     isBusy.value = true
     const operationPort = serialStore.connectedPort
     networkError.value = ''
     try {
-      await ensureMcuConsoleAvailable(`切换无线模式到 ${mode}`)
+      await ensureMcuConsoleAvailable(`切换通信模式到 ${mode}`)
+      const preservedNetwork = mode === 'NETTY' || mode === 'LOCAL' ? { ...(await readNetworkConfigOnce()).saved } : null
+      if (mode === 'LOCAL' && preservedNetwork) {
+        preservedNetwork.flags = 2
+        if (preservedNetwork.ip === '0.0.0.0') {
+          preservedNetwork.ip = SJZD_NETWORK_DEFAULTS.ip
+          preservedNetwork.mask = SJZD_NETWORK_DEFAULTS.mask
+          preservedNetwork.gateway = SJZD_NETWORK_DEFAULTS.gateway
+        }
+      }
       if (mode === '4G') {
         const config = await readFourGConfigOnce()
         if (!config.status.configOperational) throw new Error('4G 保存配置不完整，请先在 4G 页配置并读回确认')
       }
       const port = serialStore.connectedPort as string
       const switchAck = await waitForSerialLine(
-        `切换无线模式到 ${mode}`,
-        () => hardwareVariant.value === 'f412' ? networkCommand(port, `WLAN_TYPE:${mode}`) : sjzdSendWirelessType(port, mode),
-        (line) => line.includes(`Wireless type saved as ${mode}`) || line.includes(`WLAN_TYPE:SWITCH,status=OK,saved_wireless=${mode === 'SLE' ? 2 : 3},restart=YES`),
+        `切换通信模式到 ${mode}`,
+        () => hardwareVariant.value === 'f412' || mode === 'LOCAL' ? networkCommand(port, `WLAN_TYPE:${mode}`) : sjzdSendWirelessType(port, mode),
+        (line) => line.includes(`Wireless type saved as ${mode}`) || line.includes(`WLAN_TYPE:SWITCH,status=OK,saved_wireless=${{ SLE: 2, '4G': 3, NETTY: 4, LOCAL: 254 }[mode]},restart=YES`),
         (line) => line.includes('WLAN_TYPE:SWITCH,status=ERROR') || /rejected|persistence failed|Wireless type save failed/i.test(line) ? line : undefined
       )
       wlanBridgeStatus.value = null
@@ -2231,14 +2255,22 @@ export const useSjzdStore = defineStore('sjzd', () => {
         if (parsed) { wlanTypeInfo.value = parsed; return { value: parsed } }
         return undefined
       })
-      if (wlanTypeInfo.value.mode !== mode || (wlanTypeInfo.value.reportTransport && wlanTypeInfo.value.reportTransport !== mode)) throw new Error('切换后的实际承载与目标不一致')
+      const expectedMode = mode === 'LOCAL' ? 'NONE' : mode
+      if (wlanTypeInfo.value.mode !== expectedMode || (wlanTypeInfo.value.reportTransport && wlanTypeInfo.value.reportTransport !== expectedMode)) throw new Error('切换后的实际承载与目标不一致')
+      if ((mode === 'NETTY' || mode === 'LOCAL') && (wlanTypeInfo.value.uart2Active !== false || wlanTypeInfo.value.uart2Baud !== 0 ||
+          wlanTypeInfo.value.savedModeCode !== (mode === 'LOCAL' ? 254 : 4) || wlanTypeInfo.value.savedReadOk !== true)) throw new Error('上报选择未确认保存或 UART2 未停用')
       if (hardwareVariant.value === 'f412' && networkSupported.value === true) {
         await readNetworkConfigOnce()
         await readNetworkStatusOnce()
-        if (networkSnapshot.value!.running.flags & 1) throw new Error('实际 Netty 开关仍开启，切换未完成')
+        if (preservedNetwork) {
+          if (!sameSjzdNetworkConfig(preservedNetwork, networkSnapshot.value!.saved) ||
+              !sameSjzdNetworkConfig(preservedNetwork, networkSnapshot.value!.running)) throw new Error('切换后的网络配置与目标不一致')
+        } else if (networkSnapshot.value!.running.flags & 1) throw new Error('实际 Netty 开关仍开启，切换未完成')
       }
       showMessage(structuredSwitch
-        ? `已观察到设备重启并读回 ${mode} 承载；Modbus TCP 和网络参数见运行回显。`
+        ? mode === 'LOCAL' ? '已切换为仅使用 Modbus TCP：主动上报关闭并已保存，重启后不再探测无线；原 IP、端口和采集点表保留。'
+          : mode === 'NETTY' ? 'Netty 模式已重启并读回确认：无线模块及 UART2 停用，网关连接、Modbus TCP 和网参保持原保存配置。'
+          : `已观察到设备重启并读回 ${mode} 承载；Modbus TCP 和网络参数见运行回显。`
         : `无线选择已保存并实际读回 ${mode}；旧固件未提供重启证明或扩展承载时，不推断其网络能力。`)
     } catch (e: any) {
       // 跨记录保存可能部分成功；只读回实际状态，不重发切换或保存指令。
@@ -2461,8 +2493,8 @@ export const useSjzdStore = defineStore('sjzd', () => {
 
   async function reconnectFourG() {
     if (!serialStore.connectedPort) return
-    if (wlanTypeInfo.value.reportTransport === 'NETTY') {
-      showMessage('当前运行 Netty，4G 参数仅为预配置，不能触发模组重连。', false)
+    if (wlanTypeInfo.value.reportTransport === 'NETTY' || wlanTypeInfo.value.mode === 'NETTY' || wlanTypeInfo.value.mode === 'NONE') {
+      showMessage('当前运行有线承载，4G 参数仅为预配置，不能触发模组重连。', false)
       return
     }
     isBusy.value = true

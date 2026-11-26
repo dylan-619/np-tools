@@ -33,7 +33,8 @@ import ConfirmModal from '../../../components/common/ConfirmModal.vue'
 const sjzd = useSjzdStore()
 const serial = useSerialStore()
 const transportLabel = computed(() => !sjzd.wlanTypeInfo.lastSyncTime ? '尚未查询'
-  : sjzd.wlanTypeInfo.reportTransport || `实际承载未返回（无线选择 ${sjzd.wlanTypeInfo.mode}）`)
+  : sjzd.wlanTypeInfo.reportTransport === 'NONE' ? '未启用主动上报'
+    : sjzd.wlanTypeInfo.reportTransport || `实际承载未返回（无线选择 ${sjzd.wlanTypeInfo.mode}）`)
 
 // Active sub-tab
 type ActiveTab = 'params' | 'wizard' | 'logs'

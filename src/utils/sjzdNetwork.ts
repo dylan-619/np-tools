@@ -132,20 +132,35 @@ export function parseSjzdWlanType(line: string): WlanTypeInfo | undefined {
     if (!pair || fields[pair[1]!] !== undefined) throw new Error('WLAN_TYPE 字段非法或重复')
     fields[pair[1]!] = pair[2]!
   }
-  if (!['SLE', '4G'].includes(fields.mode || '')) return undefined
+  if (!['SLE', '4G', 'NETTY', 'NONE'].includes(fields.mode || '')) return undefined
   const result: WlanTypeInfo = {
-    mode: fields.mode as WlanTypeInfo['mode'], modeCode: numberField(fields, 'mode_code', 2, 3),
-    uart2Baud: numberField(fields, 'uart2_baud', 1, 10000000), lastSyncTime: new Date().toLocaleTimeString(),
+    mode: fields.mode as WlanTypeInfo['mode'], modeCode: numberField(fields, 'mode_code', 0, 4),
+    uart2Baud: numberField(fields, 'uart2_baud', 0, 10000000), lastSyncTime: new Date().toLocaleTimeString(),
   }
-  if (result.modeCode !== (result.mode === 'SLE' ? 2 : 3)) throw new Error('无线模式与代码不一致')
+  if (result.modeCode !== ({ NONE: 0, SLE: 2, '4G': 3, NETTY: 4 }[result.mode])) throw new Error('通信模式与代码不一致')
   if (fields.report_transport !== undefined) {
-    if (!['SLE', '4G', 'NETTY'].includes(fields.report_transport)) throw new Error('实际上报承载非法')
+    if (!['SLE', '4G', 'NETTY', 'NONE'].includes(fields.report_transport)) throw new Error('实际上报承载非法')
     result.reportTransport = fields.report_transport as WlanTypeInfo['reportTransport']
   }
   if (fields.uart2_active !== undefined) result.uart2Active = numberField(fields, 'uart2_active', 0, 1) === 1
   if (fields.saved_mode_code !== undefined) result.savedModeCode = numberField(fields, 'saved_mode_code', 0, 255)
   if (fields.saved_read_ok !== undefined) result.savedReadOk = numberField(fields, 'saved_read_ok', 0, 1) === 1
-  if (result.reportTransport && result.uart2Active !== undefined && result.uart2Active === (result.reportTransport === 'NETTY')) throw new Error('实际上报承载与 UART2 状态不一致')
+  if (fields.mode_source !== undefined) {
+    if (!['SAVED', 'LEGACY_NETTY', 'AUTO_PROBING', 'AUTO'].includes(fields.mode_source)) throw new Error('模式来源非法')
+    result.modeSource = fields.mode_source as WlanTypeInfo['modeSource']
+  }
+  if (fields.module_state !== undefined) {
+    if (!['DISABLED', 'PROBING', 'RESPONDING', 'NO_RESPONSE', 'BRIDGE'].includes(fields.module_state)) throw new Error('模块串口状态非法')
+    result.moduleState = fields.module_state as WlanTypeInfo['moduleState']
+  }
+  if (fields.module_age_ms !== undefined) result.moduleAgeMs = numberField(fields, 'module_age_ms', 0, 0xffffffff)
+  if (fields.module_failures !== undefined) result.moduleFailures = numberField(fields, 'module_failures', 0, 0xffffffff)
+  if (result.reportTransport && result.reportTransport !== 'NETTY' && result.reportTransport !== result.mode) throw new Error('通信模式与实际上报承载不一致')
+  if (result.mode === 'NONE' && result.reportTransport && result.reportTransport !== 'NONE') throw new Error('未启用上报状态与实际承载不一致')
+  const wired = result.mode === 'NONE' || result.mode === 'NETTY' || result.reportTransport === 'NETTY'
+  if ((wired && result.uart2Active === true) || (result.uart2Active === true && result.uart2Baud === 0) ||
+      ((result.mode === 'NETTY' || result.mode === 'NONE') && result.uart2Baud !== 0) ||
+      (!wired && result.uart2Baud === 0 && result.uart2Active !== false)) throw new Error('实际上报承载与 UART2 状态不一致')
   return result
 }
 

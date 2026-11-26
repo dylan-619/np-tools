@@ -34,8 +34,8 @@ function collect(lines) {
   return snapshot
 }
 
-const statusLines = (config = defaults) => [
-  `NET:STATUS,ip=${config.ip === '0.0.0.0' ? defaults.ip : config.ip},driver=READY,error=OK,link=UP,report_transport=${config.flags & 1 ? 'NETTY' : 'SLE'},free_heap=24744,rx_errors=0,tx_errors=0,spi_errors=0`,
+const statusLines = (config = defaults, mode = 'SLE') => [
+  `NET:STATUS,ip=${config.ip === '0.0.0.0' ? defaults.ip : config.ip},driver=READY,error=OK,link=UP,report_transport=${config.flags & 1 ? 'NETTY' : mode},free_heap=24744,rx_errors=0,tx_errors=0,spi_errors=0`,
   `NET:NETTY,enabled=${config.flags & 1 ? 1 : 0},state=${config.flags & 1 ? 'ONLINE' : 'WAIT_LINK'},last_error=NONE,errors=0`,
   `NET:MODBUS,enabled=${config.flags & 2 ? 1 : 0},listening=${config.flags & 2 ? 1 : 0},clients=0,requests=0,error=NONE`,
   'NET:CACHE,ai_valid=1,ai_age_ms=12,valid_points=0',
@@ -94,6 +94,30 @@ test('Netty NONE bridge owner and extended wireless readback remain distinct fro
   assert.throws(() => network.parseSjzdWlanType('WLAN_TYPE: mode=SLE,mode_code=2,uart2_baud=230400,mode_code=3'), /重复/)
 })
 
+test('NETTY mode readback has no wireless UART and rejects contradictory states', () => {
+  const state = network.parseSjzdWlanType('WLAN_TYPE: mode=NETTY,mode_code=4,uart2_baud=0,report_transport=NETTY,uart2_active=0,saved_mode_code=4,saved_read_ok=1')
+  assert.equal(state.mode, 'NETTY'); assert.equal(state.modeCode, 4)
+  assert.equal(state.reportTransport, 'NETTY'); assert.equal(state.uart2Active, false); assert.equal(state.uart2Baud, 0)
+  assert.equal(network.parseSjzdWlanType('WLAN_TYPE: mode=SLE,mode_code=2,uart2_baud=0,report_transport=NETTY,uart2_active=0').uart2Baud, 0)
+  for (const change of ['mode_code=3,uart2_baud=0,report_transport=NETTY,uart2_active=0',
+    'mode_code=4,uart2_baud=230400,report_transport=NETTY,uart2_active=0',
+    'mode_code=4,uart2_baud=0,report_transport=NETTY,uart2_active=1',
+    'mode_code=4,uart2_baud=0,report_transport=SLE,uart2_active=0']) {
+    assert.throws(() => network.parseSjzdWlanType(`WLAN_TYPE: mode=NETTY,${change}`), /不一致/)
+  }
+  assert.equal(protocol.parseSjzdBridgeAck('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=NONE,wireless=NETTY,status=OK').wireless, 'NETTY')
+  assert.equal(protocol.parseSjzdBridgeAck('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=MCU,wireless=NETTY,status=OK'), undefined)
+})
+
+test('automatic detection and NONE are read-only states, with separate module liveness', () => {
+  const pending = network.parseSjzdWlanType('WLAN_TYPE: mode=SLE,mode_code=2,uart2_baud=230400,report_transport=SLE,uart2_active=1,saved_mode_code=255,saved_read_ok=1,mode_source=AUTO_PROBING,module_state=PROBING,module_age_ms=4294967295,module_failures=0')
+  assert.equal(pending.modeSource, 'AUTO_PROBING'); assert.equal(pending.moduleState, 'PROBING')
+  const passive = network.parseSjzdWlanType('WLAN_TYPE: mode=NONE,mode_code=0,uart2_baud=0,report_transport=NONE,uart2_active=0,saved_mode_code=255,saved_read_ok=1,mode_source=AUTO,module_state=DISABLED,module_age_ms=4294967295,module_failures=0')
+  assert.equal(passive.mode, 'NONE'); assert.equal(passive.moduleAgeMs, 0xffffffff)
+  assert.throws(() => network.parseSjzdWlanType('WLAN_TYPE: mode=NONE,mode_code=0,uart2_baud=0,report_transport=NETTY,uart2_active=0'), /不一致/)
+  assert.equal(protocol.parseSjzdBridgeAck('SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=NONE,wireless=NONE,status=OK').active, false)
+})
+
 test('status requires five rows, preserves numeric zero and leaves missing fields unknown', () => {
   const collector = new network.SjzdNetworkStatusCollector()
   statusLines().slice(0, 4).forEach((line) => collector.feed(line))
@@ -119,19 +143,23 @@ async function fixture(options = {}) {
   const store = useSjzdStore()
   serial.connectedPort = 'mock-network'
   await nextTick()
-  const state = { saved: { ...defaults }, running: { ...defaults }, valid: true, runValid: true, revision: 100, points: [], ...options }
+  const state = { saved: { ...defaults }, running: { ...defaults }, valid: true, runValid: true, revision: 100, points: [], mode: 'SLE', ...options }
   const commands = []
   const emit = (line) => { for (const fn of [...listeners.values()]) fn(line) }
   window.__TAURI_INTERNALS__ = { invoke: async (name, args) => {
     assert.equal(name, 'sjzd_send_raw_command'); assert.equal(args.path, 'mock-network')
     const text = args.text; commands.push(text)
-    if (text === 'SLE_BRIDGE:LIST') emit(`SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=${state.running.flags & 1 ? 'NONE' : 'MCU'},wireless=SLE,status=OK`)
+    if (text === 'SLE_BRIDGE:LIST') emit(`SLE_BRIDGE:ACK,id=1,requested=0,active=0,uart_owner=${state.running.flags & 1 || state.mode === 'NETTY' || state.mode === 'NONE' ? 'NONE' : 'MCU'},wireless=${state.mode},status=OK`)
     else if (text === 'NET:LIST') {
       if (state.unsupported) emit('Command not support.')
       else if (!state.silent) configLines(state.saved, state.running, { revision: state.revision, savedValid: state.valid, runningValid: state.runValid, badCrc: state.badCrc }).forEach(emit)
-    } else if (text === 'NET:STATUS') statusLines(state.running).slice(0, state.partialStatus ? 4 : 5).forEach(emit)
+    } else if (text === 'NET:STATUS') statusLines(state.running, state.mode).slice(0, state.partialStatus ? 4 : 5).forEach(emit)
     else if (text === 'DEVINFO') emit(`DevInfo: SN=${state.sn || '430126070777'}, Type=4301, Addr=777, PwrOnCnt=1, RptFreq=3s, FwVer=SJZD_V2.0`)
-    else if (text === 'WLAN_TYPE:LIST') emit(`WLAN_TYPE: mode=SLE,mode_code=2,uart2_baud=230400,report_transport=${state.running.flags & 1 ? 'NETTY' : 'SLE'},uart2_active=${state.running.flags & 1 ? 0 : 1},saved_mode_code=0,saved_read_ok=1`)
+    else if (text === 'WLAN_TYPE:LIST') {
+      const code = { NONE: 0, SLE: 2, '4G': 3, NETTY: 4 }[state.mode]
+      const wired = Boolean(state.running.flags & 1) || state.mode === 'NETTY' || state.mode === 'NONE'
+      emit(`WLAN_TYPE: mode=${state.mode},mode_code=${code},uart2_baud=${wired ? 0 : state.mode === '4G' ? 115200 : 230400},report_transport=${state.running.flags & 1 ? 'NETTY' : state.mode},uart2_active=${wired ? 0 : 1},saved_mode_code=${state.savedModeCode ?? 0},saved_read_ok=1${state.modeSource ? `,mode_source=${state.modeSource},module_state=${state.moduleState || 'DISABLED'}` : ''}`)
+    }
     else if (text === 'RS485DEV:LIST') {
       const payload = state.points.map((unit, index) => `RS485_CONFIG:POINT,id=4,index=${index},addr=${unit},func=3,reg=1,len=1,type=0,order=0`)
       emit('RS485_CONFIG:BEGIN,id=4,version=1,revision=10'); payload.forEach(emit)
@@ -157,7 +185,17 @@ async function fixture(options = {}) {
       state.saved.flags &= ~1
       state.revision++
       emit('WLAN_TYPE:SWITCH,status=OK,saved_wireless=2,restart=YES')
-      setTimeout(() => { state.running = { ...state.saved }; emit('Application Running.') }, 100)
+      setTimeout(() => { state.running = { ...state.saved }; state.mode = 'SLE'; state.savedModeCode = 2; emit('Application Running.') }, 100)
+    } else if (text === 'WLAN_TYPE:NETTY') {
+      state.savedModeCode = 4
+      emit('WLAN_TYPE:SWITCH,status=OK,saved_wireless=4,restart=YES')
+      setTimeout(() => { state.running = { ...state.saved }; state.mode = 'NETTY'; emit('Application Running.') }, 100)
+    } else if (text === 'WLAN_TYPE:LOCAL') {
+      state.savedModeCode = 254
+      state.saved.flags = 2
+      if (state.saved.ip === '0.0.0.0') Object.assign(state.saved, { ip: defaults.ip, mask: defaults.mask, gateway: defaults.gateway })
+      emit('WLAN_TYPE:SWITCH,status=OK,saved_wireless=254,restart=YES')
+      setTimeout(() => { state.running = { ...state.saved }; state.mode = 'NONE'; state.modeSource = 'SAVED'; emit('Application Running.') }, 100)
     } else throw new Error('Unexpected command: ' + text)
     return 'sent'
   } }
@@ -292,6 +330,66 @@ test('switching Netty to SLE accepts SWITCH ACK and verifies both groups without
   } finally { f.cleanup() }
 })
 
+test('NETTY switch verifies reboot/UART shutdown and preserves all four network service combinations', async () => {
+  for (const flags of [0, 1, 2, 3]) {
+    const config = { ...defaults, flags, nettyIp: '192.168.30.254', nettyPort: 8888 }
+    const f = await fixture({ saved: config, running: config })
+    try {
+      await f.store.queryNetworkConfig(); await f.store.setWirelessMode('NETTY')
+      assert.equal(f.store.lastOpMessage.success, true, f.store.lastOpMessage.text)
+      assert.equal(f.store.wlanTypeInfo.mode, 'NETTY'); assert.equal(f.store.wlanTypeInfo.uart2Active, false)
+      assert.equal(f.store.wlanTypeInfo.reportTransport, 'NETTY')
+      assert.equal(f.store.networkSnapshot.saved.flags, flags); assert.equal(f.store.networkSnapshot.running.flags, flags)
+      assert.equal(f.store.networkSnapshot.saved.nettyPort, 8888)
+      assert.equal(f.commands.filter((command) => command === 'WLAN_TYPE:NETTY').length, 1)
+      assert.ok(!f.commands.some((command) => command.startsWith('NET:SET') || command === '4G:LIST'))
+      const before = f.commands.length
+      await f.store.toggleWlanBridge(true); await f.store.reconnectFourG()
+      assert.equal(f.commands.length, before)
+    } finally { f.cleanup() }
+  }
+})
+
+test('F411 refuses NETTY switching without sending device commands', async () => {
+  const f = await fixture()
+  try {
+    f.store.selectHardwareVariant('f411')
+    await f.store.setWirelessMode('NETTY')
+    assert.equal(f.commands.length, 0); assert.equal(f.store.lastOpMessage.success, false)
+  } finally { f.cleanup() }
+})
+
+test('LOCAL switches saved SLE/4G/Netty back to passive Modbus without module response and preserves custom IP/port/unit', async () => {
+  for (const mode of ['SLE', '4G', 'NETTY']) {
+    const config = { ...defaults, flags: 1, nettyIp: '192.168.30.254', nettyPort: 8888, aiUnit: 246, modbusPort: 1502 }
+    const f = await fixture({ mode, modeSource: 'SAVED', moduleState: 'NO_RESPONSE', saved: config, running: config })
+    try {
+      await f.store.queryNetworkConfig(); await f.store.setWirelessMode('LOCAL')
+      assert.equal(f.store.lastOpMessage.success, true, f.store.lastOpMessage.text)
+      assert.equal(f.store.wlanTypeInfo.mode, 'NONE'); assert.equal(f.store.wlanTypeInfo.savedModeCode, 254)
+      assert.equal(f.store.wlanTypeInfo.uart2Active, false)
+      assert.equal(f.store.networkSnapshot.running.flags, 2)
+      assert.equal(f.store.networkSnapshot.running.modbusPort, 1502); assert.equal(f.store.networkSnapshot.running.aiUnit, 246)
+      assert.equal(f.store.networkSnapshot.running.nettyPort, 8888)
+      assert.equal(f.commands.filter((command) => command === 'WLAN_TYPE:LOCAL').length, 1)
+      assert.ok(!f.commands.some((command) => command === '4G:LIST' || command === 'SLE:LIST'))
+      const html = await renderNetworkView(f)
+      assert.match(html, /仅使用 Modbus TCP（关闭主动上报）/)
+      assert.match(html, /主动上报已关闭/)
+    } finally { f.cleanup() }
+  }
+})
+
+test('LOCAL refuses old firmware without its persisted-off capability', async () => {
+  const f = await fixture()
+  try {
+    await f.store.queryNetworkConfig()
+    const before = f.commands.length
+    await f.store.setWirelessMode('LOCAL')
+    assert.equal(f.commands.length, before); assert.equal(f.store.lastOpMessage.success, false)
+  } finally { f.cleanup() }
+})
+
 test('failed carrier switch reads actual saved/running groups, never retries or reports success', async () => {
   const config = { ...defaults, flags: 3, nettyIp: '192.168.30.254', nettyPort: 8888 }
   const f = await fixture({ saved: config, running: config, switchError: true })
@@ -311,6 +409,37 @@ async function renderNetworkView(f) {
   const app = createSSRApp(View).use(f.pinia).use(router)
   return await renderToString(app)
 }
+
+test('NETTY device can query mode/bridge/network and renders the wired setup action', async () => {
+  const f = await fixture({ mode: 'NETTY', savedModeCode: 4 })
+  try {
+    await f.store.queryNetworkConfig(); await f.store.queryWlanType(); await f.store.queryWlanBridge()
+    assert.equal(f.store.wlanTypeInfo.mode, 'NETTY'); assert.equal(f.store.wlanBridgeStatus.uartOwner, 'NONE')
+    const html = await renderNetworkView(f)
+    assert.match(html, /Netty 上报/); assert.match(html, /星闪、4G、Netty 是三种可选上报方式/)
+    assert.match(html, /Modbus TCP 默认开启，配置本机 IP 即可被动读取数据/)
+    assert.match(html, /UART2 停用/)
+  } finally { f.cleanup() }
+})
+
+test('no-module AUTO result keeps local Modbus service and never selects Netty', async () => {
+  const f = await fixture({ mode: 'SLE', modeSource: 'AUTO_PROBING', moduleState: 'PROBING', savedModeCode: 255 })
+  try {
+    await f.store.queryNetworkConfig()
+    const probingCommands = f.commands.length
+    await f.store.toggleWlanBridge(true)
+    assert.equal(f.commands.length, probingCommands); assert.match(f.store.lastOpMessage.text, /自动探测/)
+    f.state.mode = 'NONE'; f.state.modeSource = 'AUTO'; f.state.moduleState = 'DISABLED'
+    await f.store.queryNetworkConfig(); await f.store.queryWlanType()
+    assert.equal(f.store.wlanTypeInfo.mode, 'NONE'); assert.equal(f.store.networkSnapshot.running.flags, 2)
+    const html = await renderNetworkView(f)
+    assert.match(html, /未启用主动上报/); assert.match(html, /本次启动自动识别/)
+    const before = f.commands.length
+    await f.store.toggleWlanBridge(true); await f.store.reconnectFourG()
+    assert.equal(f.commands.length, before)
+    assert.ok(!f.commands.some((command) => command === 'WLAN_TYPE:NETTY' || command.startsWith('NET:SET')))
+  } finally { f.cleanup() }
+})
 
 test('rendered F411 view exposes no network fields and performs no NET query', async () => {
   const f = await fixture()

@@ -109,8 +109,8 @@ onMounted(() => {
     </header>
 
     <!-- 4G Mode Active Alert Banner -->
-    <div v-if="sjzd.wlanTypeInfo.reportTransport === 'NETTY'" class="mode-alert-banner" role="status">
-      <AlertCircle :size="18" class="banner-icon-amber" /><div class="banner-content"><strong>当前实际承载为 Netty，UART2 不参与上报。</strong><span>SLE 参数可预配置；芯片对比和进入透传不可用。切回 SLE 请使用网口页的承载切换。</span></div>
+    <div v-if="sjzd.wlanTypeInfo.reportTransport === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NONE'" class="mode-alert-banner" role="status">
+      <AlertCircle :size="18" class="banner-icon-amber" /><div class="banner-content"><strong>{{ sjzd.wlanTypeInfo.mode === 'NONE' ? '当前未启用主动上报，Modbus TCP 可独立使用。' : '当前实际承载为 Netty，UART2 已停用。' }}</strong><span>SLE 参数可预配置；芯片对比和进入透传不可用。切回 SLE 请使用网口页的上报方式切换。</span></div>
       <router-link to="/devices/sjzdv3/network" class="btn btn-sm btn-outline">网口与上报承载</router-link>
     </div>
     <div v-if="sjzd.wlanTypeInfo.mode === '4G'" class="mode-alert-banner">
@@ -451,7 +451,7 @@ onMounted(() => {
               <button
                 v-else
                 class="btn btn-sm btn-outline-purple"
-                :disabled="!serial.connectedPort || sjzd.isBusy || sjzd.wlanTypeInfo.reportTransport === 'NETTY'"
+                :disabled="!serial.connectedPort || sjzd.isBusy || sjzd.wlanTypeInfo.reportTransport === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NONE'"
                 title="点击下发 @WLAN=1 进入直通星闪模组的原厂 AT 模式"
                 @click="sjzd.toggleWlanBridge(true)"
               >
@@ -514,7 +514,7 @@ onMounted(() => {
               <button
                 class="preset-chip chip-primary"
                 title="下发 @WLAN=1 进入透传模式"
-                :disabled="!serial.connectedPort || sjzd.isBusy || sjzd.wlanTypeInfo.reportTransport === 'NETTY'"
+                :disabled="!serial.connectedPort || sjzd.isBusy || sjzd.wlanTypeInfo.reportTransport === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NONE'"
                 @click="sendAtCommand('@WLAN=1')"
               >
                 @WLAN=1 (开启透传)

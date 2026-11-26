@@ -55,7 +55,7 @@ export interface SjzdBridgeStatus {
   requested: boolean
   active: boolean
   uartOwner: 'MCU' | 'SLE' | '4G' | 'NONE'
-  wireless: 'SLE' | '4G'
+  wireless: WirelessMode | 'NONE'
   status: 'OK' | 'ERROR'
   code?: string
   confirmedAt: string
@@ -205,17 +205,21 @@ export const LOG_LEVEL_OPTIONS = [
   { value: 5, label: '5: ERROR (仅错误)' },
 ]
 
-export type WirelessMode = 'SLE' | '4G'
+export type WirelessMode = 'SLE' | '4G' | 'NETTY'
 
 export interface WlanTypeInfo {
-  mode: WirelessMode
+  mode: WirelessMode | 'NONE'
   modeCode: number
   uart2Baud: number
   lastSyncTime?: string
-  reportTransport?: 'SLE' | '4G' | 'NETTY'
+  reportTransport?: WirelessMode | 'NONE'
   uart2Active?: boolean
   savedModeCode?: number
   savedReadOk?: boolean
+  modeSource?: 'SAVED' | 'LEGACY_NETTY' | 'AUTO_PROBING' | 'AUTO'
+  moduleState?: 'DISABLED' | 'PROBING' | 'RESPONDING' | 'NO_RESPONSE' | 'BRIDGE'
+  moduleAgeMs?: number
+  moduleFailures?: number
 }
 
 export type SjzdHardwareVariant = 'unknown' | 'f411' | 'f412'

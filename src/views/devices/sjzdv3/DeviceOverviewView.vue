@@ -332,13 +332,13 @@ onMounted(() => {
             <span class="b-label"><Wifi :size="13" style="display:inline;vertical-align:-2px;margin-right:2px;" /> 实际上报承载：</span>
             <div class="b-value-wrap">
               <span class="b-value mono-text highlight">
-                {{ sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.reportTransport || `未返回（无线选择 ${sjzd.wlanTypeInfo.mode}）` : '尚未查询' }}
+                {{ sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.reportTransport === 'NONE' ? '未启用主动上报' : sjzd.wlanTypeInfo.reportTransport || `未返回（无线选择 ${sjzd.wlanTypeInfo.mode}）` : '尚未查询' }}
               </span>
               <router-link
-                :to="sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? '/devices/sjzdv3/network' : sjzd.wlanTypeInfo.mode === '4G' ? '/devices/sjzdv3/4g' : '/devices/sjzdv3/sle'"
+                :to="sjzd.wlanTypeInfo.reportTransport === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NONE' ? '/devices/sjzdv3/network' : sjzd.wlanTypeInfo.mode === '4G' ? '/devices/sjzdv3/4g' : '/devices/sjzdv3/sle'"
                 class="inline-link-btn"
               >
-                {{ sjzd.wlanTypeInfo.reportTransport === 'NETTY' ? '网口配置' : sjzd.wlanTypeInfo.mode === '4G' ? '4G 配置' : '星闪配置' }}
+                {{ sjzd.wlanTypeInfo.reportTransport === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NETTY' || sjzd.wlanTypeInfo.mode === 'NONE' ? '网口配置' : sjzd.wlanTypeInfo.mode === '4G' ? '4G 配置' : '星闪配置' }}
               </router-link>
             </div>
           </div>

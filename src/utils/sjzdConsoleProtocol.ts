@@ -470,7 +470,8 @@ export function parseSjzdBridgeAck(line: string): SjzdBridgeStatus | undefined {
       code: parsed.fields.code,
       confirmedAt: new Date().toISOString(),
     }
-    if (!['MCU', 'SLE', '4G', 'NONE'].includes(result.uartOwner) || !['SLE', '4G'].includes(result.wireless)) return undefined
+    if (!['MCU', 'SLE', '4G', 'NONE'].includes(result.uartOwner) || !['SLE', '4G', 'NETTY', 'NONE'].includes(result.wireless)) return undefined
+    if ((result.wireless === 'NETTY' || result.wireless === 'NONE') && (result.uartOwner !== 'NONE' || result.active)) return undefined
     if (result.uartOwner === 'NONE' && result.active) return undefined
     if (result.status === 'OK' && result.active !== result.requested) return undefined
     return result

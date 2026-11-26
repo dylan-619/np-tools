@@ -55,7 +55,9 @@ const BUILTIN_COMMANDS: SerialCommandPreset[] = [
 
   // SJZDV3 智能采集终端
   { name: '终端信息', cmd: 'DEVINFO', desc: '查询终端运行时间、开机次数与状态', category: 'sjzd' },
-  { name: '查询无线模式', cmd: 'WLAN_TYPE:LIST', desc: '查询当前无线模式 (SLE vs 4G) 及 UART2 波特率', category: 'sjzd' },
+  { name: '查询上报状态', cmd: 'WLAN_TYPE:LIST', desc: '查询上报选择、自动识别来源及无线模块 UART 状态', category: 'sjzd' },
+  { name: '选择 Netty 上报', cmd: 'WLAN_TYPE:NETTY', desc: '显式选择 Netty，服务器和连接开关另行配置；仅使用 Modbus TCP 无需此操作', category: 'sjzd', danger: true },
+  { name: '仅使用 Modbus TCP', cmd: 'WLAN_TYPE:LOCAL', desc: '持久化关闭主动上报，保留 IP/端口及点表，开启 Modbus TCP 并自动重启', category: 'sjzd', danger: true },
   { name: '切换星闪模式', cmd: 'WLAN_TYPE:SLE', desc: '将无线模式设为星闪 (SLE)，设备将自动重启', category: 'sjzd', danger: true },
   { name: '切换4G模式', cmd: 'WLAN_TYPE:4G', desc: '将无线模式设为 4G Cat.1，设备将自动重启 (需先配 Broker)', category: 'sjzd', danger: true },
   { name: '查询4G配置', cmd: '4G:LIST', desc: '回读 4G/MQTT 状态、Broker、ClientID 与主题', category: 'sjzd' },

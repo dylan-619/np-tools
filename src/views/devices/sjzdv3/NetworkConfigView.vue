@@ -14,7 +14,7 @@ const serial = useSerialStore()
 const router = useRouter()
 const draft = ref<SjzdNetworkConfig>({ ...SJZD_NETWORK_DEFAULTS })
 const baseline = ref<SjzdNetworkConfig | null>(null)
-const confirmation = ref<'restart' | 'reset' | 'SLE' | '4G' | null>(null)
+const confirmation = ref<'restart' | 'reset' | 'SLE' | '4G' | 'NETTY' | 'LOCAL' | null>(null)
 const localMessage = ref('')
 const enteredAt = Date.now()
 const displayMessage = computed(() => localMessage.value || (sjzd.lastOpMessage && sjzd.lastOpMessage.time >= enteredAt ? sjzd.lastOpMessage.text : ''))
@@ -25,6 +25,18 @@ const canWrite = computed(() => Boolean(canRead.value && sjzd.networkSupported =
 const hasSnapshot = computed(() => Boolean(sjzd.networkSnapshot))
 const actualTransport = computed(() => sjzd.networkStatus?.parts.STATUS?.report_transport
   || (sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.reportTransport : undefined) || '未返回')
+const transportLabel = computed(() => sjzd.wlanTypeInfo.modeSource === 'AUTO_PROBING' ? '自动探测中'
+  : actualTransport.value === 'NONE' ? '未启用主动上报' : actualTransport.value)
+const moduleStateLabel = computed(() => {
+  const state = sjzd.wlanTypeInfo.moduleState
+  return state ? { DISABLED: '不使用无线模块', PROBING: '探测中', RESPONDING: '有应答',
+    NO_RESPONSE: '无应答，后台重试', BRIDGE: '透传中，检测暂停' }[state] : '旧固件未提供'
+})
+const modeSourceLabel = computed(() => {
+  const source = sjzd.wlanTypeInfo.modeSource
+  return source ? { SAVED: '已保存配置', LEGACY_NETTY: '已有 Netty 配置',
+    AUTO_PROBING: '未配置，自动探测中', AUTO: '本次启动自动识别' }[source] : '旧固件未提供'
+})
 const fields = SJZD_NETWORK_FIELDS.filter((field) => field.key !== 'flags').map((field) => ({ ...field,
   numeric: ['nettyPort', 'modbusPort', 'aiUnit'].includes(field.key),
   hint: ({ ip: '设备自己的地址；电脑请使用同网段其他 IP。', mask: '连续掩码，支持 /1～/30。', gateway: '同网段直连可填 0.0.0.0。',
@@ -104,12 +116,17 @@ const pendingLabel = computed(() => !sjzd.networkSnapshotFresh ? '未确认 / �
   : sjzd.networkSnapshot?.pendingRestart === 'YES' ? '已保存，待重启生效'
     : sjzd.networkSnapshot?.pendingRestart === 'NO' ? '保存值与运行值一致' : '存储状态未知')
 const confirmationTitle = computed(() => confirmation.value === 'restart' ? '重启并复核网络配置'
-  : confirmation.value === 'reset' ? '仅清除网络配置记录' : `切换至 ${confirmation.value} 上报`)
+  : confirmation.value === 'reset' ? '仅清除网络配置记录'
+    : confirmation.value === 'LOCAL' ? '仅使用 Modbus TCP（关闭主动上报）' : `选择 ${confirmation.value} 上报`)
 const confirmationMessage = computed(() => confirmation.value === 'restart'
   ? `将重启设备并核对 SN、EEPROM 保存值及启动运行值。目标 ${sjzd.networkSnapshot?.saved.ip}:${sjzd.networkSnapshot?.saved.modbusPort}，${flagLabel(sjzd.networkSnapshot?.saved.flags || 0)}。`
   : confirmation.value === 'reset'
     ? '仅清除网络记录，保留 SN、无线配置和 485 点表。重启后默认 192.168.30.55:502、AI247、Netty 关闭；若 AI247 与 485 从站冲突，服务将拒绝启动。'
-    : `保存 ${confirmation.value} 选择并重启，清除 Netty 开关，保留 Modbus TCP 开关和其他网参。尚未保存的编辑内容不参与切换。`)
+    : confirmation.value === 'LOCAL'
+      ? '关闭星闪、4G 和 Netty 主动上报，开启 Modbus TCP；保留本机 IP、端口及采集点表，保存后自动重启。即使无线模块仍插着，重启后也不再探测或初始化；需要时可重新选择星闪或 4G。'
+      : confirmation.value === 'NETTY'
+      ? '保存 Netty 上报选择并重启，停用无线 UART2；服务器和连接开关仍按网络配置启用。仅使用本机 Modbus TCP 时无需执行此操作。'
+      : `保存 ${confirmation.value} 选择并重启，清除 Netty 开关，保留 Modbus TCP 开关和其他网参。尚未保存的编辑内容不参与切换。`)
 
 async function confirm() {
   const action = confirmation.value
@@ -117,7 +134,7 @@ async function confirm() {
   localMessage.value = ''
   if (action === 'restart') await sjzd.restartNetworkAndVerify()
   else if (action === 'reset') { if (await sjzd.resetNetworkConfig()) copySaved(false) }
-  else if (action === 'SLE' || action === '4G') await sjzd.setWirelessMode(action)
+  else if (action === 'SLE' || action === '4G' || action === 'NETTY' || action === 'LOCAL') await sjzd.setWirelessMode(action)
 }
 
 const statusGroups: Array<{ kind: SjzdNetworkStatusKind; title: string; metrics: Array<[string, string, string?, SjzdNetworkStatusKind?]> }> = [
@@ -168,9 +185,11 @@ async function copyTrace() {
 
       <section class="summary" aria-label="配置与运行概况">
         <div><span>本次配置</span><strong :class="{ warning: !sjzd.networkSnapshotFresh || sjzd.networkSnapshot?.pendingRestart === 'YES' }">{{ pendingLabel }}</strong></div>
-        <div><span>实际上报承载</span><strong>{{ actualTransport }}</strong><small>无线选择 {{ sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.mode : '未读取' }}；UART2 {{ sjzd.wlanTypeInfo.uart2Active === undefined ? '未返回' : sjzd.wlanTypeInfo.uart2Active ? '参与上报' : '不参与上报' }}</small><small>无线保存字节：{{ sjzd.wlanTypeInfo.savedReadOk === false ? '读取失败' : sjzd.wlanTypeInfo.savedModeCode ?? '未返回' }}（2=SLE / 3=4G / 0=未配置）</small></div>
+        <div><span>主动上报方式</span><strong>{{ transportLabel }}</strong><small>当前选择 {{ sjzd.wlanTypeInfo.lastSyncTime ? sjzd.wlanTypeInfo.mode === 'NONE' ? sjzd.wlanTypeInfo.savedModeCode === 254 ? '主动上报已关闭' : '未选择' : sjzd.wlanTypeInfo.mode : '未读取' }}；UART2 {{ sjzd.wlanTypeInfo.uart2Active === undefined ? '未返回' : sjzd.wlanTypeInfo.uart2Active ? '参与上报' : '停用' }}</small><small>模式保存字节：{{ sjzd.wlanTypeInfo.savedReadOk === false ? '读取失败' : sjzd.wlanTypeInfo.savedModeCode ?? '未返回' }}（2=SLE / 3=4G / 4=Netty / 254=关闭 / 0=未配置）</small></div>
         <div><span>最后完整配置</span><strong>{{ sjzd.networkSnapshot?.evidence.completedAt ? new Date(sjzd.networkSnapshot.evidence.completedAt).toLocaleTimeString() : '未读取' }}</strong><small>{{ sjzd.networkRestartVerifiedAt ? '已通过重启后复核' : sjzd.networkSaveVerified ? '已通过保存后读回，尚未复核重启' : '尚无保存后复核结果' }}</small></div>
       </section>
+
+      <p class="notice" role="status">模式来源：{{ modeSourceLabel }}；无线模块串口：{{ moduleStateLabel }}。模块有应答与蜂窝、MQTT 联网状态分别显示。</p>
 
       <section v-if="hasSnapshot" class="panel">
         <div class="panel-heading"><div><h2>网络参数</h2><p>编辑值只在本地。SAVED 为 EEPROM 保存值，RUNNING 为本次启动快照。</p></div><button class="button" :disabled="!canWrite" @click="copySaved()">用保存值回填</button></div>
@@ -229,8 +248,9 @@ async function copyTrace() {
       </section>
 
       <section class="panel maintenance">
-        <div><h2>承载切换与网络重置</h2><p>切回无线会关闭 Netty，保留 Modbus TCP 及网参。网络重置只清除本网络记录。</p></div>
-        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'SLE'"><Radio :size="15" aria-hidden="true" />切至 SLE 上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = '4G'">切至 4G 上报</button><button class="button danger" :disabled="!canWrite || dirty" @click="confirmation = 'reset'">仅重置网络配置</button></div>
+        <div><h2>主动上报方式与网络重置</h2><p>星闪、4G、Netty 是三种可选上报方式。Modbus TCP 默认开启，配置本机 IP 即可被动读取数据，不要求选择任何上报方式。Netty 仅按显式配置连接服务器。</p></div>
+        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'SLE'"><Radio :size="15" aria-hidden="true" />星闪上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = '4G'">4G 上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'NETTY'"><EthernetPort :size="15" aria-hidden="true" />Netty 上报</button><button class="button danger" :disabled="!canWrite || dirty" @click="confirmation = 'reset'">仅重置网络配置</button></div>
+        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty || !sjzd.wlanTypeInfo.modeSource" @click="confirmation = 'LOCAL'"><EthernetPort :size="15" aria-hidden="true" />仅使用 Modbus TCP（关闭主动上报）</button><span>无线模块可拔插；关闭状态保存后，重启也不恢复无线初始化。旧固件需先升级。</span></div>
       </section>
 
       <section class="panel"><details><summary>本次设备原始指令与回包（{{ sjzd.networkTrace.length }} 行）</summary><button class="button trace-copy" :disabled="!sjzd.networkTrace.length" @click="copyTrace"><Copy :size="14" aria-hidden="true" />复制回包</button><pre>{{ sjzd.networkTrace.map(line => `[${line.time}] ${line.direction} ${line.text}`).join('\n') || '尚无网络指令记录' }}</pre></details></section>
