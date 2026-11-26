@@ -191,6 +191,12 @@ async function copyTrace() {
 
       <p class="notice" role="status">模式来源：{{ modeSourceLabel }}；无线模块串口：{{ moduleStateLabel }}。模块有应答与蜂窝、MQTT 联网状态分别显示。</p>
 
+      <section class="panel maintenance">
+        <div><h2>主动上报方式与网络重置</h2><p>星闪、4G、Netty 是三种可选上报方式。Modbus TCP 默认开启，配置本机 IP 即可被动读取数据，不要求选择任何上报方式。Netty 仅按显式配置连接服务器。</p></div>
+        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'SLE'"><Radio :size="15" aria-hidden="true" />星闪上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = '4G'">4G 上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'NETTY'"><EthernetPort :size="15" aria-hidden="true" />Netty 上报</button><button class="button danger" :disabled="!canWrite || dirty" @click="confirmation = 'reset'">仅重置网络配置</button></div>
+        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty || !sjzd.wlanTypeInfo.modeSource" @click="confirmation = 'LOCAL'"><EthernetPort :size="15" aria-hidden="true" />仅使用 Modbus TCP（关闭主动上报）</button><span>无线模块可拔插；关闭状态保存后，重启也不恢复无线初始化。旧固件需先升级。</span></div>
+      </section>
+
       <section v-if="hasSnapshot" class="panel">
         <div class="panel-heading"><div><h2>网络参数</h2><p>编辑值只在本地。SAVED 为 EEPROM 保存值，RUNNING 为本次启动快照。</p></div><button class="button" :disabled="!canWrite" @click="copySaved()">用保存值回填</button></div>
         <div v-if="!sjzd.networkSnapshotFresh" class="notice warning">下方保留上次完整回显，当前已失效或读取失败。请重新读取后再保存。</div>
@@ -245,12 +251,6 @@ async function copyTrace() {
           </article>
         </div>
         <div class="service-actions"><button class="button" :disabled="!canDebugAi" @click="openAiDebug"><Activity :size="15" aria-hidden="true" />用当前运行地址调试 AI</button><span>{{ currentAddress || '实际 IP 未返回' }}:{{ sjzd.networkSnapshot?.running.modbusPort ?? '—' }} · Unit {{ sjzd.networkSnapshot?.running.aiUnit ?? '—' }} · FC04 / PDU 0、2 / FLOAT32 / ABCD</span></div>
-      </section>
-
-      <section class="panel maintenance">
-        <div><h2>主动上报方式与网络重置</h2><p>星闪、4G、Netty 是三种可选上报方式。Modbus TCP 默认开启，配置本机 IP 即可被动读取数据，不要求选择任何上报方式。Netty 仅按显式配置连接服务器。</p></div>
-        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'SLE'"><Radio :size="15" aria-hidden="true" />星闪上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = '4G'">4G 上报</button><button class="button" :disabled="!canWrite || dirty" @click="confirmation = 'NETTY'"><EthernetPort :size="15" aria-hidden="true" />Netty 上报</button><button class="button danger" :disabled="!canWrite || dirty" @click="confirmation = 'reset'">仅重置网络配置</button></div>
-        <div class="service-actions"><button class="button" :disabled="!canWrite || dirty || !sjzd.wlanTypeInfo.modeSource" @click="confirmation = 'LOCAL'"><EthernetPort :size="15" aria-hidden="true" />仅使用 Modbus TCP（关闭主动上报）</button><span>无线模块可拔插；关闭状态保存后，重启也不恢复无线初始化。旧固件需先升级。</span></div>
       </section>
 
       <section class="panel"><details><summary>本次设备原始指令与回包（{{ sjzd.networkTrace.length }} 行）</summary><button class="button trace-copy" :disabled="!sjzd.networkTrace.length" @click="copyTrace"><Copy :size="14" aria-hidden="true" />复制回包</button><pre>{{ sjzd.networkTrace.map(line => `[${line.time}] ${line.direction} ${line.text}`).join('\n') || '尚无网络指令记录' }}</pre></details></section>
